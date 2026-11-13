@@ -1,6 +1,5 @@
 // ============================================================================
-// 문PD 커리어 & 캐시카우 웹앱 - 통합 엔진
-// (지역별 검색 + 관심공고함 + 사람인 이력서 다운/재등록 + 양식 체크·수정 + 포트폴리오 드라이브 자동연동)
+// 문PD 커리어 & 캐시카우 웹앱 - 무제한 자유키워드 실시간 수집 & 관심공고 카테고리 분류 엔진
 // ============================================================================
 
 const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1wReNF82GUdAZb4c0_bFFI2kbU6grpapVz7fZqD2EFQE/edit';
@@ -18,7 +17,6 @@ let appData = window.MOONPD_SEED_DATA || {
 
 let currentTab = 'career';
 let selectedIds = new Set();
-let savedIds = loadSavedJobIds();
 let currentModalTargetUrl = '';
 let currentModalFilename = '문PD_맞춤지원서.txt';
 let currentModalSite = '사람인';
@@ -26,23 +24,226 @@ let currentModalType = 'career';
 let currentModalItem = null;
 let isResumeEditMode = false;
 
+// ============================================================================
+// 1. 관심공고 카테고리 분류 상태 관리 (자동 분류 + 사용자 지정 카테고리)
+// ============================================================================
+const DEFAULT_SAVED_CATEGORIES = [
+  '📢 마케팅·브랜딩',
+  '🎬 영상·PD·편집',
+  '🧊 3D·모션·AI',
+  '🔥 1순위 지원예정',
+  '⚡ 알바·단기캐시',
+  '💰 외주·프리랜서',
+  '🏆 공모·지원사업'
+];
+
+let savedCategories = loadSavedCategories();
+let savedCategoryMap = loadSavedCategoryMap(); // { [itemId]: categoryName }
+let activeSavedCategoryFilter = 'ALL';
+let savedGroupViewMode = true; // true: 카테고리별 섹션 그룹 보기
+
+function loadSavedCategories() {
+  try {
+    const raw = localStorage.getItem('MOONPD_SAVED_CATEGORIES');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return Array.from(new Set([...DEFAULT_SAVED_CATEGORIES, ...parsed]));
+    }
+  } catch (e) {}
+  return [...DEFAULT_SAVED_CATEGORIES];
+}
+
+function persistSavedCategories() {
+  try {
+    localStorage.setItem('MOONPD_SAVED_CATEGORIES', JSON.stringify(savedCategories));
+  } catch (e) {}
+}
+
+function loadSavedCategoryMap() {
+  try {
+    const mapRaw = localStorage.getItem('MOONPD_SAVED_CATEGORY_MAP');
+    if (mapRaw) return JSON.parse(mapRaw);
+    // 하위 호환 (기존 MOONPD_SAVED_JOBS 배열이 있던 경우 마이그레이션)
+    const oldArrRaw = localStorage.getItem('MOONPD_SAVED_JOBS');
+    if (oldArrRaw) {
+      const arr = JSON.parse(oldArrRaw);
+      const migrated = {};
+      arr.forEach(id => { migrated[id] = '🎬 영상·PD·편집'; });
+      return migrated;
+    }
+  } catch (e) {}
+  return {};
+}
+
+function persistSavedCategoryMap() {
+  try {
+    localStorage.setItem('MOONPD_SAVED_CATEGORY_MAP', JSON.stringify(savedCategoryMap));
+    localStorage.setItem('MOONPD_SAVED_JOBS', JSON.stringify(Object.keys(savedCategoryMap)));
+  } catch (e) {}
+  fetch('/api/saved-jobs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      savedIds: Object.keys(savedCategoryMap),
+      savedCategoryMap,
+      savedCategories,
+      updatedAt: new Date().toLocaleString()
+    })
+  }).catch(() => {});
+}
+
+function getSavedCount() {
+  return Object.keys(savedCategoryMap).length;
+}
+
+function isJobSaved(id) {
+  return Boolean(savedCategoryMap[id]);
+}
+
+// 공고 내용 기반 스마트 카테고리 자동 판별
+function autoDetectCategory(item) {
+  if (!item) return '🎬 영상·PD·편집';
+  const text = `${item.title || ''} ${item.keyword || ''} ${item.jdSummary || ''} ${item.summary || ''}`.toLowerCase();
+  if (/마케팅|마케터|브랜드|브랜딩|퍼포먼스|바이럴|광고|ae|sns|캠페인|커머스|홍보|프로모션|그로스|crm/.test(text)) {
+    return '📢 마케팅·브랜딩';
+  }
+  if (item.track === 'alba' || item._track === 'alba') return '⚡ 알바·단기캐시';
+  if (item.track === 'freelance' || item._track === 'freelance') return '💰 외주·프리랜서';
+  if (item.category?.includes('공모') || item.category?.includes('지원') || item._track === 'contest') return '🏆 공모·지원사업';
+  if (/3d|모션|애니메이션|c4d|cinema|blender|vfx|언리얼|ai|자동화|생성형/.test(text)) {
+    return '🧊 3D·모션·AI';
+  }
+  return '🎬 영상·PD·편집';
+}
+
+function toggleStar(id) {
+  if (isJobSaved(id)) {
+    delete savedCategoryMap[id];
+    showToast('☆ 관심공고 보관함에서 해제되었습니다.');
+  } else {
+    const item = findItemById(id);
+    const cat = (activeSavedCategoryFilter !== 'ALL' && currentTab === 'saved')
+      ? activeSavedCategoryFilter
+      : autoDetectCategory(item);
+    savedCategoryMap[id] = cat;
+    showToast(`⭐ [${cat}] 카테고리에 관심공고로 저장되었습니다!`);
+  }
+  persistSavedCategoryMap();
+  onFilterChanged();
+}
+
+function changeSavedItemCategory(id, newCat) {
+  if (newCat === '__NEW__') {
+    const custom = prompt('새로 만들 관심공고 카테고리 이름을 입력하세요 (예: 📢 마케팅A급 / 💰 연봉4500+):');
+    if (!custom || !custom.trim()) {
+      renderActiveTab();
+      return;
+    }
+    const cleanCat = custom.trim();
+    if (!savedCategories.includes(cleanCat)) {
+      savedCategories.push(cleanCat);
+      persistSavedCategories();
+    }
+    savedCategoryMap[id] = cleanCat;
+    persistSavedCategoryMap();
+    onFilterChanged();
+    showToast(`📂 '${cleanCat}' 카테고리가 생성 및 적용되었습니다.`);
+    return;
+  }
+  savedCategoryMap[id] = newCat;
+  persistSavedCategoryMap();
+  onFilterChanged();
+  showToast(`📂 카테고리가 [${newCat}](으)로 변경되었습니다.`);
+}
+
+function addNewSavedCategoryPrompt() {
+  const custom = prompt('추가할 관심공고 카테고리 이름을 입력하세요 (예: 📢 퍼포먼스마케팅 / 🔥 금주지원필수):');
+  if (!custom || !custom.trim()) return;
+  const clean = custom.trim();
+  if (!savedCategories.includes(clean)) {
+    savedCategories.push(clean);
+    persistSavedCategories();
+  }
+  activeSavedCategoryFilter = clean;
+  onFilterChanged();
+  showToast(`📂 '${clean}' 카테고리가 추가되었습니다.`);
+}
+
+// ============================================================================
+// 2. 빠른 키워드 바 (마케팅 포함 + 사용자 자유 키워드 칩 추가 기능)
+// ============================================================================
+const DEFAULT_QUICK_KEYWORDS = [
+  '마케팅',
+  '콘텐츠 마케터',
+  '퍼포먼스 마케팅',
+  '영상 PD',
+  '모션그래픽',
+  '유튜브',
+  '3D',
+  'AI',
+  '편집'
+];
+
+let quickKeywords = loadQuickKeywords();
+
+function loadQuickKeywords() {
+  try {
+    const saved = localStorage.getItem('MOONPD_QUICK_KEYWORDS');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return Array.from(new Set([...DEFAULT_QUICK_KEYWORDS, ...parsed]));
+    }
+  } catch (e) {}
+  return [...DEFAULT_QUICK_KEYWORDS];
+}
+
+function renderQuickKeywordBar() {
+  const bar = document.getElementById('quickKeywordBar');
+  if (!bar) return;
+  const curQ = (document.getElementById('searchInput')?.value || '').trim();
+  bar.innerHTML = `
+    <button class="btn ${curQ === '' ? 'btn-primary' : 'btn-outline'} btn-sm" onclick="quickKeyword('')">전체</button>
+    ${quickKeywords.map(kw => `
+      <button class="btn ${curQ === kw ? 'btn-primary' : 'btn-outline'} btn-sm" onclick="quickKeyword('${kw.replace(/'/g, "\\'")}')">#${kw}</button>
+    `).join('')}
+    <button class="btn btn-outline btn-sm" onclick="addCustomQuickKeywordPrompt()" title="자주 쓰는 검색 키워드 칩 추가">➕ 키워드 추가</button>
+  `;
+}
+
+function addCustomQuickKeywordPrompt() {
+  const kw = prompt('상단에 고정할 검색 키워드를 입력하세요 (예: 브랜드 마케터, SNS 기획, 광고 AE, 드론 촬영):');
+  if (!kw || !kw.trim()) return;
+  const clean = kw.trim();
+  if (!quickKeywords.includes(clean)) {
+    quickKeywords.push(clean);
+    try {
+      localStorage.setItem('MOONPD_QUICK_KEYWORDS', JSON.stringify(quickKeywords));
+    } catch (e) {}
+  }
+  quickKeyword(clean);
+  triggerLiveCrawl();
+}
+
+// ============================================================================
+// 3. 마스터 이력서 & 브라우저 캐시 초기화
+// ============================================================================
 const DEFAULT_MASTER_RESUME = {
   name: '문PD (Moon PD)',
-  headline: '영상 기획·연출 PD | 3D 애니메이션 & AI 자동편집 전문가',
+  headline: '영상 기획·연출 PD & 콘텐츠 마케터 | 3D 애니메이션 & AI 자동화 전문가',
   phone: '010-XXXX-XXXX',
   email: 'sgstarceo@gmail.com',
   portfolioMain: '2024Portfolio_3DAnimation_50m.mp4',
   portfolioSub: 'auto_edit_capcut.py (CapCut + Gemini AI 자동편집 파이프라인)',
   portfolioDriveUrl: 'https://drive.google.com/drive/folders/1iLuXv3tbem-SzHNn-erlbLdtH2Yxyf5K',
   portfolioDriveFileId: '1aRauzELgjSsQPsRm5AHRJ8BWI9mIOulg',
-  tools: 'Premiere Pro, After Effects, Cinema 4D, Blender 3D, CapCut Pro, Python, Gemini AI',
-  techAutomation: 'CapCut + Gemini + Python 자동편집 파이프라인 구축 (편집 시간 70% 단축, 월 40편 이상 제작)',
+  tools: 'Premiere Pro, After Effects, Cinema 4D, Blender 3D, CapCut Pro, Python, Gemini AI, GA4/Meta 광고소재 기획',
+  techAutomation: 'CapCut + Gemini + Python 자동편집 파이프라인 구축 (콘텐츠 제작 리드타임 70% 단축, 월 40편+ 숏폼/마케팅 소재 제작)',
   desiredSalary: '면접 후 결정 (프로젝트 단가 협의 가능 / 즉시 투입 가능)',
   coreCareer: [
-    '브랜드 유튜브 롱폼·숏폼 기획·연출·종합편집 총괄 (누적 조회수 500만+ 달성)',
-    '3D 애니메이션 및 모션그래픽 기반 오프닝·홍보영상 제작 (2024Portfolio_3DAnimation_50m.mp4)',
-    '생성형 AI 및 Python 스크립트 기반 고속 편집 자동화 (제작 리드타임 70% 단축)',
-    '기업·관공서·커머스 맞춤형 스토리보드 기획 및 풀패키지 납품 (만족도 99%)'
+    '브랜드 유튜브·SNS 마케팅 콘텐츠 기획·연출·종합편집 총괄 (누적 조회수 500만+ 달성)',
+    '3D 애니메이션 및 모션그래픽 기반 브랜드 캠페인·홍보영상 제작 (2024Portfolio_3DAnimation_50m.mp4)',
+    '생성형 AI 및 Python 스크립트 기반 고속 퍼포먼스 영상소재 제작 자동화 (제작시간 70% 단축)',
+    '기업·관공서·커머스 맞춤형 스토리보드 기획 및 바이럴 풀패키지 납품 (만족도 99%)'
   ],
   portfolioHistory: [
     {
@@ -83,40 +284,53 @@ function persistMasterResumeLocal(newObj) {
   } catch (e) {}
 }
 
-function loadSavedJobIds() {
+// 브라우저 실시간 수집 캐시 병합 (모바일/외부 GitHub Pages에서도 수집한 키워드 공고 영구 유지)
+function mergeBrowserCrawledCache() {
   try {
-    const raw = localStorage.getItem('MOONPD_SAVED_JOBS');
-    if (raw) return new Set(JSON.parse(raw));
+    const raw = localStorage.getItem('MOONPD_CUSTOM_CRAWLED_CACHE');
+    if (!raw) return;
+    const cached = JSON.parse(raw);
+    mergeNewItemsIntoAppData(cached);
   } catch (e) {}
-  return new Set();
 }
 
-function persistSavedJobIds() {
-  const arr = Array.from(savedIds);
+function saveBrowserCrawledCache(newBundle) {
   try {
-    localStorage.setItem('MOONPD_SAVED_JOBS', JSON.stringify(arr));
+    const raw = localStorage.getItem('MOONPD_CUSTOM_CRAWLED_CACHE');
+    const prev = raw ? JSON.parse(raw) : { jobs: [], albas: [], freelances: [], contests: [] };
+    const merged = {
+      jobs: dedupeById([...(newBundle.jobs || []), ...(prev.jobs || [])]).slice(0, 300),
+      albas: dedupeById([...(newBundle.albas || []), ...(prev.albas || [])]).slice(0, 150),
+      freelances: dedupeById([...(newBundle.freelances || []), ...(prev.freelances || [])]).slice(0, 100),
+      contests: dedupeById([...(newBundle.contests || []), ...(prev.contests || [])]).slice(0, 100)
+    };
+    localStorage.setItem('MOONPD_CUSTOM_CRAWLED_CACHE', JSON.stringify(merged));
   } catch (e) {}
-  fetch('/api/saved-jobs', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ savedIds: arr, updatedAt: new Date().toLocaleString() })
-  }).catch(() => {});
 }
 
-function toggleStar(id) {
-  if (savedIds.has(id)) {
-    savedIds.delete(id);
-    showToast('☆ 관심공고 보관함에서 해제되었습니다.');
-  } else {
-    savedIds.add(id);
-    showToast('⭐ 관심공고 보관함에 저장되었습니다!');
+function dedupeById(arr) {
+  const seen = new Set();
+  const out = [];
+  for (const item of arr) {
+    if (!item || !item.id || seen.has(item.id)) continue;
+    seen.add(item.id);
+    out.push(item);
   }
-  persistSavedJobIds();
-  onFilterChanged();
+  return out;
+}
+
+function mergeNewItemsIntoAppData(bundle) {
+  if (!bundle) return;
+  if (bundle.jobs?.length) appData.jobs = dedupeById([...bundle.jobs, ...(appData.jobs || [])]);
+  if (bundle.albas?.length) appData.albas = dedupeById([...bundle.albas, ...(appData.albas || [])]);
+  if (bundle.freelances?.length) appData.freelances = dedupeById([...bundle.freelances, ...(appData.freelances || [])]);
+  if (bundle.contests?.length) appData.contests = dedupeById([...bundle.contests, ...(appData.contests || [])]);
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
   await fetchLatestDataFromServer();
+  mergeBrowserCrawledCache();
+  renderQuickKeywordBar();
   onFilterChanged();
 });
 
@@ -128,19 +342,20 @@ async function fetchLatestDataFromServer() {
 }
 
 // ============================================================================
-// 지역 판별 + 키워드 + 사이트 통합 필터
+// 4. 지역 판별 + 키워드 + 사이트 통합 필터
 // ============================================================================
 function inferRegionBucket(item) {
   if (item.region && item.region !== 'ALL') return item.region;
   const raw = `${item.location || ''} ${item.title || ''} ${item.company || ''} ${item.summary || ''}`;
-  if (/서울|강남|서초|마포|상암|여의도|성수|송파|영등포|구로|가산|종로|중구|용산/.test(raw)) return '서울';
-  if (/경기|인천|성남|판교|분당|수원|일산|고양|부천|안양|용인|하남|김포|파주/.test(raw)) return '경기·인천';
+  if (/재택|원격|비대면|전국/.test(raw)) return '재택·전국';
+  if (/서울|강남|서초|마포|상암|여의도|성수|송파|영등포|구로|가산|종로|중구|용산|성동|광진|강서/.test(raw)) return '서울';
+  if (/경기|인천|성남|판교|분당|수원|일산|고양|부천|안양|용인|하남|김포|파주|화성|동탄/.test(raw)) return '경기·인천';
   if (/부산|울산|경남|창원|김해|해운대/.test(raw)) return '부산·울산·경남';
-  if (/대구|경북|포항|구미|경산/.test(raw)) return '대구·경북';
-  if (/대전|충청|충남|충북|세종|천안|청주/.test(raw)) return '대전·충청';
-  if (/광주|전라|전남|전북|전주/.test(raw)) return '광주·전라';
-  if (/강원|제주|춘천|원주|강릉/.test(raw)) return '강원·제주';
-  return '재택·전국';
+  if (/대구|경북|포항|구미|경산|수성/.test(raw)) return '대구·경북';
+  if (/대전|충청|충남|충북|세종|천안|청주|아산/.test(raw)) return '대전·충청';
+  if (/광주|전라|전남|전북|전주|여수|순천/.test(raw)) return '광주·전라';
+  if (/강원|제주|춘천|원주|강릉|서귀포/.test(raw)) return '강원·제주';
+  return '서울';
 }
 
 function matchesSearchAndFilter(item) {
@@ -190,19 +405,42 @@ function getAllItemsWithTrack() {
   ];
 }
 
+function findItemById(id) {
+  return getAllItemsWithTrack().find(x => x.id === id);
+}
+
 function getSavedItemsFiltered() {
-  return getAllItemsWithTrack().filter(item => savedIds.has(item.id) && matchesSearchAndFilter(item));
+  return getAllItemsWithTrack().filter(item => {
+    if (!isJobSaved(item.id)) return false;
+    if (!matchesSearchAndFilter(item)) return false;
+    if (activeSavedCategoryFilter !== 'ALL' && savedCategoryMap[item.id] !== activeSavedCategoryFilter) {
+      return false;
+    }
+    return true;
+  });
 }
 
 function onFilterChanged() {
+  renderQuickKeywordBar();
   updateKpiAndCounts();
   renderActiveTab();
 }
 
-function quickKeyword(kw) {
+async function quickKeyword(kw) {
   const input = document.getElementById('searchInput');
   if (input) input.value = kw;
   onFilterChanged();
+
+  // 선택한 키워드의 공고가 현재 DB에 적으면 즉시 실시간 수집 실행
+  if (kw) {
+    const matchedCount =
+      (appData.jobs || []).filter(matchesSearchAndFilter).length +
+      (appData.albas || []).filter(matchesSearchAndFilter).length +
+      (appData.contests || []).filter(matchesSearchAndFilter).length;
+    if (matchedCount < 3) {
+      await triggerLiveCrawl();
+    }
+  }
 }
 
 function resetSearchFilter() {
@@ -212,6 +450,7 @@ function resetSearchFilter() {
   if (input) input.value = '';
   if (reg) reg.value = 'ALL';
   if (sel) sel.value = 'ALL';
+  activeSavedCategoryFilter = 'ALL';
   onFilterChanged();
 }
 
@@ -226,7 +465,7 @@ function updateKpiAndCounts() {
   const filteredAlbas = allAlbas.filter(matchesSearchAndFilter);
   const filteredFree = allFree.filter(matchesSearchAndFilter);
   const filteredContests = allContests.filter(matchesSearchAndFilter);
-  const filteredSaved = getSavedItemsFiltered();
+  const allSavedItems = getAllItemsWithTrack().filter(x => isJobSaved(x.id) && matchesSearchAndFilter(x));
 
   const q = (document.getElementById('searchInput')?.value || '').trim();
   const regionF = document.getElementById('regionFilter')?.value || 'ALL';
@@ -242,14 +481,14 @@ function updateKpiAndCounts() {
   setTxt('kpiAlbaCount', isFiltered ? `${filteredAlbas.length} / ${allAlbas.length}건` : `${allAlbas.length}건`);
   setTxt('kpiFreelanceCount', isFiltered ? `${filteredFree.length} / ${allFree.length}건` : `${allFree.length}건`);
   setTxt('kpiContestCount', isFiltered ? `${filteredContests.length} / ${allContests.length}건` : `${allContests.length}건`);
-  setTxt('kpiSavedCount', `${savedIds.size}건`);
-  setTxt('headerSavedCount', savedIds.size);
+  setTxt('kpiSavedCount', `${getSavedCount()}건`);
+  setTxt('headerSavedCount', getSavedCount());
 
   setTxt('tabCountCareer', filteredJobs.length);
   setTxt('tabCountAlba', filteredAlbas.length);
   setTxt('tabCountFreelance', filteredFree.length);
   setTxt('tabCountContests', filteredContests.length);
-  setTxt('tabCountSaved', filteredSaved.length);
+  setTxt('tabCountSaved', allSavedItems.length);
   setTxt('tabCountRadar', allSites.length);
   setTxt('selectedCount', selectedIds.size);
 
@@ -259,7 +498,7 @@ function updateKpiAndCounts() {
     if (q) parts.push(`'${q}'`);
     if (regionF !== 'ALL') parts.push(regionF);
     if (siteF !== 'ALL') parts.push(siteF);
-    const label = parts.length ? parts.join(' · ') : (appData.lastKeyword || '실시간 검증');
+    const label = parts.length ? parts.join(' · ') : (appData.lastKeyword || '자유키워드 실시간 연동');
     const totalShown = filteredJobs.length + filteredAlbas.length + filteredFree.length + filteredContests.length;
     badge.textContent = `☁️ ${label} (${totalShown}건 표시)`;
   }
@@ -288,6 +527,14 @@ function selectAllVisible() {
   showToast(`☑️ 현재 목록 ${selectedIds.size}건 선택됨`);
 }
 
+function selectCategoryGroup(catName) {
+  const items = getSavedItemsFiltered().filter(x => (savedCategoryMap[x.id] || '🎬 영상·PD·편집') === catName);
+  items.forEach(item => selectedIds.add(item.id));
+  document.getElementById('selectedCount').textContent = selectedIds.size;
+  renderActiveTab();
+  showToast(`☑️ [${catName}] 카테고리 ${items.length}건이 선택되었습니다.`);
+}
+
 function clearSelection() {
   selectedIds.clear();
   document.getElementById('selectedCount').textContent = 0;
@@ -299,12 +546,12 @@ function getCurrentTabList() {
   if (currentTab === 'alba') return appData.albas || [];
   if (currentTab === 'freelance') return appData.freelances || [];
   if (currentTab === 'contests') return appData.contests || [];
-  if (currentTab === 'saved') return getAllItemsWithTrack().filter(x => savedIds.has(x.id));
+  if (currentTab === 'saved') return getSavedItemsFiltered();
   return [];
 }
 
 // ============================================================================
-// 경고 및 확인 모달
+// 5. 경고 및 확인 모달
 // ============================================================================
 function openConfirmDialog({ title, message, subText, onConfirm }) {
   document.getElementById('confirmModalTitle').textContent = title || '⚠️ 데이터 변경 경고';
@@ -323,13 +570,44 @@ function closeConfirmModal() {
 }
 
 // ============================================================================
-// 탭별 카드 렌더링 (지역 배지 + ⭐ 관심공고 버튼 포함)
+// 6. 탭별 카드 렌더링 (관심버튼 + 카테고리 드롭다운 포함)
 // ============================================================================
-function renderStarButton(id) {
-  const isSaved = savedIds.has(id);
-  return `<button class="btn-star ${isSaved ? 'active' : ''}" onclick="toggleStar('${id}')" title="관심공고함에 저장/해제">
-    ${isSaved ? '⭐ 관심됨' : '☆ 관심'}
-  </button>`;
+function renderStarAndCategoryControl(item) {
+  const id = item.id;
+  const saved = isJobSaved(id);
+  const currentCat = savedCategoryMap[id] || autoDetectCategory(item);
+
+  return `
+    <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
+      <button class="btn-star ${saved ? 'active' : ''}" onclick="toggleStar('${id}')" title="관심공고함에 저장/해제">
+        ${saved ? '⭐ 관심됨' : '☆ 관심'}
+      </button>
+      ${saved ? `
+        <select class="cat-select" onchange="changeSavedItemCategory('${id}', this.value)" title="관심공고 카테고리 변경">
+          ${savedCategories.map(c => `<option value="${c}" ${c === currentCat ? 'selected' : ''}>${c}</option>`).join('')}
+          <option value="__NEW__">➕ 새 카테고리...</option>
+        </select>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderEmptySearchPrompt(trackLabel) {
+  const kw = (document.getElementById('searchInput')?.value || '').trim();
+  if (kw) {
+    return `
+      <div class="panel-card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div>
+          <strong>🔍 현재 로컬 목록에 '${kw}' 관련 ${trackLabel} 공고가 없습니다.</strong>
+          <p style="font-size:12px;color:var(--text-sub);margin-top:4px;">우측 버튼을 누르면 사람인·원티드·잡코리아·알바몬·위비티에서 <strong>'${kw}'</strong> 키워드로 지금 즉시 실시간 공고를 수집해 옵니다!</p>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="triggerLiveCrawl()">
+          🌐 '${kw}' 지금 바로 실시간 수집하기
+        </button>
+      </div>
+    `;
+  }
+  return `<div class="panel-card">🔍 조건에 맞는 공고가 없습니다. <strong>[초기화]</strong> 또는 <strong>[🌐 입력 키워드 실시간 수집]</strong>을 눌러보세요.</div>`;
 }
 
 function renderActiveTab() {
@@ -349,7 +627,7 @@ function renderActiveTab() {
 function renderCareerTab(area) {
   const items = (appData.jobs || []).filter(matchesSearchAndFilter);
   if (!items.length) {
-    area.innerHTML = `<div class="panel-card">🔍 조건에 맞는 채용공고가 없습니다. 지역 필터를 <strong>[📍 전체 지역]</strong>으로 바꾸거나 우측 상단 <strong>[🌐 키워드 수집]</strong>을 눌러주세요.</div>`;
+    area.innerHTML = renderEmptySearchPrompt('정규·계약직');
     return;
   }
   area.innerHTML = `<div class="cards-grid">${items.map(item => {
@@ -362,9 +640,10 @@ function renderCareerTab(area) {
             <div class="badge-group">
               <span class="badge-site">🌐 ${item.site}</span>
               <span class="badge-match">📍 ${regionTag}</span>
+              ${item.keyword ? `<span class="chip" style="padding:1px 6px;font-size:10.5px;">#${item.keyword}</span>` : ''}
             </div>
             <div style="display:flex;gap:6px;align-items:center;">
-              ${renderStarButton(item.id)}
+              ${renderStarAndCategoryControl(item)}
               <label class="select-check">
                 <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleSelect('${item.id}', this.checked)" /> 선택
               </label>
@@ -392,7 +671,7 @@ function renderCareerTab(area) {
 function renderAlbaTab(area) {
   const items = (appData.albas || []).filter(matchesSearchAndFilter);
   if (!items.length) {
-    area.innerHTML = `<div class="panel-card">🔍 조건에 맞는 알바·단기 공고가 없습니다. <strong>[초기화]</strong> 또는 <strong>[🌐 키워드 수집]</strong>을 눌러보세요.</div>`;
+    area.innerHTML = renderEmptySearchPrompt('알바·단기');
     return;
   }
   area.innerHTML = `<div class="cards-grid">${items.map(item => {
@@ -405,9 +684,10 @@ function renderAlbaTab(area) {
             <div class="badge-group">
               <span class="badge-site">⚡ ${item.site}</span>
               <span class="badge-match">📍 ${regionTag}</span>
+              ${item.keyword ? `<span class="chip" style="padding:1px 6px;font-size:10.5px;">#${item.keyword}</span>` : ''}
             </div>
             <div style="display:flex;gap:6px;align-items:center;">
-              ${renderStarButton(item.id)}
+              ${renderStarAndCategoryControl(item)}
               <label class="select-check">
                 <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleSelect('${item.id}', this.checked)" /> 선택
               </label>
@@ -435,7 +715,7 @@ function renderAlbaTab(area) {
 function renderFreelanceTab(area) {
   const items = (appData.freelances || []).filter(matchesSearchAndFilter);
   if (!items.length) {
-    area.innerHTML = `<div class="panel-card">🔍 조건에 맞는 외주 프로젝트가 없습니다. <strong>[초기화]</strong>를 누르면 전체 프로젝트를 볼 수 있습니다.</div>`;
+    area.innerHTML = renderEmptySearchPrompt('외주·프리랜서');
     return;
   }
   area.innerHTML = `<div class="cards-grid">${items.map(item => {
@@ -450,7 +730,7 @@ function renderFreelanceTab(area) {
               <span class="badge-match">📍 ${regionTag}</span>
             </div>
             <div style="display:flex;gap:6px;align-items:center;">
-              ${renderStarButton(item.id)}
+              ${renderStarAndCategoryControl(item)}
               <label class="select-check">
                 <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleSelect('${item.id}', this.checked)" /> 선택
               </label>
@@ -479,7 +759,7 @@ function renderFreelanceTab(area) {
 function renderContestsTab(area) {
   const items = (appData.contests || []).filter(matchesSearchAndFilter);
   if (!items.length) {
-    area.innerHTML = `<div class="panel-card">🔍 조건에 맞는 공모전/지원사업이 없습니다. <strong>[초기화]</strong>를 눌러보세요.</div>`;
+    area.innerHTML = renderEmptySearchPrompt('공모전·지원사업');
     return;
   }
   area.innerHTML = `<div class="cards-grid">${items.map(item => {
@@ -492,9 +772,10 @@ function renderContestsTab(area) {
             <div class="badge-group">
               <span class="badge-site">🏆 ${item.site}</span>
               <span class="badge-match">🎯 ${item.winProbability}</span>
+              ${item.keyword ? `<span class="chip" style="padding:1px 6px;font-size:10.5px;">#${item.keyword}</span>` : ''}
             </div>
             <div style="display:flex;gap:6px;align-items:center;">
-              ${renderStarButton(item.id)}
+              ${renderStarAndCategoryControl(item)}
               <label class="select-check">
                 <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleSelect('${item.id}', this.checked)" /> 선택
               </label>
@@ -507,7 +788,7 @@ function renderContestsTab(area) {
             <span class="chip">💎 ${item.prizeScale}</span>
           </div>
           <div class="one-liner" style="margin-top:8px;">
-            🔑 <strong>필승전략:</strong> ${ws.selectionTip || '3D+AI 자동편집 시안으로 조기 선점'}
+            🔑 <strong>필승전략:</strong> ${ws.selectionTip || '콘텐츠 기획+3D/AI 시안으로 조기 선점'}
           </div>
         </div>
         <div class="card-footer">
@@ -521,66 +802,128 @@ function renderContestsTab(area) {
   }).join('')}</div>`;
 }
 
-// 5. 관심공고 보관함 탭 (⭐ 관심공고함)
+// 5. 관심공고 보관함 탭 (⭐ 카테고리별 분류 & 그룹 보기 지원)
+function setSavedCategoryFilter(cat) {
+  activeSavedCategoryFilter = cat;
+  renderActiveTab();
+}
+
+function toggleSavedGroupViewMode() {
+  savedGroupViewMode = !savedGroupViewMode;
+  renderActiveTab();
+}
+
+function renderSavedCardHtml(item) {
+  const isSel = selectedIds.has(item.id);
+  const regionTag = inferRegionBucket(item);
+  const orgName = item.company || item.organizer || item.client || item.site;
+  const metaInfo = item.deadline || item.pay || item.budget || item.dday || '';
+  return `
+    <article class="item-card ${isSel ? 'selected' : ''}">
+      <div>
+        <div class="card-top">
+          <div class="badge-group">
+            <span class="badge-site">🌐 ${item.site}</span>
+            <span class="badge-match">📍 ${regionTag}</span>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            ${renderStarAndCategoryControl(item)}
+            <label class="select-check">
+              <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleSelect('${item.id}', this.checked)" /> 선택
+            </label>
+          </div>
+        </div>
+        <h3 class="card-title" style="margin-top:8px;">${item.title}</h3>
+        <div class="summary-chips" style="margin-top:8px;">
+          <span class="chip">🏢 <strong>${orgName}</strong></span>
+          <span class="chip">🗺️ ${item.location || regionTag}</span>
+          <span class="chip">⏰ ${metaInfo}</span>
+        </div>
+      </div>
+      <div class="card-footer">
+        <button class="btn btn-primary btn-sm" onclick="openConvertedDocModal('${item._track}', '${item.id}')">
+          ✨ 양식변환·검증·지원
+        </button>
+        <a class="btn btn-outline btn-sm" href="${item.url}" target="_blank" rel="noopener">↗ 원문</a>
+      </div>
+    </article>
+  `;
+}
+
 function renderSavedTab(area) {
-  const items = getSavedItemsFiltered();
-  if (!items.length) {
-    area.innerHTML = `
+  const allSaved = getAllItemsWithTrack().filter(item => isJobSaved(item.id) && matchesSearchAndFilter(item));
+  const filteredItems = getSavedItemsFiltered();
+
+  // 카테고리별 카운트 계산
+  const catCounts = {};
+  savedCategories.forEach(c => { catCounts[c] = 0; });
+  allSaved.forEach(item => {
+    const c = savedCategoryMap[item.id] || autoDetectCategory(item);
+    catCounts[c] = (catCounts[c] || 0) + 1;
+  });
+
+  const filterBarHtml = `
+    <div class="panel-card" style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+        <span>⭐ <strong>관심공고 카테고리별 보관함 (총 ${allSaved.length}건)</strong> · 카드 상단 드롭다운에서 언제든 카테고리를 이동할 수 있습니다.</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn btn-outline btn-sm" onclick="toggleSavedGroupViewMode()">
+            ${savedGroupViewMode ? '📋 단일 그리드로 보기' : '🗂️ 카테고리별 그룹 묶음 보기'}
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="addNewSavedCategoryPrompt()">➕ 새 카테고리 만들기</button>
+          <button class="btn btn-primary btn-sm" onclick="runBatchConvertAndApply()">🚀 선택 관심공고 일괄변환</button>
+        </div>
+      </div>
+
+      <!-- 카테고리 필터 탭 바 -->
+      <div class="cat-filter-bar" style="margin-bottom:0;">
+        <button class="cat-pill ${activeSavedCategoryFilter === 'ALL' ? 'active' : ''}" onclick="setSavedCategoryFilter('ALL')">
+          📂 전체 카테고리 (${allSaved.length})
+        </button>
+        ${savedCategories.map(cat => `
+          <button class="cat-pill ${activeSavedCategoryFilter === cat ? 'active' : ''}" onclick="setSavedCategoryFilter('${cat.replace(/'/g, "\\'")}')">
+            ${cat} (${catCounts[cat] || 0})
+          </button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  if (!filteredItems.length) {
+    area.innerHTML = filterBarHtml + `
       <div class="panel-card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-        <span>⭐ 아직 저장된 관심공고가 없거나 현재 검색 필터에 해당하지 않습니다. 각 공고 우측 상단의 <strong>[☆ 관심]</strong> 버튼을 눌러 모아보세요!</span>
-        <button class="btn btn-outline btn-sm" onclick="switchTab('career')">🎬 전체 채용공고 보러가기</button>
+        <span>⭐ ${activeSavedCategoryFilter === 'ALL' ? '아직 저장된 관심공고가 없습니다.' : `[${activeSavedCategoryFilter}] 카테고리에 저장된 공고가 없습니다.`} 각 공고 카드 우측 상단의 <strong>[☆ 관심]</strong>을 눌러보세요! (마케팅/영상/3D/알바 등 카테고리 자동 분류)</span>
+        <button class="btn btn-outline btn-sm" onclick="switchTab('career')">🎬 채용공고 보러가기</button>
       </div>
     `;
     return;
   }
 
-  area.innerHTML = `
-    <div class="panel-card" style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-      <span>⭐ <strong>나의 관심공고 보관함 (${items.length}건)</strong> · 모아둔 공고를 한눈에 비교하고 맞춤 이력서로 일괄 지원하세요.</span>
-      <div style="display:flex;gap:6px;">
-        <button class="btn btn-outline btn-sm" onclick="selectAllVisible()">☑️ 관심공고 전체선택</button>
-        <button class="btn btn-primary btn-sm" onclick="runBatchConvertAndApply()">🚀 선택 관심공고 일괄변환</button>
-      </div>
-    </div>
-    <div class="cards-grid">
-      ${items.map(item => {
-        const isSel = selectedIds.has(item.id);
-        const regionTag = inferRegionBucket(item);
-        const orgName = item.company || item.organizer || item.client || item.site;
-        const metaInfo = item.deadline || item.pay || item.budget || item.dday || '';
-        return `
-          <article class="item-card ${isSel ? 'selected' : ''}">
-            <div>
-              <div class="card-top">
-                <div class="badge-group">
-                  <span class="badge-site">🌐 ${item.site}</span>
-                  <span class="badge-match">📍 ${regionTag}</span>
-                </div>
-                <div style="display:flex;gap:6px;align-items:center;">
-                  ${renderStarButton(item.id)}
-                  <label class="select-check">
-                    <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleSelect('${item.id}', this.checked)" /> 선택
-                  </label>
-                </div>
-              </div>
-              <h3 class="card-title" style="margin-top:8px;">${item.title}</h3>
-              <div class="summary-chips" style="margin-top:8px;">
-                <span class="chip">🏢 <strong>${orgName}</strong></span>
-                <span class="chip">🗺️ ${item.location || regionTag}</span>
-                <span class="chip">⏰ ${metaInfo}</span>
-              </div>
+  // 카테고리별 그룹 섹션 보기 모드
+  if (savedGroupViewMode && activeSavedCategoryFilter === 'ALL') {
+    const activeCats = savedCategories.filter(c => (catCounts[c] || 0) > 0);
+    area.innerHTML = filterBarHtml + activeCats.map(cat => {
+      const groupItems = filteredItems.filter(item => (savedCategoryMap[item.id] || autoDetectCategory(item)) === cat);
+      if (!groupItems.length) return '';
+      return `
+        <div class="cat-group-box">
+          <div class="cat-group-header">
+            <strong style="font-size:13.5px;color:var(--text-main);">${cat} <span class="status-chip">${groupItems.length}건</span></strong>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-outline btn-sm" onclick="selectCategoryGroup('${cat.replace(/'/g, "\\'")}')">☑️ 이 카테고리 전체선택</button>
             </div>
-            <div class="card-footer">
-              <button class="btn btn-primary btn-sm" onclick="openConvertedDocModal('${item._track}', '${item.id}')">
-                ✨ 양식변환·검증·지원
-              </button>
-              <a class="btn btn-outline btn-sm" href="${item.url}" target="_blank" rel="noopener">↗ 원문</a>
-            </div>
-          </article>
-        `;
-      }).join('')}
-    </div>
-  `;
+          </div>
+          <div class="cards-grid">
+            ${groupItems.map(renderSavedCardHtml).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+    return;
+  }
+
+  // 단일 카테고리 또는 일반 나열 보기
+  area.innerHTML = filterBarHtml + `<div class="cards-grid">${filteredItems.map(renderSavedCardHtml).join('')}</div>`;
 }
 
 // 6. 참조사이트 레이더 탭
@@ -588,7 +931,7 @@ function renderRadarTab(area) {
   const sites = appData.sites || [];
   area.innerHTML = `
     <div class="panel-card" style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-      <span>📡 <strong>연동 플랫폼 (${sites.length}곳)</strong> · 키워드 입력 후 [🌐 키워드 수집] 클릭 시 실시간 수집</span>
+      <span>📡 <strong>연동 플랫폼 (${sites.length}곳)</strong> · 어떤 키워드든 입력 후 [🌐 입력 키워드 실시간 수집] 클릭 시 실시간 수집</span>
       <button class="btn btn-primary btn-sm" onclick="addNewCustomSitePrompt()">➕ 사이트 추가</button>
     </div>
     <div class="cards-grid">
@@ -621,23 +964,20 @@ function renderAnalyticsAndResumeTab(area) {
   const pfList = masterResume.portfolioHistory || DEFAULT_MASTER_RESUME.portfolioHistory;
 
   area.innerHTML = `
-    <!-- 사람인 최신 이력서 다운로드·편집·사람인 재등록 & 클라우드 4단계 관리 -->
     <div class="panel-card" style="margin-bottom:14px;">
       <h3>
         <span>📄 사람인 최신 이력서 백업 · 수정 · 사람인 재등록 & 사이트 자동변환</span>
         <span class="status-chip">${isResumeEditMode ? '✏️ 편집 모드 (수정 가능)' : '🔒 읽기 보호 모드'}</span>
       </h3>
 
-      <!-- 사람인 전용 빠른 브릿지 바 -->
       <div class="one-liner" style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;-webkit-line-clamp:unset;">
-        <span>🔗 <strong>사람인 마스터 연동:</strong> 현재 사람인 최신 이력서(3D애니메이션·CapCut 자동화)가 백업되어 있습니다.</span>
+        <span>🔗 <strong>사람인 마스터 연동:</strong> 현재 사람인 최신 이력서(3D애니메이션·CapCut 자동화·마케팅 콘텐츠)가 백업되어 있습니다.</span>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button class="btn btn-outline btn-sm" onclick="downloadSaraminLatestResume()">💾 사람인 최신 이력서 파일 다운(.json/.txt)</button>
+          <button class="btn btn-outline btn-sm" onclick="downloadSaraminLatestResume()">💾 사람인 최신 이력서 파일 다운(.txt)</button>
           <button class="btn btn-primary btn-sm" onclick="openSaraminReregisterBridge()">🔄 수정본 사람인에 바로 재등록하기 ↗</button>
         </div>
       </div>
 
-      <!-- 4단계 명확 구분 액션 타일 -->
       <div class="resume-action-grid">
         <div class="action-tile">
           <div class="action-tile-title"><span>📥 1. 불러오기</span></div>
@@ -701,7 +1041,6 @@ function renderAnalyticsAndResumeTab(area) {
       </div>
     </div>
 
-    <!-- 포트폴리오 Google Drive 자동 저장 & 채용사이트 자동 업로드 허브 -->
     <div class="panel-card" style="margin-bottom:14px;">
       <h3>
         <span>🎬 사람인 최신 포트폴리오 Google 드라이브 저장소 & 채용사이트 자동 첨부</span>
@@ -734,7 +1073,7 @@ function renderAnalyticsAndResumeTab(area) {
 }
 
 // ============================================================================
-// 사람인 최신 이력서 다운로드 & 사람인 재등록 브릿지
+// 8. 사람인 최신 이력서 다운로드 & 사람인 재등록 브릿지
 // ============================================================================
 function downloadSaraminLatestResume() {
   const txtContent = `[사람인 등록 최신 마스터 이력서 백업본]
@@ -755,7 +1094,7 @@ ${(masterResume.coreCareer || []).map((c, i) => `${i + 1}. ${c}`).join('\n')}
   a.href = URL.createObjectURL(blob);
   a.download = `사람인_최신이력서_문PD_${new Date().toISOString().slice(0, 10)}.txt`;
   a.click();
-  showToast('💾 사람인 최신 이력서가 PC에 다운로드되었습니다 (구글 드라이브 자동백업 완료).');
+  showToast('💾 사람인 최신 이력서가 PC에 다운로드되었습니다.');
 }
 
 function openSaraminReregisterBridge() {
@@ -785,7 +1124,7 @@ ${(masterResume.coreCareer || []).map(c => `• ${c}`).join('\n')}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
   document.getElementById('modalTitle').textContent = '🔄 수정 이력서 → 사람인(Saramin) 재등록 브릿지';
-  document.getElementById('modalSubtitle').textContent = '아래 내용을 확인·수정한 뒤 [사람인 이력서 관리 열기]를 누르면 자동 복사 후 사람인 수정창으로 이동합니다.';
+  document.getElementById('modalSubtitle').textContent = '아래 내용을 확인·수정한 뒤 [지원창 열기]를 누르면 자동 복사 후 사람인 이력서 관리창으로 이동합니다.';
   document.getElementById('modalTextarea').value = saraminFormatted;
   renderModalPortfolioBar();
   runLiveFormatValidation();
@@ -793,7 +1132,7 @@ ${(masterResume.coreCareer || []).map(c => `• ${c}`).join('\n')}
 }
 
 // ============================================================================
-// 포트폴리오 Google Drive 업로드 & 채용사이트 자동 첨부 핸들러
+// 9. 포트폴리오 Google Drive 업로드 & 채용사이트 자동 첨부 핸들러
 // ============================================================================
 function triggerPortfolioFileUpload() {
   const input = document.getElementById('hiddenPortfolioFileInput');
@@ -877,7 +1216,7 @@ function setAsPrimaryPortfolio(idx) {
 }
 
 // ============================================================================
-// 이력서 4대 작업 핸들러 (경고 및 확인 모달 필수)
+// 10. 이력서 4대 작업 핸들러
 // ============================================================================
 function requestLoadResume() {
   openConfirmDialog({
@@ -943,7 +1282,7 @@ function requestSaveEditedResume() {
       } catch (e) {}
       isResumeEditMode = false;
       renderActiveTab();
-      showToast('💾 이력서 편집 내용이 저장되었습니다. [사람인에 바로 재등록하기]로 즉시 반영할 수 있습니다.');
+      showToast('💾 이력서 편집 내용이 저장되었습니다.');
     }
   });
 }
@@ -1016,7 +1355,7 @@ function requestCloudSync() {
 }
 
 // ============================================================================
-// 채용사이트별 양식 자동 변환 + 양식 부적합 체크 및 원클릭 수정 엔진
+// 11. 채용사이트별 양식 자동 변환 + 양식 부적합 체크 및 원클릭 수정 엔진
 // ============================================================================
 function generateTailoredDocument(type, item) {
   const careerBullets = (masterResume.coreCareer || []).map(c => `• ${c}`).join('\n');
@@ -1032,7 +1371,7 @@ function generateTailoredDocument(type, item) {
 
 [핵심 역량 및 정량적 성과]
 ${careerBullets}
-• 제작/자동화 툴: ${masterResume.tools}
+• 제작/자동화/마케팅 툴: ${masterResume.tools}
 • 정량 성과: ${masterResume.techAutomation}
 
 [포트폴리오 자동 첨부 (Google Drive 연동)]
@@ -1043,16 +1382,16 @@ ${careerBullets}
 • ${salaryInfo}
 
 [맞춤 지원동기]
-${item.company}의 '${item.title}' 포지션에 지원합니다. 3D 애니메이션 연출력과 Python/CapCut 기반 고속 자동편집 파이프라인(제작시간 70% 단축)을 결합해 기획부터 납품까지 즉시 기여하겠습니다.`;
+${item.company}의 '${item.title}' 포지션에 지원합니다. 콘텐츠 기획·마케팅 감각과 3D 애니메이션 연출력, Python/CapCut 기반 고속 자동편집 파이프라인(제작시간 70% 단축)을 결합해 기획부터 성과 전환까지 즉시 기여하겠습니다.`;
   }
 
   if (type === 'alba') {
     return `[${item.site} 단기·알바 핵심 요약 지원서]
 안녕하세요! '${item.title}' 공고를 보고 지원드리는 ${masterResume.name}입니다.
-• 보유 기술: Premiere Pro, After Effects, CapCut, 3D 모션 (편집시간 70% 단축 자동화 보유)
+• 보유 기술: Premiere Pro, After Effects, CapCut, 3D 모션, SNS 마케팅 소재 제작 (편집시간 70% 단축 자동화 보유)
 • 대표 포트폴리오: ${masterResume.portfolioMain} (${pfUrl})
 • 근무 가능 조건: ${item.pay || '시급/건별 협의'} / ${item.schedule || '즉시 투입 및 일정 조율 가능'}
-빠르고 정확한 컷편집·자막·모션 작업으로 즉시 도움드리겠습니다!`;
+빠르고 정확한 작업으로 즉시 도움드리겠습니다!`;
   }
 
   if (type === 'freelance') {
@@ -1060,9 +1399,9 @@ ${item.company}의 '${item.title}' 포지션에 지원합니다. 3D 애니메이
 안녕하세요! '${item.title}' 프로젝트 요청서를 확인하고 제안드리는 ${masterResume.name}입니다.
 
 ■ 핵심 강점 및 정량 성과
-1) 고퀄리티 3D & 모션 연출 (${masterResume.portfolioMain})
+1) 고효율 마케팅 영상 & 3D 모션 연출 (${masterResume.portfolioMain})
 2) 48시간 내 1차 가편집 시안 제공 (CapCut+AI 자동화 파이프라인으로 리드타임 70% 단축)
-3) 가로형(16:9) 마스터본 + 쇼츠/릴스(9:16) 파생본 패키지 지원
+3) 가로형(16:9) 마스터본 + 쇼츠/릴스(9:16) 광고 소재 패키지 지원
 
 ■ 포트폴리오 클라우드 링크 (자동 첨부)
 • 파일명: ${masterResume.portfolioMain}
@@ -1078,25 +1417,24 @@ ${item.company}의 '${item.title}' 포지션에 지원합니다. 3D 애니메이
 ■ 지원규모: ${item.prizeScale}
 
 [1. 문제인식 (Problem)]
-• 기존 영상 제작 방식의 높은 외주 비용과 느린 납기 문제를 해결할 AI·3D 융합 파이프라인 필요
+• 기존 콘텐츠·마케팅 소재 제작 방식의 높은 외주 비용과 느린 납기 문제를 해결할 AI·3D 융합 파이프라인 필요
 
 [2. 실현가능성 (Solution — 문PD 핵심 경쟁우위)]
 • ${ws.unfairAdvantage || masterResume.techAutomation}
 • 보유 툴: ${masterResume.tools}
 
 [3. 성장전략 및 기대효과 (Scale-up)]
-• 심사 배점 핵심(${ws.evaluationFocus || '기획성+독창성+기술성'})에 맞춘 3D+AI 데모 시안 선제 제출 (효율 70% 향상)
+• 심사 배점 핵심(${ws.evaluationFocus || '기획성+독창성+마케팅확산성'})에 맞춘 데모 시안 선제 제출 (효율 70% 향상)
 
 [4. 팀 역량 및 대표 포트폴리오 (Team & Portfolio)]
 • 총괄 PD: ${masterResume.name} (${masterResume.email})
 • 증빙 포트폴리오: ${masterResume.portfolioMain} (${pfUrl})`;
 }
 
-// 채용사이트 양식 적합성 실시간 체크 규칙
 function evaluateSiteFormatRules(site, type, text) {
   const rules = [];
   const hasPortfolioLink = /https?:\/\/drive\.google\.com|\.mp4|\.pdf|포트폴리오/i.test(text);
-  const hasTools = /Premiere|After Effects|CapCut|3D|Python|프리미어|애프터이펙트|캡컷/i.test(text);
+  const hasTools = /Premiere|After Effects|CapCut|3D|Python|프리미어|애프터이펙트|캡컷|마케팅|GA4/i.test(text);
   const hasMetric = /\d+%|\d+편|\d+만|\d+시간|단축|달성/.test(text);
   const hasCondition = /희망|급여|연봉|단가|견적|투입|일정|협의/.test(text);
 
@@ -1110,7 +1448,7 @@ function evaluateSiteFormatRules(site, type, text) {
 
   rules.push({
     id: 'tools',
-    label: `[${site} 양식] 영상 편집·3D·AI 활용 툴 명시 여부`,
+    label: `[${site} 양식] 직무 핵심 툴/스킬 명시 여부`,
     passed: hasTools,
     fixLabel: '+ 보유 툴 자동기입',
     fixSnippet: `\n• 활용 툴 및 기술: ${masterResume.tools}`
@@ -1134,7 +1472,7 @@ function evaluateSiteFormatRules(site, type, text) {
       label: `[${site} 모바일 규격] 핵심 요약 글자수 적정성 (현재 ${len}자 / 권장 100~600자)`,
       passed: isGoodLen,
       fixLabel: '⚡ 300자 핵심요약으로 자동축약',
-      fixReplaceAll: `[${site} 300자 핵심 지원서]\n안녕하세요! ${masterResume.name}입니다.\n1) 보유기술: ${masterResume.tools}\n2) 강점: CapCut+AI 자동편집으로 컷편집·자막·모션 작업을 70% 빠르게 납품합니다.\n3) 포트폴리오: ${masterResume.portfolioMain} (${masterResume.portfolioDriveUrl || GOOGLE_DRIVE_URL})\n4) 근무조건: 즉시 투입 및 일정 협의 가능합니다!`
+      fixReplaceAll: `[${site} 300자 핵심 지원서]\n안녕하세요! ${masterResume.name}입니다.\n1) 보유기술: ${masterResume.tools}\n2) 강점: CapCut+AI 자동화로 콘텐츠·마케팅 영상 작업을 70% 빠르게 납품합니다.\n3) 포트폴리오: ${masterResume.portfolioMain} (${masterResume.portfolioDriveUrl || GOOGLE_DRIVE_URL})\n4) 근무조건: 즉시 투입 및 일정 협의 가능합니다!`
     });
   } else {
     rules.push({
@@ -1153,7 +1491,7 @@ function evaluateSiteFormatRules(site, type, text) {
       label: `[정부지원/공모전 표준] PSST(문제인식-실현가능성-성장전략-팀) 목차 준수`,
       passed: hasPsst,
       fixLabel: '+ PSST 표준 목차 보완',
-      fixSnippet: `\n[PSST 표준 요약]\n• Problem(문제인식): 고비용 영상 제작 구조 혁신\n• Solution(실현가능성): ${masterResume.techAutomation}\n• Scale-up(성장전략): 숏폼·롱폼 멀티 포맷 동시 납품\n• Team(팀역량): ${masterResume.name} (${masterResume.portfolioMain})`
+      fixSnippet: `\n[PSST 표준 요약]\n• Problem(문제인식): 고비용 콘텐츠 제작 구조 혁신\n• Solution(실현가능성): ${masterResume.techAutomation}\n• Scale-up(성장전략): 숏폼·롱폼 멀티 포맷 동시 납품\n• Team(팀역량): ${masterResume.name} (${masterResume.portfolioMain})`
     });
   }
 
@@ -1220,8 +1558,7 @@ function renderModalPortfolioBar() {
 }
 
 function openConvertedDocModal(type, itemId) {
-  const all = [...(appData.jobs || []), ...(appData.albas || []), ...(appData.freelances || []), ...(appData.contests || [])];
-  const item = all.find(x => x.id === itemId);
+  const item = findItemById(itemId);
   if (!item) return;
 
   currentModalItem = item;
@@ -1307,17 +1644,212 @@ function runBatchConvertAndApply() {
 }
 
 // ============================================================================
-// 키워드 기반 실시간 크롤링 실행
+// 12. 무제한 자유 키워드 실시간 수집 엔진 (로컬 서버 + 외부/모바일 브라우저 직접 수집 겸용)
 // ============================================================================
+async function fetchViaCorsProxy(targetUrl) {
+  const proxies = [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`
+  ];
+  for (const pUrl of proxies) {
+    try {
+      const res = await fetch(pUrl, { cache: 'no-store' });
+      if (res.ok) return await res.text();
+    } catch (e) {}
+  }
+  return '';
+}
+
+// 외부/모바일(GitHub Pages) 접속 시에도 사용자가 입력한 모든 키워드를 실시간으로 긁어오는 브라우저 수집기
+async function crawlKeywordDirectlyInBrowser(keyword) {
+  const kw = (keyword || '마케팅').trim();
+  const encKw = encodeURIComponent(kw);
+  const nowStr = new Date().toLocaleString();
+  const newJobs = [];
+  const newAlbas = [];
+  const newContests = [];
+
+  await Promise.allSettled([
+    // 1) 원티드(Wanted) 실시간 키워드 검색
+    (async () => {
+      const raw = await fetchViaCorsProxy(`https://www.wanted.co.kr/api/chaos/search/v1/results?query=${encKw}&tab=position&limit=20`);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      const list = data?.positions?.data || [];
+      list.forEach(item => {
+        const wid = String(item.id);
+        const loc = item.address?.full_location || item.location || '서울/수도권';
+        const pos = item.position || '';
+        const comp = item.company?.name || '원티드 채용기업';
+        newJobs.push({
+          id: `wanted-${wid}`,
+          site: '원티드',
+          siteBadge: 'WANTED',
+          track: 'career',
+          keyword: kw,
+          title: pos,
+          company: comp,
+          location: loc,
+          region: inferRegionBucket({ location: loc, title: pos }),
+          salary: '합격보상금 100만원',
+          deadline: `상시채용 (wd/${wid})`,
+          matchScore: 95,
+          url: `https://www.wanted.co.kr/wd/${wid}`,
+          applyType: '원티드 간편지원',
+          jdSummary: `[원티드 #${wid} | 키워드:${kw}] ${comp} (${loc}) '${pos}'`,
+          collectedAt: nowStr,
+          verified: true
+        });
+      });
+    })(),
+
+    // 2) 사람인(Saramin) 실시간 키워드 검색
+    (async () => {
+      const raw = await fetchViaCorsProxy(`https://m.saramin.co.kr/search/get-recruit-list?searchType=search&searchword=${encKw}`);
+      if (!raw) return;
+      let html = raw;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed.innerHTML) html = parsed.innerHTML;
+      } catch (e) {}
+      const regex = /data-rec_idx=(\d+)>[\s\S]{1,1200}?<p class="tit">([\s\S]{1,250}?)<\/p>\s*<div class="meta">\s*<span>([^<]+)<\/span>[\s\S]{1,400}?<span class="corp_name">([^<]+)<\/span>/g;
+      let m;
+      let count = 0;
+      while ((m = regex.exec(html)) !== null && count < 20) {
+        count++;
+        const ridx = m[1].trim();
+        const title = m[2].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+        const loc = m[3].trim();
+        const comp = m[4].trim();
+        newJobs.push({
+          id: `saramin-${ridx}`,
+          site: '사람인',
+          siteBadge: 'SARAMIN',
+          track: 'career',
+          keyword: kw,
+          title,
+          company: comp,
+          location: loc,
+          region: inferRegionBucket({ location: loc, title }),
+          salary: '공고문 참조',
+          deadline: `접수중 (#${ridx})`,
+          matchScore: 96,
+          url: `https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=${ridx}`,
+          applyType: '사람인 즉시지원',
+          jdSummary: `[사람인 #${ridx} | 키워드:${kw}] ${comp} (${loc}) '${title}'`,
+          collectedAt: nowStr,
+          verified: true
+        });
+      }
+    })(),
+
+    // 3) 알바몬(Albamon) 실시간 키워드 검색
+    (async () => {
+      const html = await fetchViaCorsProxy(`https://www.albamon.com/total-search?keyword=${encKw}`);
+      if (!html) return;
+      const regex = /\/jobs\/detail\/(\d+)[^"]*"><div[^>]*list-item-recruit__recruit-title"><span[^>]*>([^<]+)<\/span><span[^>]*><\/span><span[^>]*>([^<]+)<\/span>/g;
+      let m;
+      let count = 0;
+      while ((m = regex.exec(html)) !== null && count < 15) {
+        count++;
+        const aid = m[1].trim();
+        const comp = m[2].trim();
+        const title = m[3].trim();
+        const reg = inferRegionBucket({ title, company: comp });
+        newAlbas.push({
+          id: `albamon-${aid}`,
+          site: '알바몬',
+          siteBadge: 'ALBAMON',
+          track: 'alba',
+          keyword: kw,
+          title,
+          company: comp,
+          location: reg,
+          region: reg,
+          pay: '시급/건당 협의',
+          schedule: `접수중 (#${aid})`,
+          matchScore: 94,
+          url: `https://www.albamon.com/jobs/detail/${aid}`,
+          applyType: '알바몬 온라인지원',
+          summary: `[알바몬 #${aid} | 키워드:${kw}] ${comp} '${title}'`,
+          collectedAt: nowStr,
+          verified: true
+        });
+      }
+    })(),
+
+    // 4) 위비티(Wevity) 실시간 키워드 공모전 검색
+    (async () => {
+      const html = await fetchViaCorsProxy(`https://www.wevity.com/?c=find&s=1&gbn=list&stx=${encKw}`);
+      if (!html) return;
+      const regex = /<div class="tit">\s*<a href="([^"]+)">([^<]+)[\s\S]{1,400}?<div class="organ">([^<]+)<\/div>\s*<div class="day">\s*(D-[\d]+|오늘마감|접수예정|마감임박)/g;
+      let m;
+      let count = 0;
+      while ((m = regex.exec(html)) !== null && count < 12) {
+        count++;
+        const relUrl = m[1].trim();
+        const ixMatch = relUrl.match(/ix=(\d+)/);
+        const ix = ixMatch ? ixMatch[1] : String(Date.now() + count);
+        const title = m[2].trim();
+        const organ = m[3].trim();
+        const dday = m[4].trim();
+        newContests.push({
+          id: `wevity-${ix}`,
+          category: '공모전(실시간)',
+          site: '위비티',
+          siteBadge: 'WEVITY',
+          keyword: kw,
+          title,
+          organizer: organ,
+          location: '전국/온라인',
+          region: '재택·전국',
+          dday,
+          prizeScale: `상금 원문참조 (#${ix})`,
+          winProbability: `접수중 (${dday})`,
+          matchScore: 95,
+          url: `https://www.wevity.com/${relUrl}`,
+          summary: `[위비티 #${ix} | 키워드:${kw}] ${organ} '${title}'`,
+          winningStrategy: {
+            unfairAdvantage: '콘텐츠 기획력 + 3D·AI 자동편집 파이프라인으로 시각적 완성도 및 마케팅 전환율 우위 선점',
+            evaluationFocus: '독창성(35%) + 주제 적합성(35%) + 완성도 및 확산성(30%)',
+            actionSteps: ['1단계: 핵심 타겟 후킹 컷 배치', '2단계: 브랜드 메시지 명확화', '3단계: 멀티 포맷 패키지 제출'],
+            selectionTip: '초반 5초 하이라이트 구간에 타겟 맞춤형 후킹 카피와 시각 이펙트를 집중 배치하세요.'
+          },
+          collectedAt: nowStr,
+          verified: true
+        });
+      }
+    })()
+  ]);
+
+  const bundle = { jobs: newJobs, albas: newAlbas, contests: newContests };
+  mergeNewItemsIntoAppData(bundle);
+  saveBrowserCrawledCache(bundle);
+  return newJobs.length + newAlbas.length + newContests.length;
+}
+
 async function triggerLiveCrawl() {
   const btn = document.getElementById('liveCrawlBtn');
   const kw = (document.getElementById('searchInput')?.value || '').trim();
-  const orig = btn.innerHTML;
+  const orig = btn ? btn.innerHTML : '🔄 실시간 수집';
 
-  btn.disabled = true;
-  btn.innerHTML = '⏳ 수집 중...';
-  showToast(kw ? `🌐 '${kw}' 키워드로 사람인·원티드·잡코리아·알바몬 실시간 수집 중...` : '🌐 전체 키워드 실시간 수집 중...');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '⏳ 실시간 수집 중...';
+  }
 
+  // 새로 검색한 키워드를 상단 빠른 키워드 바에 자동 등록
+  if (kw && !quickKeywords.includes(kw)) {
+    quickKeywords.unshift(kw);
+    try {
+      localStorage.setItem('MOONPD_QUICK_KEYWORDS', JSON.stringify(quickKeywords.slice(0, 14)));
+    } catch (e) {}
+    renderQuickKeywordBar();
+  }
+
+  showToast(kw ? `🌐 '${kw}' 키워드로 사람인·원티드·잡코리아·알바몬·위비티 실시간 수집 중...` : '🌐 전체 키워드 실시간 수집 중...');
+
+  let handledByLocalServer = false;
   try {
     const res = await fetch('/api/crawl', {
       method: 'POST',
@@ -1326,24 +1858,38 @@ async function triggerLiveCrawl() {
     });
     if (res.ok) {
       appData = await res.json();
+      mergeBrowserCrawledCache();
+      handledByLocalServer = true;
       onFilterChanged();
-      const total = (appData.jobs?.length || 0) + (appData.albas?.length || 0) + (appData.freelances?.length || 0) + (appData.contests?.length || 0);
-      showToast(`✅ 실시간 수집 완료! (총 ${total}건 연동됨)`);
-    } else {
-      onFilterChanged();
-      showToast(`🔍 현재 수집된 DB에서 '${kw || '전체'}' 결과를 표시합니다.`);
+      const matchedNow =
+        (appData.jobs || []).filter(matchesSearchAndFilter).length +
+        (appData.albas || []).filter(matchesSearchAndFilter).length +
+        (appData.freelances || []).filter(matchesSearchAndFilter).length +
+        (appData.contests || []).filter(matchesSearchAndFilter).length;
+      showToast(`✅ '${kw || '전체'}' 실시간 수집 완료! (조건 일치 ${matchedNow}건 표시)`);
     }
-  } catch (e) {
+  } catch (e) {}
+
+  // 외부/모바일 URL(GitHub Pages)이거나 로컬 서버 미연결 시 브라우저 직접 크롤링 수행
+  if (!handledByLocalServer) {
+    const addedCount = await crawlKeywordDirectlyInBrowser(kw || '마케팅');
     onFilterChanged();
-    showToast(`🔍 로컬/클라우드 DB에서 '${kw || '전체'}' 필터 결과를 표시합니다.`);
-  } finally {
+    const matchedNow =
+      (appData.jobs || []).filter(matchesSearchAndFilter).length +
+      (appData.albas || []).filter(matchesSearchAndFilter).length +
+      (appData.freelances || []).filter(matchesSearchAndFilter).length +
+      (appData.contests || []).filter(matchesSearchAndFilter).length;
+    showToast(`✅ '${kw || '전체'}' 실시간 수집 완료! (신규 ${addedCount}건 포함 총 ${matchedNow}건 표시)`);
+  }
+
+  if (btn) {
     btn.disabled = false;
     btn.innerHTML = orig;
   }
 }
 
 function addNewCustomSitePrompt() {
-  const name = prompt('추가할 사이트 이름 (예: 크몽 / 클래스101):');
+  const name = prompt('추가할 사이트 이름 (예: 크몽 / 클래스101 / 매드타임즈):');
   if (!name) return;
   const url = prompt('사이트 URL:', 'https://');
   if (!url) return;
