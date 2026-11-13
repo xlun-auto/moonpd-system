@@ -692,3 +692,66 @@ html, body {
 .toast.show {
   display: block;
 }
+
+/* 관심공고 카테고리 분류 드롭다운 & 섹션 헤더 */
+.cat-select {
+  background: var(--color-secondary-soft);
+  border: 1px solid rgba(79, 70, 229, 0.45);
+  color: #c7d2fe;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  max-width: 145px;
+}
+
+.cat-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.cat-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.cat-pill {
+  background: var(--bg-sub);
+  border: 1px solid var(--border-line);
+  color: var(--text-sub);
+  padding: 6px 11px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.cat-pill.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.cat-group-box {
+  margin-bottom: 18px;
+}
+
+.cat-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  background: var(--bg-sub);
+  border-left: 3px solid var(--color-primary);
+  border-radius: 6px;
+}
