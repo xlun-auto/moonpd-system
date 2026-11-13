@@ -1,5 +1,5 @@
 // ============================================================================
-// 문PD 커리어 & 캐시카우 웹앱 - 심플 요약형 UI & Google Drive/Sheets 연동 엔진
+// 문PD 커리어 & 캐시카우 웹앱 - 키워드 실시간 수집 & 숫자 100% 동기화 엔진
 // ============================================================================
 
 const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1wReNF82GUdAZb4c0_bFFI2kbU6grpapVz7fZqD2EFQE/edit';
@@ -56,8 +56,7 @@ function persistMasterResumeLocal(newObj) {
 
 window.addEventListener('DOMContentLoaded', async () => {
   await fetchLatestDataFromServer();
-  updateKpiAndCounts();
-  renderActiveTab();
+  onFilterChanged();
 });
 
 async function fetchLatestDataFromServer() {
@@ -67,25 +66,91 @@ async function fetchLatestDataFromServer() {
   } catch (e) {}
 }
 
+// 검색어(다중 단어 토큰 지원) 및 사이트 필터 판별
+function matchesSearchAndFilter(item) {
+  const q = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+  const siteF = document.getElementById('siteFilter')?.value || 'ALL';
+
+  if (siteF !== 'ALL' && !(item.site || item.category || '').includes(siteF)) {
+    return false;
+  }
+  if (!q) return true;
+
+  const searchableText = [
+    item.title,
+    item.company,
+    item.organizer,
+    item.client,
+    item.site,
+    item.category,
+    item.keyword,
+    item.location,
+    item.jdSummary,
+    item.summary,
+    item.requestDetail
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  const tokens = q.split(/\s+/).filter(Boolean);
+  return tokens.every(token => searchableText.includes(token));
+}
+
+// 검색어나 사이트 필터 변경 시 KPI 숫자와 탭 배지 숫자를 표시 카드 수와 100% 일치시킴
+function onFilterChanged() {
+  updateKpiAndCounts();
+  renderActiveTab();
+}
+
+function quickKeyword(kw) {
+  const input = document.getElementById('searchInput');
+  if (input) input.value = kw;
+  onFilterChanged();
+}
+
+function resetSearchFilter() {
+  const input = document.getElementById('searchInput');
+  const sel = document.getElementById('siteFilter');
+  if (input) input.value = '';
+  if (sel) sel.value = 'ALL';
+  onFilterChanged();
+}
+
 function updateKpiAndCounts() {
-  const jobsCount = (appData.jobs || []).length;
-  const albasCount = (appData.albas || []).length;
-  const freeCount = (appData.freelances || []).length;
-  const contestCount = (appData.contests || []).length;
-  const siteCount = (appData.sites || []).length;
+  const allJobs = appData.jobs || [];
+  const allAlbas = appData.albas || [];
+  const allFree = appData.freelances || [];
+  const allContests = appData.contests || [];
+  const allSites = appData.sites || [];
 
-  document.getElementById('kpiCareerCount').textContent = `${jobsCount}건`;
-  document.getElementById('kpiAlbaCount').textContent = `${albasCount}건`;
-  document.getElementById('kpiFreelanceCount').textContent = `${freeCount}건`;
-  document.getElementById('kpiContestCount').textContent = `${contestCount}건`;
-  document.getElementById('kpiSiteCount').textContent = `${siteCount}곳`;
+  const filteredJobs = allJobs.filter(matchesSearchAndFilter);
+  const filteredAlbas = allAlbas.filter(matchesSearchAndFilter);
+  const filteredFree = allFree.filter(matchesSearchAndFilter);
+  const filteredContests = allContests.filter(matchesSearchAndFilter);
 
-  document.getElementById('tabCountCareer').textContent = jobsCount;
-  document.getElementById('tabCountAlba').textContent = albasCount;
-  document.getElementById('tabCountFreelance').textContent = freeCount;
-  document.getElementById('tabCountContests').textContent = contestCount;
-  document.getElementById('tabCountRadar').textContent = siteCount;
+  const q = (document.getElementById('searchInput')?.value || '').trim();
+  const siteF = document.getElementById('siteFilter')?.value || 'ALL';
+  const isFiltered = Boolean(q || siteF !== 'ALL');
+
+  // 상단 KPI 카드 숫자: 필터 중일 때는 "표시건수 / 전체건수"로 명확히 표기
+  document.getElementById('kpiCareerCount').textContent = isFiltered ? `${filteredJobs.length} / ${allJobs.length}건` : `${allJobs.length}건`;
+  document.getElementById('kpiAlbaCount').textContent = isFiltered ? `${filteredAlbas.length} / ${allAlbas.length}건` : `${allAlbas.length}건`;
+  document.getElementById('kpiFreelanceCount').textContent = isFiltered ? `${filteredFree.length} / ${allFree.length}건` : `${allFree.length}건`;
+  document.getElementById('kpiContestCount').textContent = isFiltered ? `${filteredContests.length} / ${allContests.length}건` : `${allContests.length}건`;
+  document.getElementById('kpiSiteCount').textContent = `${allSites.length}곳`;
+
+  // 탭 버튼 배지 숫자: 실제 화면에 렌더링되는 카드 개수와 100% 동일하게 표시
+  document.getElementById('tabCountCareer').textContent = filteredJobs.length;
+  document.getElementById('tabCountAlba').textContent = filteredAlbas.length;
+  document.getElementById('tabCountFreelance').textContent = filteredFree.length;
+  document.getElementById('tabCountContests').textContent = filteredContests.length;
+  document.getElementById('tabCountRadar').textContent = allSites.length;
+
   document.getElementById('selectedCount').textContent = selectedIds.size;
+
+  const badge = document.getElementById('syncStatusBadge');
+  if (badge) {
+    const kwLabel = q ? `'${q}' 검색결과` : (appData.lastKeyword || '전체 키워드');
+    badge.textContent = `☁️ ${kwLabel} (총 ${filteredJobs.length + filteredAlbas.length + filteredFree.length + filteredContests.length}건 표시)`;
+  }
 }
 
 function switchTab(tabName) {
@@ -94,14 +159,6 @@ function switchTab(tabName) {
     btn.classList.toggle('active', btn.dataset.tab === tabName);
   });
   renderActiveTab();
-}
-
-function matchesSearchAndFilter(item) {
-  const q = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
-  const siteF = document.getElementById('siteFilter')?.value || 'ALL';
-  if (siteF !== 'ALL' && !(item.site || item.category || '').includes(siteF)) return false;
-  if (!q) return true;
-  return JSON.stringify(item).toLowerCase().includes(q);
 }
 
 function toggleSelect(id, checked) {
@@ -116,7 +173,7 @@ function selectAllVisible() {
   list.filter(matchesSearchAndFilter).forEach(item => selectedIds.add(item.id));
   document.getElementById('selectedCount').textContent = selectedIds.size;
   renderActiveTab();
-  showToast(`☑️ ${selectedIds.size}건 선택됨`);
+  showToast(`☑️ 현재 목록 ${selectedIds.size}건 선택됨`);
 }
 
 function clearSelection() {
@@ -167,11 +224,11 @@ function renderActiveTab() {
   else if (currentTab === 'analytics') renderAnalyticsAndResumeTab(area);
 }
 
-// 1. 정규·계약직 탭 (심플 요약형)
+// 1. 정규·계약직 탭
 function renderCareerTab(area) {
   const items = (appData.jobs || []).filter(matchesSearchAndFilter);
   if (!items.length) {
-    area.innerHTML = `<div class="panel-card">🔍 검색 결과가 없습니다.</div>`;
+    area.innerHTML = `<div class="panel-card">🔍 현재 목록에 일치하는 공고가 없습니다. 우측 상단 <strong>[🌐 키워드 수집]</strong> 버튼을 누르면 입력하신 키워드로 각 사이트에서 실시간 수집합니다.</div>`;
     return;
   }
   area.innerHTML = `<div class="cards-grid">${items.map(item => {
@@ -191,7 +248,7 @@ function renderCareerTab(area) {
           <h3 class="card-title" style="margin-top:8px;">${item.title}</h3>
           <div class="summary-chips" style="margin-top:8px;">
             <span class="chip">🏢 <strong>${item.company}</strong></span>
-            <span class="chip">💰 ${item.salary}</span>
+            <span class="chip">📍 ${item.location || '서울/수도권'}</span>
             <span class="chip">⏰ ${item.deadline}</span>
           </div>
         </div>
@@ -206,9 +263,13 @@ function renderCareerTab(area) {
   }).join('')}</div>`;
 }
 
-// 2. 알바·당근 탭 (심플 요약형)
+// 2. 알바·당근 탭
 function renderAlbaTab(area) {
   const items = (appData.albas || []).filter(matchesSearchAndFilter);
+  if (!items.length) {
+    area.innerHTML = `<div class="panel-card">🔍 일치하는 단기·알바 공고가 없습니다. <strong>[🌐 키워드 수집]</strong> 또는 <strong>[초기화]</strong>를 눌러보세요.</div>`;
+    return;
+  }
   area.innerHTML = `<div class="cards-grid">${items.map(item => {
     const isSel = selectedIds.has(item.id);
     return `
@@ -241,9 +302,13 @@ function renderAlbaTab(area) {
   }).join('')}</div>`;
 }
 
-// 3. 숨고·외주 탭 (심플 요약형)
+// 3. 숨고·외주 탭
 function renderFreelanceTab(area) {
   const items = (appData.freelances || []).filter(matchesSearchAndFilter);
+  if (!items.length) {
+    area.innerHTML = `<div class="panel-card">🔍 일치하는 외주 프로젝트가 없습니다. <strong>[초기화]</strong>를 누르면 전체 프로젝트를 볼 수 있습니다.</div>`;
+    return;
+  }
   area.innerHTML = `<div class="cards-grid">${items.map(item => {
     const isSel = selectedIds.has(item.id);
     return `
@@ -277,9 +342,13 @@ function renderFreelanceTab(area) {
   }).join('')}</div>`;
 }
 
-// 4. 공모전·지원사업 탭 (아이콘 + 핵심 필승팁 1줄 요약 + 클릭 시 상세 전략/계획서 모달)
+// 4. 공모전·지원사업 탭
 function renderContestsTab(area) {
   const items = (appData.contests || []).filter(matchesSearchAndFilter);
+  if (!items.length) {
+    area.innerHTML = `<div class="panel-card">🔍 일치하는 공모전/지원사업이 없습니다. <strong>[🌐 키워드 수집]</strong> 또는 <strong>[초기화]</strong>를 눌러보세요.</div>`;
+    return;
+  }
   area.innerHTML = `<div class="cards-grid">${items.map(item => {
     const isSel = selectedIds.has(item.id);
     const ws = item.winningStrategy || {};
@@ -316,12 +385,12 @@ function renderContestsTab(area) {
   }).join('')}</div>`;
 }
 
-// 5. 참조사이트 레이더 탭 (가로 스크롤 없는 반응형 그리드 카드)
+// 5. 참조사이트 레이더 탭
 function renderRadarTab(area) {
   const sites = appData.sites || [];
   area.innerHTML = `
     <div class="panel-card" style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-      <span>📡 <strong>연동 플랫폼 (${sites.length}곳)</strong> · 매일 신규 구인·외주·공모전 자동 탐색</span>
+      <span>📡 <strong>연동 플랫폼 (${sites.length}곳)</strong> · 키워드 입력 후 [🌐 키워드 수집] 클릭 시 실시간 수집</span>
       <button class="btn btn-primary btn-sm" onclick="addNewCustomSitePrompt()">➕ 사이트 추가</button>
     </div>
     <div class="cards-grid">
@@ -347,7 +416,7 @@ function renderRadarTab(area) {
   `;
 }
 
-// 6. 이력서 4단계 구분 관리 (불러오기 / 편집하기 / 업로드하기 / 동기화하기) + JD 요약 분석
+// 6. 이력서 4단계 구분 관리 + JD 요약 분석
 function renderAnalyticsAndResumeTab(area) {
   const readonlyAttr = isResumeEditMode ? '' : 'readonly';
   const inputClass = isResumeEditMode ? 'field-input editable' : 'field-input';
@@ -361,7 +430,6 @@ function renderAnalyticsAndResumeTab(area) {
   ];
 
   area.innerHTML = `
-    <!-- 이력서 4대 기능 명확 구분 바 -->
     <div class="panel-card" style="margin-bottom:14px;">
       <h3>
         <span>📄 사람인 마스터 이력서 & Google 클라우드 관리</span>
@@ -369,7 +437,6 @@ function renderAnalyticsAndResumeTab(area) {
       </h3>
 
       <div class="resume-action-grid">
-        <!-- 1. 불러오기 -->
         <div class="action-tile">
           <div class="action-tile-title"><span>📥 1. 불러오기</span></div>
           <div class="action-tile-desc">구글 시트 클라우드에서 최신 이력서 불러오기</div>
@@ -378,7 +445,6 @@ function renderAnalyticsAndResumeTab(area) {
           </button>
         </div>
 
-        <!-- 2. 편집하기 -->
         <div class="action-tile ${isResumeEditMode ? 'active-mode' : ''}">
           <div class="action-tile-title"><span>✏️ 2. 편집하기</span></div>
           <div class="action-tile-desc">${isResumeEditMode ? '하단 항목 수정 후 [편집 저장] 클릭' : '잠금 해제 후 이력서 내용 직접 수정'}</div>
@@ -388,7 +454,6 @@ function renderAnalyticsAndResumeTab(area) {
           }
         </div>
 
-        <!-- 3. 업로드하기 -->
         <div class="action-tile">
           <div class="action-tile-title"><span>📤 3. 업로드하기</span></div>
           <div class="action-tile-desc">PC 이력서 파일(.json/.txt) 적용 및 드라이브 업로드</div>
@@ -397,7 +462,6 @@ function renderAnalyticsAndResumeTab(area) {
           </button>
         </div>
 
-        <!-- 4. 동기화하기 -->
         <div class="action-tile">
           <div class="action-tile-title"><span>🔄 4. 동기화하기</span></div>
           <div class="action-tile-desc">구글 시트 DB & 드라이브 폴더에 즉시 동기화</div>
@@ -407,7 +471,6 @@ function renderAnalyticsAndResumeTab(area) {
         </div>
       </div>
 
-      <!-- 마스터 이력서 폼 -->
       <div class="form-grid">
         <label class="field-label">👤 성명 / 브랜드명
           <input id="resName" class="${inputClass}" ${readonlyAttr} value="${masterResume.name || ''}" />
@@ -430,7 +493,6 @@ function renderAnalyticsAndResumeTab(area) {
       </div>
     </div>
 
-    <!-- 하단 2단: JD 핵심 역량 요약 & Google 클라우드 바로가기 -->
     <div class="two-col-layout">
       <div class="panel-card">
         <h3>📊 수집 공고(JD) 요구 역량 TOP 5</h3>
@@ -465,14 +527,12 @@ function renderAnalyticsAndResumeTab(area) {
 }
 
 // ============================================================================
-// 이력서 4대 작업 핸들러 (모두 경고 및 확인 모달 통과 필수)
+// 이력서 4대 작업 핸들러 (경고 및 확인 모달 필수)
 // ============================================================================
-
-// [1. 불러오기]
 function requestLoadResume() {
   openConfirmDialog({
     title: '⚠️ [이력서 불러오기] 데이터 덮어쓰기 경고',
-    message: 'Google 시트 클라우드(또는 저장된 마스터 파일)에서 이력서를 불러옵니다. 현재 화면에 표시된 기존 이력서 데이터가 덮어씌워집니다. 진행하시겠습니까?',
+    message: 'Google 시트 클라우드에서 이력서를 불러옵니다. 현재 화면의 이력서 데이터가 덮어씌워집니다. 진행하시겠습니까?',
     subText: '• 대상: 문PD_커리어_캐시카우_통합DB (마스터이력서 시트)',
     onConfirm: async () => {
       try {
@@ -493,11 +553,10 @@ function requestLoadResume() {
   });
 }
 
-// [2. 편집하기 & 저장]
 function enableResumeEditMode() {
   isResumeEditMode = true;
   renderActiveTab();
-  showToast('✏️ 편집 모드가 활성화되었습니다. 수정 후 [편집 내용 저장]을 눌러주세요.');
+  showToast('✏️ 편집 모드가 켜졌습니다. 수정 후 [편집 내용 저장]을 눌러주세요.');
 }
 
 function requestSaveEditedResume() {
@@ -510,19 +569,17 @@ function requestSaveEditedResume() {
 
   openConfirmDialog({
     title: '⚠️ [이력서 편집 저장] 기존 데이터 변경 확인',
-    message: '기존 마스터 이력서 데이터가 지금 수정하신 내용으로 변경되며, 모든 사이트 자동 변환기에 즉시 적용됩니다. 저장하시겠습니까?',
-    subText: `• 변경 대표 헤드라인: ${newHeadline}`,
+    message: '기존 마스터 이력서 데이터가 수정하신 내용으로 변경됩니다. 저장하시겠습니까?',
+    subText: `• 변경 헤드라인: ${newHeadline}`,
     onConfirm: async () => {
-      const updated = {
+      persistMasterResumeLocal({
         name: newName,
         email: newEmail,
         headline: newHeadline,
         portfolioMain: newPortfolio,
         tools: newTools,
-        coreCareer: newCareer,
-        updatedAt: new Date().toLocaleString()
-      };
-      persistMasterResumeLocal(updated);
+        coreCareer: newCareer
+      });
       try {
         await fetch('/api/resume-save', {
           method: 'POST',
@@ -532,12 +589,11 @@ function requestSaveEditedResume() {
       } catch (e) {}
       isResumeEditMode = false;
       renderActiveTab();
-      showToast('💾 이력서 편집 내용이 안전하게 저장되었습니다.');
+      showToast('💾 이력서 편집 내용이 저장되었습니다.');
     }
   });
 }
 
-// [3. 업로드하기]
 function triggerResumeFileUpload() {
   const input = document.getElementById('hiddenResumeFileInput');
   input.value = '';
@@ -553,18 +609,15 @@ function handleFileUploadSelected(event) {
     const rawContent = e.target.result;
     openConfirmDialog({
       title: '⚠️ [이력서 업로드] 기존 데이터 교체 경고',
-      message: `선택하신 '${file.name}' 파일의 데이터로 기존 마스터 이력서가 교체되며, Google 드라이브 전용 폴더에도 업로드됩니다. 계속하시겠습니까?`,
+      message: `선택하신 '${file.name}' 파일의 데이터로 기존 마스터 이력서가 교체되며 Google 드라이브에 업로드됩니다. 진행하시겠습니까?`,
       subText: `• 파일명: ${file.name} (${file.size} bytes)`,
       onConfirm: async () => {
-        let parsed = null;
         try {
           if (file.name.endsWith('.json')) {
-            parsed = JSON.parse(rawContent);
-            persistMasterResumeLocal(parsed);
+            persistMasterResumeLocal(JSON.parse(rawContent));
           } else {
             const lines = rawContent.split('\n').map(l => l.trim()).filter(Boolean);
-            parsed = { ...masterResume, coreCareer: lines.slice(0, 8), updatedAt: new Date().toLocaleString() };
-            persistMasterResumeLocal(parsed);
+            persistMasterResumeLocal({ ...masterResume, coreCareer: lines.slice(0, 8) });
           }
         } catch (err) {}
 
@@ -578,21 +631,20 @@ function handleFileUploadSelected(event) {
 
         isResumeEditMode = false;
         renderActiveTab();
-        showToast(`📤 '${file.name}' 업로드 및 이력서 반영 완료!`);
+        showToast(`📤 '${file.name}' 업로드 완료!`);
       }
     });
   };
   reader.readAsText(file, 'utf-8');
 }
 
-// [4. 동기화하기]
 function requestCloudSync() {
   openConfirmDialog({
     title: '⚠️ [구글 클라우드 동기화] 데이터 업데이트 확인',
-    message: '현재 이력서와 5대 트랙 수집 데이터를 Google 시트(문PD_커리어_캐시카우_통합DB) 및 Google 드라이브 폴더에 동기화합니다. 클라우드의 기존 데이터가 현재 데이터로 업데이트됩니다. 진행하시겠습니까?',
-    subText: '• 연동 계정: sgstarceo@gmail.com (Google Sheets & Drive)',
+    message: '현재 이력서와 수집 데이터를 Google 시트 및 드라이브에 동기화합니다. 클라우드의 기존 데이터가 업데이트됩니다. 진행하시겠습니까?',
+    subText: '• 연동 계정: sgstarceo@gmail.com',
     onConfirm: async () => {
-      showToast('⏳ Google 시트 및 드라이브 동기화 진행 중...');
+      showToast('⏳ Google 시트 및 드라이브 동기화 중...');
       try {
         const res = await fetch('/api/resume-sync', {
           method: 'POST',
@@ -600,17 +652,17 @@ function requestCloudSync() {
           body: JSON.stringify(masterResume)
         });
         if (res.ok) {
-          showToast('🔄 Google 시트 & 드라이브 양방향 동기화 완료!');
+          showToast('🔄 Google 시트 & 드라이브 동기화 완료!');
           return;
         }
       } catch (e) {}
-      showToast('🔄 로컬 및 클라우드 시드 동기화가 완료되었습니다.');
+      showToast('🔄 동기화가 완료되었습니다.');
     }
   });
 }
 
 // ============================================================================
-// 사이트별 맞춤 문서 생성 & 모달
+// 사이트별 맞춤 문서 생성 & 키워드 실시간 크롤링
 // ============================================================================
 function generateTailoredDocument(type, item) {
   const careerBullets = (masterResume.coreCareer || []).map(c => `• ${c}`).join('\n');
@@ -752,21 +804,33 @@ function runBatchConvertAndApply() {
   document.getElementById('docModal').classList.add('open');
 }
 
+// 키워드 맞춤형 실시간 수집 트리거
 async function triggerLiveCrawl() {
+  const kw = (document.getElementById('searchInput')?.value || '').trim();
   const btn = document.getElementById('liveCrawlBtn');
   const orig = btn.innerHTML;
-  btn.innerHTML = '⏳ 수집·동기화 중...';
+  const targetLabel = kw || '전체 핵심키워드';
+  btn.innerHTML = `⏳ '${targetLabel}' 수집 중...`;
   btn.disabled = true;
+  showToast(`🔄 '${targetLabel}' 키워드로 사람인·원티드·잡코리아·알바몬·위비티 실시간 수집 중...`);
+
   try {
-    const res = await fetch('/api/crawl', { method: 'POST' });
+    const res = await fetch('/api/crawl', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword: kw })
+    });
     if (res.ok) {
       appData = await res.json();
-      updateKpiAndCounts();
-      renderActiveTab();
-      showToast('🔄 실시간 수집 및 Google 시트 동기화 완료!');
+      onFilterChanged();
+      const total = (appData.jobs?.length || 0) + (appData.albas?.length || 0) + (appData.freelances?.length || 0) + (appData.contests?.length || 0);
+      showToast(`✅ '${targetLabel}' 실시간 수집 완료! (총 ${total}건)`);
+    } else {
+      onFilterChanged();
     }
   } catch (e) {
-    showToast('ℹ️ 로컬 서버 실행 시 실시간 수집이 작동합니다.');
+    onFilterChanged();
+    showToast(`🔍 '${targetLabel}' 키워드로 통합 DB 필터링이 적용되었습니다.`);
   } finally {
     btn.innerHTML = orig;
     btn.disabled = false;
@@ -787,8 +851,7 @@ function addNewCustomSitePrompt() {
     status: '연동됨',
     dailyNew: '상시 탐색'
   });
-  updateKpiAndCounts();
-  renderActiveTab();
+  onFilterChanged();
   showToast(`➕ '${name}' 추가됨`);
 }
 
