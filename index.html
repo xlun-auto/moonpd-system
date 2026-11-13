@@ -15,7 +15,7 @@
         <div class="brand-title">
           <h1>
             문PD 커리어 · 캐시카우
-            <span class="status-chip" id="syncStatusBadge">☁️ Google 시트·드라이브 연동</span>
+            <span class="status-chip" id="syncStatusBadge">☁️ 실시간 검증 연동</span>
           </h1>
         </div>
       </div>
@@ -34,14 +34,14 @@
           🚀 일괄변환·지원 (<span id="selectedCount">0</span>)
         </button>
         <button class="btn btn-primary btn-sm" id="liveCrawlBtn" onclick="triggerLiveCrawl()">
-          🔄 실시간 수집
+          🔄 키워드 실시간 수집
         </button>
       </div>
     </div>
   </header>
 
   <main class="container">
-    <!-- 심플 아이콘 KPI 바 -->
+    <!-- 심플 아이콘 KPI 바 (현재 검색/필터 결과와 100% 실시간 숫자 일치) -->
     <section class="kpi-grid">
       <div class="kpi-card">
         <span class="kpi-label">🎬 정규·계약직</span>
@@ -65,17 +65,18 @@
       </div>
     </section>
 
-    <!-- 심플 검색 & 필터 -->
+    <!-- 심플 검색 & 키워드 실시간 수집 바 -->
     <section class="toolbar">
       <div class="search-box">
         <input
           type="text"
           id="searchInput"
           class="search-input"
-          placeholder="🔍 키워드 검색 (PD, 3D, AI, 쇼츠, 공모전...)"
-          oninput="renderActiveTab()"
+          placeholder="🔍 원하는 키워드 입력 (예: 모션그래픽, 유튜브, 3D, AI, 편집, 촬영...) — 엔터 시 실시간 수집"
+          oninput="onFilterChanged()"
+          onkeydown="if(event.key==='Enter') triggerLiveCrawl()"
         />
-        <select id="siteFilter" class="filter-select" onchange="renderActiveTab()">
+        <select id="siteFilter" class="filter-select" onchange="onFilterChanged()">
           <option value="ALL">🌐 전체 사이트</option>
           <option value="사람인">사람인</option>
           <option value="원티드">원티드</option>
@@ -83,16 +84,31 @@
           <option value="미디어잡">미디어잡</option>
           <option value="알바몬">알바몬</option>
           <option value="당근알바">당근알바</option>
-          <option value="숨고">숨고</option>
           <option value="위시켓">위시켓</option>
-          <option value="크몽">크몽</option>
           <option value="위비티">위비티</option>
           <option value="K-Startup">K-Startup</option>
         </select>
+        <button class="btn btn-primary btn-sm" onclick="triggerLiveCrawl()" title="입력한 키워드로 각 사이트에서 새로 수집합니다">
+          🌐 키워드 수집
+        </button>
+        <button class="btn btn-outline btn-sm" onclick="resetSearchFilter()">초기화</button>
       </div>
-      <div style="display:flex; gap:6px;">
-        <button class="btn btn-outline btn-sm" onclick="selectAllVisible()">☑️ 전체선택</button>
-        <button class="btn btn-outline btn-sm" onclick="clearSelection()">✖ 해제</button>
+
+      <!-- 빠른 키워드 칩 & 전체선택 -->
+      <div style="display:flex; gap:6px; flex-wrap:wrap; width:100%; justify-content:space-between; align-items:center; padding-top:4px;">
+        <div class="summary-chips">
+          <button class="btn btn-outline btn-sm" onclick="quickKeyword('')">전체보기</button>
+          <button class="btn btn-outline btn-sm" onclick="quickKeyword('영상 PD')">#영상 PD</button>
+          <button class="btn btn-outline btn-sm" onclick="quickKeyword('모션그래픽')">#모션그래픽</button>
+          <button class="btn btn-outline btn-sm" onclick="quickKeyword('유튜브')">#유튜브</button>
+          <button class="btn btn-outline btn-sm" onclick="quickKeyword('3D')">#3D</button>
+          <button class="btn btn-outline btn-sm" onclick="quickKeyword('AI')">#AI</button>
+          <button class="btn btn-outline btn-sm" onclick="quickKeyword('편집')">#편집</button>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button class="btn btn-outline btn-sm" onclick="selectAllVisible()">☑️ 현재목록 선택</button>
+          <button class="btn btn-outline btn-sm" onclick="clearSelection()">✖ 해제</button>
+        </div>
       </div>
     </section>
 
@@ -122,7 +138,6 @@
     <section id="tabContentArea"></section>
   </main>
 
-  <!-- 숨겨진 파일 업로드 인풋 -->
   <input type="file" id="hiddenResumeFileInput" accept=".json,.txt,.md" style="display:none;" onchange="handleFileUploadSelected(event)" />
 
   <!-- 1) 상세 전략 & 맞춤 지원서 변환 모달 -->
@@ -147,7 +162,7 @@
     </div>
   </div>
 
-  <!-- 2) 데이터 변경 경고 및 확인 모달 (Warning & Confirmation Dialog) -->
+  <!-- 2) 데이터 변경 경고 및 확인 모달 -->
   <div class="modal-backdrop" id="confirmModal">
     <div class="modal-content confirm-box">
       <div class="modal-header">
