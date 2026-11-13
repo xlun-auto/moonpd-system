@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>문PD 커리어 & 캐시카우 웹앱</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- 상단 심플 헤더 -->
+  <header class="top-header">
+    <div class="header-inner">
+      <div class="brand-area">
+        <div class="brand-logo">문PD</div>
+        <div class="brand-title">
+          <h1>
+            문PD 커리어 · 캐시카우
+            <span class="status-chip" id="syncStatusBadge">☁️ Google 시트·드라이브 연동</span>
+          </h1>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <a class="btn btn-outline btn-sm" href="https://docs.google.com/spreadsheets/d/1wReNF82GUdAZb4c0_bFFI2kbU6grpapVz7fZqD2EFQE/edit" target="_blank" rel="noopener">
+          📊 구글시트 DB
+        </a>
+        <a class="btn btn-outline btn-sm" href="https://drive.google.com/drive/folders/1iLuXv3tbem-SzHNn-erlbLdtH2Yxyf5K" target="_blank" rel="noopener">
+          📁 구글드라이브
+        </a>
+        <button class="btn btn-outline btn-sm" onclick="switchTab('analytics')">
+          📄 이력서 관리
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="runBatchConvertAndApply()">
+          🚀 일괄변환·지원 (<span id="selectedCount">0</span>)
+        </button>
+        <button class="btn btn-primary btn-sm" id="liveCrawlBtn" onclick="triggerLiveCrawl()">
+          🔄 실시간 수집
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- 심플 아이콘 KPI 바 -->
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <span class="kpi-label">🎬 정규·계약직</span>
+        <span class="kpi-value" id="kpiCareerCount">0</span>
+      </div>
+      <div class="kpi-card indigo">
+        <span class="kpi-label">⚡ 알바·당근</span>
+        <span class="kpi-value" id="kpiAlbaCount">0</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">💰 숨고·외주</span>
+        <span class="kpi-value" id="kpiFreelanceCount">0</span>
+      </div>
+      <div class="kpi-card indigo">
+        <span class="kpi-label">🏆 공모·지원금</span>
+        <span class="kpi-value" id="kpiContestCount">0</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">📡 연동 사이트</span>
+        <span class="kpi-value" id="kpiSiteCount">20</span>
+      </div>
+    </section>
+
+    <!-- 심플 검색 & 필터 -->
+    <section class="toolbar">
+      <div class="search-box">
+        <input
+          type="text"
+          id="searchInput"
+          class="search-input"
+          placeholder="🔍 키워드 검색 (PD, 3D, AI, 쇼츠, 공모전...)"
+          oninput="renderActiveTab()"
+        />
+        <select id="siteFilter" class="filter-select" onchange="renderActiveTab()">
+          <option value="ALL">🌐 전체 사이트</option>
+          <option value="사람인">사람인</option>
+          <option value="원티드">원티드</option>
+          <option value="잡코리아">잡코리아</option>
+          <option value="미디어잡">미디어잡</option>
+          <option value="알바몬">알바몬</option>
+          <option value="당근알바">당근알바</option>
+          <option value="숨고">숨고</option>
+          <option value="위시켓">위시켓</option>
+          <option value="크몽">크몽</option>
+          <option value="위비티">위비티</option>
+          <option value="K-Startup">K-Startup</option>
+        </select>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-outline btn-sm" onclick="selectAllVisible()">☑️ 전체선택</button>
+        <button class="btn btn-outline btn-sm" onclick="clearSelection()">✖ 해제</button>
+      </div>
+    </section>
+
+    <!-- 6개 트랙 탭 -->
+    <nav class="tabs-nav">
+      <button class="tab-btn active" data-tab="career" onclick="switchTab('career')">
+        🎬 정규·계약직 <span class="tab-count" id="tabCountCareer">0</span>
+      </button>
+      <button class="tab-btn" data-tab="alba" onclick="switchTab('alba')">
+        ⚡ 알바·당근 <span class="tab-count" id="tabCountAlba">0</span>
+      </button>
+      <button class="tab-btn" data-tab="freelance" onclick="switchTab('freelance')">
+        💰 숨고·외주 <span class="tab-count" id="tabCountFreelance">0</span>
+      </button>
+      <button class="tab-btn" data-tab="contests" onclick="switchTab('contests')">
+        🏆 공모·지원사업 <span class="tab-count" id="tabCountContests">0</span>
+      </button>
+      <button class="tab-btn" data-tab="radar" onclick="switchTab('radar')">
+        📡 사이트 레이더 <span class="tab-count" id="tabCountRadar">20</span>
+      </button>
+      <button class="tab-btn" data-tab="analytics" onclick="switchTab('analytics')">
+        📄 이력서·동기화·분석
+      </button>
+    </nav>
+
+    <!-- 컨텐츠 영역 -->
+    <section id="tabContentArea"></section>
+  </main>
+
+  <!-- 숨겨진 파일 업로드 인풋 -->
+  <input type="file" id="hiddenResumeFileInput" accept=".json,.txt,.md" style="display:none;" onchange="handleFileUploadSelected(event)" />
+
+  <!-- 1) 상세 전략 & 맞춤 지원서 변환 모달 -->
+  <div class="modal-backdrop" id="docModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h3 id="modalTitle" style="font-size:15px;font-weight:800;">✨ 사이트 맞춤 변환</h3>
+          <p id="modalSubtitle" style="font-size:12px;color:var(--text-sub);margin-top:2px;"></p>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="closeDocModal()">✕ 닫기</button>
+      </div>
+      <div class="modal-body">
+        <div id="modalGuideBox" class="one-liner" style="-webkit-line-clamp:6;"></div>
+        <textarea id="modalTextarea" class="modal-textarea"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline btn-sm" onclick="copyModalContent()">📋 복사</button>
+        <button class="btn btn-secondary btn-sm" onclick="saveModalContentToFile()">☁️ 드라이브·로컬 저장</button>
+        <button class="btn btn-primary btn-sm" onclick="copyAndOpenTargetSite()">🚀 복사 후 지원페이지 열기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2) 데이터 변경 경고 및 확인 모달 (Warning & Confirmation Dialog) -->
+  <div class="modal-backdrop" id="confirmModal">
+    <div class="modal-content confirm-box">
+      <div class="modal-header">
+        <h3 id="confirmModalTitle" style="font-size:15px;font-weight:800;">⚠️ 데이터 변경 확인</h3>
+        <button class="btn btn-outline btn-sm" onclick="closeConfirmModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="confirmModalMessage" style="font-size:13.5px;color:var(--text-main);line-height:1.5;"></p>
+        <div id="confirmModalSub" class="one-liner" style="font-size:12px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline btn-sm" onclick="closeConfirmModal()">취소</button>
+        <button class="btn btn-primary btn-sm" id="confirmProceedBtn">확인 및 진행</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastNotification" class="toast"></div>
+
+  <script src="data/db_seed.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
