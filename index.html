@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>문PD 커리어 & 캐시카우 웹앱</title>
+  <title>문PD 커리어 & 캐시카우 통합 시스템</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -14,8 +14,8 @@
         <div class="brand-logo">문PD</div>
         <div class="brand-title">
           <h1>
-            문PD 커리어 · 캐시카우
-            <span class="status-chip" id="syncStatusBadge">☁️ 자유키워드 실시간 연동</span>
+            문PD 커리어 · 캐시카우 시스템
+            <span class="status-chip" id="syncStatusBadge">☁️ 실시간 공고분석·합격예측 가동중</span>
           </h1>
         </div>
       </div>
@@ -31,7 +31,7 @@
           ⭐ 관심공고 (<span id="headerSavedCount">0</span>)
         </button>
         <button class="btn btn-outline btn-sm" onclick="switchTab('analytics')">
-          📄 이력서·폴리오
+          📈 커리어지표·이력서
         </button>
         <button class="btn btn-secondary btn-sm" onclick="runBatchConvertAndApply()">
           🚀 일괄변환·지원 (<span id="selectedCount">0</span>)
@@ -62,20 +62,20 @@
         <span class="kpi-label">🏆 공모·지원금</span>
         <span class="kpi-value" id="kpiContestCount">0</span>
       </div>
-      <div class="kpi-card" onclick="switchTab('saved')">
-        <span class="kpi-label">⭐ 관심공고함</span>
-        <span class="kpi-value" id="kpiSavedCount">0</span>
+      <div class="kpi-card" onclick="switchTab('analytics')">
+        <span class="kpi-label">📈 평균 채용예측률</span>
+        <span class="kpi-value" id="kpiAvgProb">91%</span>
       </div>
     </section>
 
-    <!-- 자유 키워드 실시간 수집 + 지역별 검색 + 사이트 필터 바 -->
+    <!-- 자유 키워드 실시간 수집 + 지역별 검색 + 사이트 필터 + 마감일/등록순 정렬 바 -->
     <section class="toolbar">
       <div class="search-box">
         <input
           type="text"
           id="searchInput"
           class="search-input"
-          placeholder="🔍 어떤 키워드든 입력 (예: 마케팅, 퍼포먼스 마케터, 브랜드 기획, 영상 PD, 3D...) — 엔터 시 전 사이트 실시간 수집!"
+          placeholder="🔍 어떤 키워드든 입력 (마케팅, 퍼포먼스 마케터, 브랜드 기획, 영상 PD, 3D...) — 엔터 시 실시간 수집!"
           oninput="onFilterChanged()"
           onkeydown="if(event.key==='Enter') triggerLiveCrawl()"
         />
@@ -102,23 +102,31 @@
           <option value="위비티">위비티</option>
           <option value="K-Startup">K-Startup</option>
         </select>
+        <select id="sortFilter" class="filter-select" onchange="onFilterChanged()">
+          <option value="DEADLINE_ASC">⏰ 마감일 임박순</option>
+          <option value="REG_DESC">🆕 최신 등록순</option>
+          <option value="PROB_DESC">🎯 채용확률 높은순</option>
+        </select>
         <button class="btn btn-primary btn-sm" onclick="triggerLiveCrawl()">
-          🌐 입력 키워드 실시간 수집
+          🌐 키워드 실시간 수집
         </button>
         <button class="btn btn-outline btn-sm" onclick="resetSearchFilter()">초기화</button>
       </div>
 
-      <!-- 빠른 키워드 칩 (마케팅·기획 포함 + 사용자 커스텀 키워드 추가 가능) -->
+      <!-- 빠른 키워드 칩 + 마감공고 자동숨김 상태 표시 -->
       <div style="display:flex; gap:6px; flex-wrap:wrap; width:100%; justify-content:space-between; align-items:center; padding-top:4px;">
         <div class="summary-chips" id="quickKeywordBar"></div>
-        <div style="display:flex; gap:6px;">
+        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+          <span class="chip" id="hiddenExpiredBadge" title="일반 목록에서는 마감·기간경과 공고를 자동 숨김 처리하며, 관심공고함에서는 마감 표시와 함께 유지합니다.">
+            🧹 마감공고 자동숨김 ON
+          </span>
           <button class="btn btn-outline btn-sm" onclick="selectAllVisible()">☑️ 현재목록 선택</button>
           <button class="btn btn-outline btn-sm" onclick="clearSelection()">✖ 해제</button>
         </div>
       </div>
     </section>
 
-    <!-- 7개 트랙 탭 (관심공고 카테고리 보관함 포함) -->
+    <!-- 7개 트랙 탭 -->
     <nav class="tabs-nav">
       <button class="tab-btn active" data-tab="career" onclick="switchTab('career')">
         🎬 정규·계약직 <span class="tab-count" id="tabCountCareer">0</span>
@@ -135,11 +143,11 @@
       <button class="tab-btn" data-tab="saved" onclick="switchTab('saved')">
         ⭐ 관심공고함 <span class="tab-count" id="tabCountSaved">0</span>
       </button>
+      <button class="tab-btn" data-tab="analytics" onclick="switchTab('analytics')">
+        📈 커리어 성장지표 · 이력서
+      </button>
       <button class="tab-btn" data-tab="radar" onclick="switchTab('radar')">
         📡 사이트 레이더 <span class="tab-count" id="tabCountRadar">20</span>
-      </button>
-      <button class="tab-btn" data-tab="analytics" onclick="switchTab('analytics')">
-        📄 이력서·폴리오·동기화
       </button>
     </nav>
 
@@ -151,17 +159,20 @@
   <input type="file" id="hiddenResumeFileInput" accept=".json,.txt,.md,.html" style="display:none;" onchange="handleFileUploadSelected(event)" />
   <input type="file" id="hiddenPortfolioFileInput" accept=".mp4,.mov,.pdf,.pptx,.zip,.json,.txt" style="display:none;" onchange="handlePortfolioUploadSelected(event)" />
 
-  <!-- 1) 사이트 맞춤 변환 + 양식 적합성 체크 & 즉시 수정 모달 -->
+  <!-- 1) 공고 대비 나의 장단점·합격확률 진단 + 사이트 맞춤 변환 & 양식 검증 모달 -->
   <div class="modal-backdrop" id="docModal">
     <div class="modal-content">
       <div class="modal-header">
         <div>
-          <h3 id="modalTitle" style="font-size:15px;font-weight:800;">✨ 사이트 맞춤 변환 & 양식 검증</h3>
+          <h3 id="modalTitle" style="font-size:15px;font-weight:800;">✨ 공고 합격진단 & 사이트 맞춤 양식 변환</h3>
           <p id="modalSubtitle" style="font-size:12px;color:var(--text-sub);margin-top:2px;"></p>
         </div>
         <button class="btn btn-outline btn-sm" onclick="closeDocModal()">✕ 닫기</button>
       </div>
       <div class="modal-body">
+        <!-- 공고 분석 vs 나의 장단점 & 채용확률 비교 진단 박스 -->
+        <div id="modalFitAnalysisBox" class="validation-panel"></div>
+
         <!-- 채용사이트 양식 자동 검증 & 원클릭 보완 체크리스트 -->
         <div id="formatValidationBox" class="validation-panel"></div>
 
