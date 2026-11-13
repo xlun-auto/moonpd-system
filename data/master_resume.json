@@ -1,0 +1,36 @@
+﻿{
+  "name": "문PD (Moon PD)",
+  "headline": "영상 기획·연출 PD | 3D 애니메이션 & AI 자동편집 전문가",
+  "phone": "010-XXXX-XXXX",
+  "email": "sgstarceo@gmail.com",
+  "portfolioMain": "2024Portfolio_3DAnimation_50m.mp4",
+  "portfolioSub": "auto_edit_capcut.py (CapCut + Gemini AI 자동편집 파이프라인)",
+  "portfolioDriveUrl": "https://drive.google.com/drive/folders/1iLuXv3tbem-SzHNn-erlbLdtH2Yxyf5K",
+  "portfolioDriveFileId": "1aRauzELgjSsQPsRm5AHRJ8BWI9mIOulg",
+  "tools": "Premiere Pro, After Effects, Cinema 4D, Blender 3D, CapCut Pro, Python, Gemini AI",
+  "techAutomation": "CapCut + Gemini + Python 자동편집 파이프라인 구축 (편집 시간 70% 단축, 월 40편 이상 제작)",
+  "desiredSalary": "면접 후 결정 (프로젝트 단가 협의 가능 / 즉시 투입 가능)",
+  "coreCareer": [
+    "브랜드 유튜브 롱폼·숏폼 기획·연출·종합편집 총괄 (누적 조회수 500만+ 달성)",
+    "3D 애니메이션 및 모션그래픽 기반 오프닝·홍보영상 제작 (2024Portfolio_3DAnimation_50m.mp4)",
+    "생성형 AI 및 Python 스크립트 기반 고속 편집 자동화 (제작 리드타임 70% 단축)",
+    "기업·관공서·커머스 맞춤형 스토리보드 기획 및 풀패키지 납품 (만족도 99%)"
+  ],
+  "portfolioHistory": [
+    {
+      "name": "2024Portfolio_3DAnimation_50m.mp4",
+      "source": "사람인 등록 최신 대표 포트폴리오 (3D 애니메이션 릴)",
+      "driveId": "1aRauzELgjSsQPsRm5AHRJ8BWI9mIOulg",
+      "driveUrl": "https://drive.google.com/file/d/1aRauzELgjSsQPsRm5AHRJ8BWI9mIOulg/view",
+      "uploadedAt": "2026-11-13"
+    },
+    {
+      "name": "auto_edit_capcut.py",
+      "source": "사람인 등록 기술 포트폴리오 (CapCut+Gemini 자동편집 엔진)",
+      "driveId": "15tl_gwI0TFpeQq7cak9XjBzuv7g0dZB8",
+      "driveUrl": "https://drive.google.com/file/d/15tl_gwI0TFpeQq7cak9XjBzuv7g0dZB8/view",
+      "uploadedAt": "2026-11-13"
+    }
+  ],
+  "updatedAt": "2026-11-13"
+}
