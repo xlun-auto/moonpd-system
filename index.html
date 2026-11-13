@@ -30,8 +30,11 @@
         <button class="btn btn-outline btn-sm" onclick="switchTab('saved')">
           ⭐ 관심공고 (<span id="headerSavedCount">0</span>)
         </button>
+        <button class="btn btn-outline btn-sm" onclick="switchTab('career_analysis')">
+          🎯 커리어분석
+        </button>
         <button class="btn btn-outline btn-sm" onclick="switchTab('analytics')">
-          📈 커리어지표·이력서
+          📄 이력서·폴리오
         </button>
         <button class="btn btn-secondary btn-sm" onclick="runBatchConvertAndApply()">
           🚀 일괄변환·지원 (<span id="selectedCount">0</span>)
@@ -62,7 +65,7 @@
         <span class="kpi-label">🏆 공모·지원금</span>
         <span class="kpi-value" id="kpiContestCount">0</span>
       </div>
-      <div class="kpi-card" onclick="switchTab('analytics')">
+      <div class="kpi-card" onclick="switchTab('career_analysis')">
         <span class="kpi-label">📈 평균 채용예측률</span>
         <span class="kpi-value" id="kpiAvgProb">91%</span>
       </div>
@@ -143,8 +146,11 @@
       <button class="tab-btn" data-tab="saved" onclick="switchTab('saved')">
         ⭐ 관심공고함 <span class="tab-count" id="tabCountSaved">0</span>
       </button>
+      <button class="tab-btn" data-tab="career_analysis" onclick="switchTab('career_analysis')">
+        🎯 커리어 직군분석
+      </button>
       <button class="tab-btn" data-tab="analytics" onclick="switchTab('analytics')">
-        📈 커리어 성장지표 · 이력서
+        📄 이력서·폴리오·동기화
       </button>
       <button class="tab-btn" data-tab="radar" onclick="switchTab('radar')">
         📡 사이트 레이더 <span class="tab-count" id="tabCountRadar">20</span>
