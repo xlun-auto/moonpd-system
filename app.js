@@ -939,6 +939,7 @@ function renderActiveTab() {
   else if (currentTab === 'freelance') renderFreelanceTab(area);
   else if (currentTab === 'contests') renderContestsTab(area);
   else if (currentTab === 'saved') renderSavedTab(area);
+  else if (currentTab === 'career_analysis') renderCareerAnalysisTab(area);
   else if (currentTab === 'radar') renderRadarTab(area);
   else if (currentTab === 'analytics') renderAnalyticsAndResumeTab(area);
 }
@@ -976,7 +977,6 @@ function renderCareerTab(area) {
             <span class="chip">🏢 <strong>${item.company}</strong></span>
             <span class="chip">📅 <strong>지원기간:</strong> ${sched.applyPeriod}</span>
           </div>
-          ${renderFitMiniSummary(item)}
         </div>
         <div class="card-footer">
           <button class="btn btn-primary btn-sm" onclick="openConvertedDocModal('career', '${item.id}')">
@@ -1022,7 +1022,6 @@ function renderAlbaTab(area) {
             <span class="chip">🏪 <strong>${item.company}</strong></span>
             <span class="chip">📅 <strong>지원기간:</strong> ${sched.applyPeriod}</span>
           </div>
-          ${renderFitMiniSummary(item)}
         </div>
         <div class="card-footer">
           <button class="btn btn-primary btn-sm" onclick="openConvertedDocModal('alba', '${item.id}')">
@@ -1066,7 +1065,6 @@ function renderFreelanceTab(area) {
             <span class="chip">💰 <strong>${item.budget}</strong></span>
             <span class="chip">📅 <strong>지원기간:</strong> ${sched.applyPeriod}</span>
           </div>
-          ${renderFitMiniSummary(item)}
         </div>
         <div class="card-footer">
           <button class="btn btn-primary btn-sm" onclick="openConvertedDocModal('freelance', '${item.id}')">
@@ -1110,7 +1108,6 @@ function renderContestsTab(area) {
             <span class="chip">🏛️ <strong>${item.organizer}</strong></span>
             <span class="chip">📅 <strong>지원기간:</strong> ${sched.applyPeriod}</span>
           </div>
-          ${renderFitMiniSummary(item)}
         </div>
         <div class="card-footer">
           <button class="btn btn-primary btn-sm" onclick="openConvertedDocModal('contest', '${item.id}')">
@@ -1166,7 +1163,6 @@ function renderSavedCardHtml(item) {
           <span class="chip">🏢 <strong>${orgName}</strong> (${regionTag})</span>
           <span class="chip">📅 <strong>지원기간:</strong> ${sched.applyPeriod}</span>
         </div>
-        ${renderFitMiniSummary(item)}
       </div>
       <div class="card-footer">
         <button class="btn btn-primary btn-sm" onclick="openConvertedDocModal('${item._track}', '${item.id}')">
@@ -1291,148 +1287,170 @@ function renderRadarTab(area) {
 }
 
 // ============================================================================
-// 9. [핵심] 문PD 커리어 나침반 & 장단점 비교 & 연마 기술 로드맵 + 사람인 이력서/포트폴리오 탭
+// 9. [신설] 커리어 직군분석 메뉴: 등록된 키워드 직군에 대해서만 장단점 비교 & 보완 로드맵 제시
 // ============================================================================
-function computeCareerGrowthMetrics() {
-  const all = getAllItemsWithTrack();
-  const totalCount = Math.max(1, all.length);
+function analyzeKeywordRoleProfile(kw) {
+  const allActive = getAllItemsWithTrack().filter(x => !getScheduleMeta(x).isExpired);
+  const kwLower = kw.toLowerCase();
+  const matched = allActive.filter(item => {
+    const text = `${item.title || ''} ${item.keyword || ''} ${item.jdSummary || ''} ${item.summary || ''}`.toLowerCase();
+    return text.includes(kwLower) || kwLower.split(/\s+/).every(t => text.includes(t));
+  });
 
-  const countRegex = reg => all.filter(x => reg.test(`${x.title || ''} ${x.keyword || ''} ${x.jdSummary || ''}`)).length;
+  const avgProb = matched.length
+    ? Math.round(matched.reduce((acc, it) => acc + analyzePostingForMoonPD(it).hireProb, 0) / matched.length)
+    : analyzePostingForMoonPD({ title: kw, keyword: kw }).hireProb;
 
-  const videoCount = countRegex(/영상|pd|피디|편집|유튜브|숏폼|촬영/);
-  const mktCount = countRegex(/마케팅|마케터|퍼포먼스|브랜드|광고|sns|바이럴|커머스/);
-  const motion3dCount = countRegex(/3d|모션|애니메이션|c4d|블렌더|애프터이펙트|ai/);
+  let roleCategory = '🎬 영상·제작 직군';
+  let strength = '기획·연출부터 3D·AI 자동편집(제작시간 70% 단축)까지 원스톱 수행 가능한 올라운더 실무력';
+  let weakness = '지원 직무에 특화된 대표 성과 1~2줄과 정량 지표(조회수·납기단축률)를 이력서 최상단에 배치 필요';
+  let actionGuide = '등록된 대표 포트폴리오(2024Portfolio_3DAnimation_50m.mp4) 외에 해당 키워드 맞춤형 30초 숏폼 하이라이트 릴 추가 제작';
+  let polishSkill = '생성형 AI 비디오(Runway/Kling) + 빠른 컷편집 자동화 템플릿 고도화';
+
+  if (/퍼포먼스|그로스|광고/.test(kwLower)) {
+    roleCategory = '📊 퍼포먼스·광고 마케팅 직군';
+    strength = '광고 소재(릴스·쇼츠·모션)를 외주 없이 자체 고속 제작(주 15편+)하여 소재 피로도를 즉시 해결하는 능력';
+    weakness = '매체 운영 데이터 지표(ROAS · CTR · CVR · GA4) 분석 경험 및 A/B 테스트 성과 수치 기재 부족';
+    actionGuide = '이력서에 "광고소재 3종 A/B 테스트 기반 CTR 개선" 사례를 추가하고, Meta Ads/GA4 기초 지표 리포팅 역량 보완';
+    polishSkill = 'Meta/Google 광고 관리자 성과 분석(ROAS·CTR) & 데이터 기반 후킹 카피라이팅';
+  } else if (/마케팅|마케터|브랜드|sns|바이럴|기획/.test(kwLower)) {
+    roleCategory = '📢 콘텐츠·브랜드 마케팅 직군';
+    strength = '영상·3D·모션그래픽을 직접 기획·제작하는 압도적 콘텐츠 생산력 및 채널 누적 조회수 500만+ 경험';
+    weakness = '단순 제작을 넘어선 브랜드 캠페인 퍼널(인지→유입→전환) 및 팔로워/매출 기여도 수치 강조 필요';
+    actionGuide = '사람인 헤드라인에 "조회수·전환율을 만드는 콘텐츠 마케터" 포지셔닝 추가 및 상세페이지/릴스 전환 패키지 포트폴리오화';
+    polishSkill = '브랜드 스토리텔링 퍼널 설계 & 인스타그램·유튜브 알고리즘 그로스 지표 관리';
+  } else if (/3d|모션|애니메이션|그래픽/.test(kwLower)) {
+    roleCategory = '🧊 3D·모션그래픽 직군';
+    strength = '실무 3D 애니메이션 포트폴리오(50m.mp4) 보유 및 After Effects·Cinema 4D·Blender 통합 워크플로우';
+    weakness = '하이엔드 스튜디오 공고에서 요구하는 리얼타임 렌더러(Octane/Unreal) 및 최근 1년 내 신규 3D 릴 보강 권장';
+    actionGuide = '최신 3D 모션 15초 시퀀스 2~3개를 추가 렌더링해 Google 드라이브 대표 포트폴리오로 자동 첨부 설정';
+    polishSkill = 'Cinema 4D (Octane) 라이팅·룩뎁 및 Unreal Engine 5 리얼타임 모션 연출';
+  } else if (/ai|자동화/.test(kwLower)) {
+    roleCategory = '🤖 AI 콘텐츠·자동화 직군';
+    strength = 'Python + Gemini + CapCut 자동편집 파이프라인(auto_edit_capcut.py) 실구현 및 실증 데이터 보유';
+    weakness = '텍스트·편집 자동화를 넘어 이미지/비디오 생성 AI(ComfyUI, Runway, Kling) 실무 상용화 레퍼런스 추가 필요';
+    actionGuide = '자체 자동편집 스크립트의 실행 결과 전후(Before/After 제작시간 70% 단축)를 1장 요약 PDF로 만들어 드라이브에 업로드';
+    polishSkill = 'ComfyUI 워크플로우 구축 · AI 비디오(Runway/Kling) 실무 상용화 파이프라인';
+  } else if (/유튜브|숏폼|편집|pd/.test(kwLower)) {
+    roleCategory = '🎬 유튜브·영상 PD 직군';
+    strength = '롱폼·숏폼 기획/연출/자막/모션 원스톱 제작 및 자동화 템플릿으로 경쟁자 대비 2~3배 빠른 납기';
+    weakness = '채널 타겟 시청자층(예: 뷰티·IT·재테크·커머스)별 레퍼런스 분류가 한눈에 보이도록 정리 필요';
+    actionGuide = '지원 공고 업종에 맞는 레퍼런스 영상 링크 2개를 지원서 최상단에 자동 배치(양식 검증 모달 활용)';
+    polishSkill = '초반 3초 시청지속률(Retention) 후킹 편집 기법 & 숏폼 바이럴 패키징';
+  }
 
   return {
-    totalCount,
-    videoCount,
-    mktCount,
-    motion3dCount,
-    trackProbs: [
-      { label: '🎬 영상 기획·연출 PD / 유튜브·숏폼', prob: 94, target: '즉시 주력 지원 (최상위 경쟁력)', count: videoCount },
-      { label: '🧊 3D 애니메이션 · 모션그래픽 · AI 영상', prob: 92, target: '고단가 채용·외주 핵심 캐시카우', count: motion3dCount },
-      { label: '💰 프리랜서 외주 & 🏆 공모전·지원사업(PSST)', prob: 89, target: '자동화 파이프라인 실증으로 수주 우위', count: (appData.freelances?.length || 0) + (appData.contests?.length || 0) },
-      { label: '📢 콘텐츠·브랜드·퍼포먼스 마케팅', prob: 81, target: '광고지표(ROAS/GA4) 보강 시 93%로 급상승', count: mktCount }
-    ],
-    skillRoadmap: [
-      {
-        rank: '1순위 연마',
-        skill: '📊 퍼포먼스 영상 마케팅 & 광고 데이터 지표 (Meta Ads · GA4 · ROAS/CTR)',
-        marketDemand: 92,
-        myLevel: 68,
-        gainText: '연마 시 마케팅·커머스 직군 채용확률 +14%p 상승 (79% → 93%)',
-        reason: '수집된 마케팅·브랜드 공고의 85% 이상이 영상 제작 능력에 더해 클릭률(CTR)·전환율(CVR)·ROAS 분석 능력을 동시에 요구합니다.'
-      },
-      {
-        rank: '2순위 연마',
-        skill: '🤖 생성형 AI 비디오 실무 합성 파이프라인 (Runway Gen-3 · Kling · ComfyUI)',
-        marketDemand: 89,
-        myLevel: 82,
-        gainText: '연마 시 외주·공모전 수주율 +10%p & 건당 제작 수익성 2배 상승',
-        reason: '기존 Python+CapCut 자동화 강점에 AI 실사/3D 비디오 생성 워크플로우를 결합하면 에이전시·기업 외주에서 독보적 단가 협상력을 갖습니다.'
-      },
-      {
-        rank: '3순위 연마',
-        skill: '🛒 이커머스 숏폼 & 상세페이지 GIF 전환 패키지 기획력',
-        marketDemand: 86,
-        myLevel: 74,
-        gainText: '연마 시 숨고·위시켓·크몽 월 고정 리테이너(캐시카우) 확보율 +25%p',
-        reason: '단발성 영상 편집 외주보다 "상세페이지용 3초 후킹 GIF + 메타 릴스 광고소재 3종 세트"가 재계약률과 단가가 가장 높습니다.'
-      },
-      {
-        rank: '4순위 연마',
-        skill: '🧊 Cinema 4D (Octane) & Unreal Engine 리얼타임 3D 연출',
-        marketDemand: 78,
-        myLevel: 80,
-        gainText: '연마 시 대기업·메이저 프로덕션 하이엔드 포지션 채용확률 95% 달성',
-        reason: '현재 보유한 3D 애니메이션 포트폴리오(50m.mp4)에 언리얼/옥테인 고속 렌더링 키워드를 추가하면 시니어 아트디렉터급으로 도약합니다.'
-      },
-      {
-        rank: '5순위 연마',
-        skill: '📑 정부지원사업(PSST) AI 콘텐츠 솔루션 B2B 사업화 제안',
-        marketDemand: 75,
-        myLevel: 76,
-        gainText: '연마 시 K-Startup·콘진원 지원금(3,000만~1억 원) 선정 확률 극대화',
-        reason: '문PD님의 자동편집 파이프라인(auto_edit_capcut.py)을 단순 툴이 아닌 "중소기업용 마케팅 영상 자동제작 솔루션"으로 포지셔닝하면 지원사업 선정에 매우 유리합니다.'
-      }
-    ]
+    keyword: kw,
+    roleCategory,
+    matchedCount: matched.length,
+    avgProb,
+    boostedProb: Math.min(99, avgProb + (avgProb < 86 ? 11 : 4)),
+    strength,
+    weakness,
+    actionGuide,
+    polishSkill
   };
+}
+
+function renderCareerAnalysisTab(area) {
+  const registeredKeywords = quickKeywords && quickKeywords.length ? quickKeywords : DEFAULT_QUICK_KEYWORDS;
+  const roleProfiles = registeredKeywords.map(analyzeKeywordRoleProfile);
+  const overallAvg = roleProfiles.length
+    ? Math.round(roleProfiles.reduce((a, b) => a + b.avgProb, 0) / roleProfiles.length)
+    : 90;
+
+  area.innerHTML = `
+    <div class="panel-card" style="margin-bottom:14px;">
+      <h3>
+        <span>🎯 등록 키워드 직군별 커리어 분석 (총 ${registeredKeywords.length}개 등록 키워드 기준)</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <span class="status-chip">📈 평균 채용예측률 ${overallAvg}%</span>
+          <button class="btn btn-primary btn-sm" onclick="addCustomQuickKeywordPrompt()">➕ 분석할 직군 키워드 추가</button>
+        </div>
+      </h3>
+
+      <div class="one-liner" style="margin-bottom:14px;-webkit-line-clamp:unset;">
+        💡 <strong>맞춤 직군 분석 원칙:</strong> 무관한 전체 공고가 아니라, 문PD님이 상단에 등록한 키워드 직군(<strong>${registeredKeywords.map(k => `#${k}`).join(', ')}</strong>)에 해당하는 활성 공고만 추출해 <strong>나의 강점·약점·채용확률·보완 방법</strong>을 제시합니다.
+      </div>
+
+      <div class="cards-grid">
+        ${roleProfiles.map(rp => `
+          <article class="item-card">
+            <div>
+              <div class="card-top">
+                <div class="badge-group">
+                  <span class="badge-site">#${rp.keyword}</span>
+                  <span class="badge-match">🎯 채용확률 ${rp.avgProb}% → 보완 시 ${rp.boostedProb}%</span>
+                </div>
+                <span class="chip">${rp.matchedCount}건 분석</span>
+              </div>
+
+              <h3 class="card-title" style="margin-top:8px;">${rp.roleCategory} (${rp.keyword})</h3>
+
+              <div class="bar-row" style="margin-top:8px;margin-bottom:8px;">
+                <div class="bar-track"><div class="bar-fill" style="width:${rp.avgProb}%"></div></div>
+              </div>
+
+              <div class="fit-mini-box">
+                <div>💪 <strong style="color:#93c5fd;">나의 강점:</strong> ${rp.strength}</div>
+                <div style="margin-top:4px;">⚡ <strong style="color:#c7d2fe;">약점/보완점:</strong> ${rp.weakness}</div>
+                <div style="margin-top:4px;">🧭 <strong>어떻게 보완할까:</strong> ${rp.actionGuide}</div>
+                <div style="margin-top:4px;">🛠️ <strong>연마 추천 기술:</strong> ${rp.polishSkill}</div>
+              </div>
+            </div>
+            <div class="card-footer">
+              <button class="btn btn-primary btn-sm" onclick="quickKeyword('${rp.keyword.replace(/'/g, "\\'")}'); switchTab('career');">
+                🔍 '${rp.keyword}' 공고 바로 보기
+              </button>
+              <button class="btn btn-outline btn-sm" onclick="switchTab('analytics')">
+                ✏️ 이력서 보완하기
+              </button>
+            </div>
+          </article>
+        `).join('')}
+      </div>
+    </div>
+
+    <!-- 카카오톡 나에게 보내기 매일 자동 알림 연동 패널 -->
+    <div class="panel-card">
+      <h3>
+        <span>💬 매일 공고 확인 & 채용확률 90%↑ 신규공고 카카오톡 [나에게 보내기] 자동 알림</span>
+        <span class="status-chip">🤖 kakao_notify.ps1 연동 준비</span>
+      </h3>
+      <div class="one-liner" style="margin-bottom:10px;-webkit-line-clamp:unset;">
+        • <strong>동작 방식:</strong> 매일 정해진 시간에 자동 수집기(<code>crawler.ps1</code>)가 최신 공고를 확인한 뒤, <strong>이전 알림에 없던 신규 공고 중 채용확률 90% 이상</strong>인 공고만 추려 <strong>카카오톡 나에게 보내기</strong>로 즉시 전송합니다.<br/>
+        • <strong>필요 설정:</strong> 카카오 디벨로퍼스 무료 앱의 <code>REST API 키</code>와 1회 로그인 인증(<code>talk_message</code> 권한)만 연결하면 PC 작업 스케줄러로 매일 자동 발송됩니다.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary btn-sm" onclick="testKakaoNotifyViaServer()">🔔 카카오톡 알림 테스트 발송</button>
+        <span class="chip">📁 스크립트 위치: moonpd_system/kakao_notify.ps1</span>
+      </div>
+    </div>
+  `;
+}
+
+async function testKakaoNotifyViaServer() {
+  showToast('⏳ 카카오톡 알림 발송 테스트 요청 중...');
+  try {
+    const res = await fetch('/api/kakao-test', { method: 'POST' });
+    const data = await res.json();
+    if (res.ok && data.ok) {
+      showToast('✅ 카카오톡 나에게 보내기 발송 성공!');
+    } else {
+      alert(data.message || '카카오톡 REST API 토큰 설정(kakao_setup.ps1)이 먼저 필요합니다.');
+    }
+  } catch (e) {
+    alert('로컬 PC 서버(http://localhost:8090)가 켜진 상태에서 kakao_setup.ps1로 카카오 인증을 1회 진행해 주세요.');
+  }
 }
 
 function renderAnalyticsAndResumeTab(area) {
   const readonlyAttr = isResumeEditMode ? '' : 'readonly';
   const inputClass = isResumeEditMode ? 'field-input editable' : 'field-input';
   const pfList = masterResume.portfolioHistory || DEFAULT_MASTER_RESUME.portfolioHistory;
-  const metrics = computeCareerGrowthMetrics();
 
   area.innerHTML = `
-    <!-- 1) 문PD 커리어 & 캐시카우 핵심 전략 지표: 공고 빅데이터 분석 · 장단점 · 채용확률 · 향후 연마 기술 -->
-    <div class="panel-card" style="margin-bottom:14px;">
-      <h3>
-        <span>📈 문PD 커리어 & 캐시카우 성장 지표 (실시간 수집 공고 ${metrics.totalCount}건 정밀 비교 분석)</span>
-        <span class="status-chip">🎯 맞춤형 커리어 나침반</span>
-      </h3>
-
-      <div class="two-col-layout" style="margin-bottom:14px;">
-        <!-- 분야별 채용/수주 예측 확률 -->
-        <div class="action-tile">
-          <div class="action-tile-title">🎯 트랙별 지원 시 채용·수주 예측 확률</div>
-          <div class="action-tile-desc" style="margin-bottom:6px;">현재 사람인 마스터 이력서 기준 각 분야 지원 시 합격 예측치입니다.</div>
-          ${metrics.trackProbs.map(t => `
-            <div class="bar-row" style="margin-bottom:8px;">
-              <div class="bar-label">
-                <span>${t.label} <span class="status-chip">${t.count}건</span></span>
-                <strong>${t.prob}%</strong>
-              </div>
-              <div class="bar-track"><div class="bar-fill" style="width:${t.prob}%"></div></div>
-              <div style="font-size:11px;color:var(--text-sub);margin-top:2px;">💡 ${t.target}</div>
-            </div>
-          `).join('')}
-        </div>
-
-        <!-- 채용시장 대비 나의 강점 vs 단점(보완점) 비교 -->
-        <div class="action-tile">
-          <div class="action-tile-title">⚖️ 수집 공고 대비 [문PD 장단점(강점 vs 약점) 핵심 진단]</div>
-          <div class="fit-mini-box" style="margin-top:4px;">
-            <strong style="color:#93c5fd;">💪 시장 상위 5% 핵심 강점 (Strengths — 즉시 캐시카우 무기)</strong><br/>
-            1. <strong>기획+3D+편집+AI자동화 올인원:</strong> 일반 편집자 대비 제작 속도 70% 단축<br/>
-            2. <strong>검증된 실무 에셋:</strong> <code>2024Portfolio_3DAnimation_50m.mp4</code> & <code>auto_edit_capcut.py</code> 보유<br/>
-            3. <strong>멀티 트랙 확장성:</strong> 정규직(PD/마케터) + 단기알바 + 외주 + 정부지원사업 동시 공략 가능
-          </div>
-          <div class="fit-mini-box" style="margin-top:6px;border-left-color:var(--color-secondary);">
-            <strong style="color:#c7d2fe;">⚡ 채용공고 대비 현재 보완점 (Weaknesses — 합격률 점프 포인트)</strong><br/>
-            1. <strong>마케팅 직군 지원 시:</strong> 영상 조회수 외에 <strong>광고 효율 지표(ROAS·CTR·CVR·GA4)</strong> 수치 연결 필요<br/>
-            2. <strong>커머스·브랜드 지원 시:</strong> <strong>상세페이지 GIF + 숏폼 광고소재 A/B 테스트</strong> 패키지 명시 필요<br/>
-            3. <strong>하이엔드 3D 공고 지원 시:</strong> <strong>Cinema 4D(Octane)·Unreal·생성형 AI 비디오</strong> 워크플로우 키워드 보강
-          </div>
-        </div>
-      </div>
-
-      <!-- 앞으로 어떤 방향과 기술을 더 연마해야 하는지 알려주는 로드맵 지표 -->
-      <div class="action-tile active-mode">
-        <div class="action-tile-title" style="font-size:13.5px;">
-          🧭 앞으로 어떤 방향과 기술을 더 연마해야 할까? [문PD 기술 연마 & 캐시카우 우선순위 TOP 5]
-        </div>
-        <div class="action-tile-desc" style="margin-bottom:8px;">
-          실시간 수집된 채용·외주·공모전 공고들이 가장 많이 요구하는 기술과 문PD님의 현재 이력서를 비교하여 산출한 <strong>연마 우선순위 지표</strong>입니다.
-        </div>
-        <div class="cards-grid">
-          ${metrics.skillRoadmap.map(sr => `
-            <div class="action-tile" style="background:var(--bg-card);">
-              <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
-                <span class="badge-site">${sr.rank}</span>
-                <span class="badge-match">시장요구 ${sr.marketDemand}% / 내 숙련 ${sr.myLevel}%</span>
-              </div>
-              <div style="font-size:13px;font-weight:800;color:var(--text-main);margin-top:4px;">${sr.skill}</div>
-              <div style="font-size:11.5px;color:#93c5fd;font-weight:700;">🚀 ${sr.gainText}</div>
-              <div class="action-tile-desc">${sr.reason}</div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    </div>
-
-    <!-- 2) 사람인 최신 이력서 백업 · 수정 · 사람인 재등록 & 클라우드 4단계 관리 -->
+    <!-- 사람인 최신 이력서 백업 · 수정 · 사람인 재등록 & 클라우드 4단계 관리 -->
     <div class="panel-card" style="margin-bottom:14px;">
       <h3>
         <span>📄 사람인 최신 이력서 백업 · 수정 · 사람인 재등록 & 사이트 자동변환</span>
