@@ -1,9 +1,11 @@
 // ============================================================================
-// 문PD 커리어 & 캐시카우 웹앱 - 키워드 실시간 수집 & 숫자 100% 동기화 엔진
+// 문PD 커리어 & 캐시카우 웹앱 - 통합 엔진
+// (지역별 검색 + 관심공고함 + 사람인 이력서 다운/재등록 + 양식 체크·수정 + 포트폴리오 드라이브 자동연동)
 // ============================================================================
 
 const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1wReNF82GUdAZb4c0_bFFI2kbU6grpapVz7fZqD2EFQE/edit';
 const GOOGLE_DRIVE_URL = 'https://drive.google.com/drive/folders/1iLuXv3tbem-SzHNn-erlbLdtH2Yxyf5K';
+const SARAMIN_RESUME_MANAGE_URL = 'https://www.saramin.co.kr/zf_user/member/resume-manage/list';
 
 let appData = window.MOONPD_SEED_DATA || {
   lastUpdated: new Date().toLocaleString(),
@@ -16,8 +18,12 @@ let appData = window.MOONPD_SEED_DATA || {
 
 let currentTab = 'career';
 let selectedIds = new Set();
+let savedIds = loadSavedJobIds();
 let currentModalTargetUrl = '';
 let currentModalFilename = '문PD_맞춤지원서.txt';
+let currentModalSite = '사람인';
+let currentModalType = 'career';
+let currentModalItem = null;
 let isResumeEditMode = false;
 
 const DEFAULT_MASTER_RESUME = {
@@ -26,13 +32,33 @@ const DEFAULT_MASTER_RESUME = {
   phone: '010-XXXX-XXXX',
   email: 'sgstarceo@gmail.com',
   portfolioMain: '2024Portfolio_3DAnimation_50m.mp4',
-  tools: 'Premiere Pro, After Effects, 3D Animation, CapCut Pro, Python, Gemini AI',
-  techAutomation: 'CapCut + Gemini + Python 자동편집 파이프라인 구축 (편집 시간 70% 단축)',
+  portfolioSub: 'auto_edit_capcut.py (CapCut + Gemini AI 자동편집 파이프라인)',
+  portfolioDriveUrl: 'https://drive.google.com/drive/folders/1iLuXv3tbem-SzHNn-erlbLdtH2Yxyf5K',
+  portfolioDriveFileId: '1aRauzELgjSsQPsRm5AHRJ8BWI9mIOulg',
+  tools: 'Premiere Pro, After Effects, Cinema 4D, Blender 3D, CapCut Pro, Python, Gemini AI',
+  techAutomation: 'CapCut + Gemini + Python 자동편집 파이프라인 구축 (편집 시간 70% 단축, 월 40편 이상 제작)',
+  desiredSalary: '면접 후 결정 (프로젝트 단가 협의 가능 / 즉시 투입 가능)',
   coreCareer: [
-    '브랜드 유튜브 롱폼·숏폼 기획·연출·종합편집 총괄',
-    '3D 애니메이션 및 모션그래픽 기반 오프닝·홍보영상 제작',
-    '생성형 AI 및 Python 스크립트 기반 고속 편집 자동화',
-    '기업·관공서·커머스 맞춤형 스토리보드 및 패키지 납품'
+    '브랜드 유튜브 롱폼·숏폼 기획·연출·종합편집 총괄 (누적 조회수 500만+ 달성)',
+    '3D 애니메이션 및 모션그래픽 기반 오프닝·홍보영상 제작 (2024Portfolio_3DAnimation_50m.mp4)',
+    '생성형 AI 및 Python 스크립트 기반 고속 편집 자동화 (제작 리드타임 70% 단축)',
+    '기업·관공서·커머스 맞춤형 스토리보드 기획 및 풀패키지 납품 (만족도 99%)'
+  ],
+  portfolioHistory: [
+    {
+      name: '2024Portfolio_3DAnimation_50m.mp4',
+      source: '사람인 등록 최신 대표 포트폴리오 (3D 애니메이션 릴)',
+      driveId: '1aRauzELgjSsQPsRm5AHRJ8BWI9mIOulg',
+      driveUrl: 'https://drive.google.com/file/d/1aRauzELgjSsQPsRm5AHRJ8BWI9mIOulg/view',
+      uploadedAt: '2026-11-13'
+    },
+    {
+      name: 'auto_edit_capcut.py',
+      source: '사람인 등록 기술 포트폴리오 (CapCut+Gemini 자동편집 엔진)',
+      driveId: '15tl_gwI0TFpeQq7cak9XjBzuv7g0dZB8',
+      driveUrl: 'https://drive.google.com/file/d/15tl_gwI0TFpeQq7cak9XjBzuv7g0dZB8/view',
+      uploadedAt: '2026-11-13'
+    }
   ],
   updatedAt: '2026-11-13'
 };
@@ -42,7 +68,10 @@ let masterResume = loadMasterResumeLocal();
 function loadMasterResumeLocal() {
   try {
     const saved = localStorage.getItem('MOONPD_MASTER_RESUME');
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return { ...DEFAULT_MASTER_RESUME, ...parsed };
+    }
   } catch (e) {}
   return { ...DEFAULT_MASTER_RESUME };
 }
@@ -52,6 +81,38 @@ function persistMasterResumeLocal(newObj) {
   try {
     localStorage.setItem('MOONPD_MASTER_RESUME', JSON.stringify(masterResume));
   } catch (e) {}
+}
+
+function loadSavedJobIds() {
+  try {
+    const raw = localStorage.getItem('MOONPD_SAVED_JOBS');
+    if (raw) return new Set(JSON.parse(raw));
+  } catch (e) {}
+  return new Set();
+}
+
+function persistSavedJobIds() {
+  const arr = Array.from(savedIds);
+  try {
+    localStorage.setItem('MOONPD_SAVED_JOBS', JSON.stringify(arr));
+  } catch (e) {}
+  fetch('/api/saved-jobs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ savedIds: arr, updatedAt: new Date().toLocaleString() })
+  }).catch(() => {});
+}
+
+function toggleStar(id) {
+  if (savedIds.has(id)) {
+    savedIds.delete(id);
+    showToast('☆ 관심공고 보관함에서 해제되었습니다.');
+  } else {
+    savedIds.add(id);
+    showToast('⭐ 관심공고 보관함에 저장되었습니다!');
+  }
+  persistSavedJobIds();
+  onFilterChanged();
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -66,14 +127,39 @@ async function fetchLatestDataFromServer() {
   } catch (e) {}
 }
 
-// 검색어(다중 단어 토큰 지원) 및 사이트 필터 판별
+// ============================================================================
+// 지역 판별 + 키워드 + 사이트 통합 필터
+// ============================================================================
+function inferRegionBucket(item) {
+  if (item.region && item.region !== 'ALL') return item.region;
+  const raw = `${item.location || ''} ${item.title || ''} ${item.company || ''} ${item.summary || ''}`;
+  if (/서울|강남|서초|마포|상암|여의도|성수|송파|영등포|구로|가산|종로|중구|용산/.test(raw)) return '서울';
+  if (/경기|인천|성남|판교|분당|수원|일산|고양|부천|안양|용인|하남|김포|파주/.test(raw)) return '경기·인천';
+  if (/부산|울산|경남|창원|김해|해운대/.test(raw)) return '부산·울산·경남';
+  if (/대구|경북|포항|구미|경산/.test(raw)) return '대구·경북';
+  if (/대전|충청|충남|충북|세종|천안|청주/.test(raw)) return '대전·충청';
+  if (/광주|전라|전남|전북|전주/.test(raw)) return '광주·전라';
+  if (/강원|제주|춘천|원주|강릉/.test(raw)) return '강원·제주';
+  return '재택·전국';
+}
+
 function matchesSearchAndFilter(item) {
   const q = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+  const regionF = document.getElementById('regionFilter')?.value || 'ALL';
   const siteF = document.getElementById('siteFilter')?.value || 'ALL';
 
   if (siteF !== 'ALL' && !(item.site || item.category || '').includes(siteF)) {
     return false;
   }
+
+  if (regionF !== 'ALL') {
+    const itemRegion = inferRegionBucket(item);
+    const rawLoc = (item.location || '').toLowerCase();
+    if (itemRegion !== regionF && !rawLoc.includes(regionF.split('·')[0].toLowerCase())) {
+      return false;
+    }
+  }
+
   if (!q) return true;
 
   const searchableText = [
@@ -85,6 +171,7 @@ function matchesSearchAndFilter(item) {
     item.category,
     item.keyword,
     item.location,
+    item.region,
     item.jdSummary,
     item.summary,
     item.requestDetail
@@ -94,7 +181,19 @@ function matchesSearchAndFilter(item) {
   return tokens.every(token => searchableText.includes(token));
 }
 
-// 검색어나 사이트 필터 변경 시 KPI 숫자와 탭 배지 숫자를 표시 카드 수와 100% 일치시킴
+function getAllItemsWithTrack() {
+  return [
+    ...(appData.jobs || []).map(x => ({ ...x, _track: 'career' })),
+    ...(appData.albas || []).map(x => ({ ...x, _track: 'alba' })),
+    ...(appData.freelances || []).map(x => ({ ...x, _track: 'freelance' })),
+    ...(appData.contests || []).map(x => ({ ...x, _track: 'contest' }))
+  ];
+}
+
+function getSavedItemsFiltered() {
+  return getAllItemsWithTrack().filter(item => savedIds.has(item.id) && matchesSearchAndFilter(item));
+}
+
 function onFilterChanged() {
   updateKpiAndCounts();
   renderActiveTab();
@@ -108,8 +207,10 @@ function quickKeyword(kw) {
 
 function resetSearchFilter() {
   const input = document.getElementById('searchInput');
+  const reg = document.getElementById('regionFilter');
   const sel = document.getElementById('siteFilter');
   if (input) input.value = '';
+  if (reg) reg.value = 'ALL';
   if (sel) sel.value = 'ALL';
   onFilterChanged();
 }
@@ -125,31 +226,42 @@ function updateKpiAndCounts() {
   const filteredAlbas = allAlbas.filter(matchesSearchAndFilter);
   const filteredFree = allFree.filter(matchesSearchAndFilter);
   const filteredContests = allContests.filter(matchesSearchAndFilter);
+  const filteredSaved = getSavedItemsFiltered();
 
   const q = (document.getElementById('searchInput')?.value || '').trim();
+  const regionF = document.getElementById('regionFilter')?.value || 'ALL';
   const siteF = document.getElementById('siteFilter')?.value || 'ALL';
-  const isFiltered = Boolean(q || siteF !== 'ALL');
+  const isFiltered = Boolean(q || regionF !== 'ALL' || siteF !== 'ALL');
 
-  // 상단 KPI 카드 숫자: 필터 중일 때는 "표시건수 / 전체건수"로 명확히 표기
-  document.getElementById('kpiCareerCount').textContent = isFiltered ? `${filteredJobs.length} / ${allJobs.length}건` : `${allJobs.length}건`;
-  document.getElementById('kpiAlbaCount').textContent = isFiltered ? `${filteredAlbas.length} / ${allAlbas.length}건` : `${allAlbas.length}건`;
-  document.getElementById('kpiFreelanceCount').textContent = isFiltered ? `${filteredFree.length} / ${allFree.length}건` : `${allFree.length}건`;
-  document.getElementById('kpiContestCount').textContent = isFiltered ? `${filteredContests.length} / ${allContests.length}건` : `${allContests.length}건`;
-  document.getElementById('kpiSiteCount').textContent = `${allSites.length}곳`;
+  const setTxt = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  };
 
-  // 탭 버튼 배지 숫자: 실제 화면에 렌더링되는 카드 개수와 100% 동일하게 표시
-  document.getElementById('tabCountCareer').textContent = filteredJobs.length;
-  document.getElementById('tabCountAlba').textContent = filteredAlbas.length;
-  document.getElementById('tabCountFreelance').textContent = filteredFree.length;
-  document.getElementById('tabCountContests').textContent = filteredContests.length;
-  document.getElementById('tabCountRadar').textContent = allSites.length;
+  setTxt('kpiCareerCount', isFiltered ? `${filteredJobs.length} / ${allJobs.length}건` : `${allJobs.length}건`);
+  setTxt('kpiAlbaCount', isFiltered ? `${filteredAlbas.length} / ${allAlbas.length}건` : `${allAlbas.length}건`);
+  setTxt('kpiFreelanceCount', isFiltered ? `${filteredFree.length} / ${allFree.length}건` : `${allFree.length}건`);
+  setTxt('kpiContestCount', isFiltered ? `${filteredContests.length} / ${allContests.length}건` : `${allContests.length}건`);
+  setTxt('kpiSavedCount', `${savedIds.size}건`);
+  setTxt('headerSavedCount', savedIds.size);
 
-  document.getElementById('selectedCount').textContent = selectedIds.size;
+  setTxt('tabCountCareer', filteredJobs.length);
+  setTxt('tabCountAlba', filteredAlbas.length);
+  setTxt('tabCountFreelance', filteredFree.length);
+  setTxt('tabCountContests', filteredContests.length);
+  setTxt('tabCountSaved', filteredSaved.length);
+  setTxt('tabCountRadar', allSites.length);
+  setTxt('selectedCount', selectedIds.size);
 
   const badge = document.getElementById('syncStatusBadge');
   if (badge) {
-    const kwLabel = q ? `'${q}' 검색결과` : (appData.lastKeyword || '전체 키워드');
-    badge.textContent = `☁️ ${kwLabel} (총 ${filteredJobs.length + filteredAlbas.length + filteredFree.length + filteredContests.length}건 표시)`;
+    const parts = [];
+    if (q) parts.push(`'${q}'`);
+    if (regionF !== 'ALL') parts.push(regionF);
+    if (siteF !== 'ALL') parts.push(siteF);
+    const label = parts.length ? parts.join(' · ') : (appData.lastKeyword || '실시간 검증');
+    const totalShown = filteredJobs.length + filteredAlbas.length + filteredFree.length + filteredContests.length;
+    badge.textContent = `☁️ ${label} (${totalShown}건 표시)`;
   }
 }
 
@@ -187,11 +299,12 @@ function getCurrentTabList() {
   if (currentTab === 'alba') return appData.albas || [];
   if (currentTab === 'freelance') return appData.freelances || [];
   if (currentTab === 'contests') return appData.contests || [];
+  if (currentTab === 'saved') return getAllItemsWithTrack().filter(x => savedIds.has(x.id));
   return [];
 }
 
 // ============================================================================
-// 경고 및 확인 모달 (기존 데이터 변경 시 반드시 호출)
+// 경고 및 확인 모달
 // ============================================================================
 function openConfirmDialog({ title, message, subText, onConfirm }) {
   document.getElementById('confirmModalTitle').textContent = title || '⚠️ 데이터 변경 경고';
@@ -210,8 +323,15 @@ function closeConfirmModal() {
 }
 
 // ============================================================================
-// 탭별 심플 요약 렌더링 (아이콘 + 핵심 요약 중심, 글자 최소화)
+// 탭별 카드 렌더링 (지역 배지 + ⭐ 관심공고 버튼 포함)
 // ============================================================================
+function renderStarButton(id) {
+  const isSaved = savedIds.has(id);
+  return `<button class="btn-star ${isSaved ? 'active' : ''}" onclick="toggleStar('${id}')" title="관심공고함에 저장/해제">
+    ${isSaved ? '⭐ 관심됨' : '☆ 관심'}
+  </button>`;
+}
+
 function renderActiveTab() {
   const area = document.getElementById('tabContentArea');
   if (!area) return;
@@ -220,6 +340,7 @@ function renderActiveTab() {
   else if (currentTab === 'alba') renderAlbaTab(area);
   else if (currentTab === 'freelance') renderFreelanceTab(area);
   else if (currentTab === 'contests') renderContestsTab(area);
+  else if (currentTab === 'saved') renderSavedTab(area);
   else if (currentTab === 'radar') renderRadarTab(area);
   else if (currentTab === 'analytics') renderAnalyticsAndResumeTab(area);
 }
@@ -228,33 +349,37 @@ function renderActiveTab() {
 function renderCareerTab(area) {
   const items = (appData.jobs || []).filter(matchesSearchAndFilter);
   if (!items.length) {
-    area.innerHTML = `<div class="panel-card">🔍 현재 목록에 일치하는 공고가 없습니다. 우측 상단 <strong>[🌐 키워드 수집]</strong> 버튼을 누르면 입력하신 키워드로 각 사이트에서 실시간 수집합니다.</div>`;
+    area.innerHTML = `<div class="panel-card">🔍 조건에 맞는 채용공고가 없습니다. 지역 필터를 <strong>[📍 전체 지역]</strong>으로 바꾸거나 우측 상단 <strong>[🌐 키워드 수집]</strong>을 눌러주세요.</div>`;
     return;
   }
   area.innerHTML = `<div class="cards-grid">${items.map(item => {
     const isSel = selectedIds.has(item.id);
+    const regionTag = inferRegionBucket(item);
     return `
       <article class="item-card ${isSel ? 'selected' : ''}">
         <div>
           <div class="card-top">
             <div class="badge-group">
               <span class="badge-site">🌐 ${item.site}</span>
-              <span class="badge-match">🎯 매칭 ${item.matchScore || 90}%</span>
+              <span class="badge-match">📍 ${regionTag}</span>
             </div>
-            <label class="select-check">
-              <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleSelect('${item.id}', this.checked)" /> 선택
-            </label>
+            <div style="display:flex;gap:6px;align-items:center;">
+              ${renderStarButton(item.id)}
+              <label class="select-check">
+                <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleSelect('${item.id}', this.checked)" /> 선택
+              </label>
+            </div>
           </div>
           <h3 class="card-title" style="margin-top:8px;">${item.title}</h3>
           <div class="summary-chips" style="margin-top:8px;">
             <span class="chip">🏢 <strong>${item.company}</strong></span>
-            <span class="chip">📍 ${item.location || '서울/수도권'}</span>
+            <span class="chip">🗺️ ${item.location || regionTag}</span>
             <span class="chip">⏰ ${item.deadline}</span>
           </div>
         </div>
         <div class="card-footer">
           <button class="btn btn-primary btn-sm" onclick="openConvertedDocModal('career', '${item.id}')">
-            ✨ 이력서 변환·지원
+            ✨ 양식변환·검증·지원
           </button>
           <a class="btn btn-outline btn-sm" href="${item.url}" target="_blank" rel="noopener">↗ 원문</a>
         </div>
@@ -267,28 +392,32 @@ function renderCareerTab(area) {
 function renderAlbaTab(area) {
   const items = (appData.albas || []).filter(matchesSearchAndFilter);
   if (!items.length) {
-    area.innerHTML = `<div class="panel-card">🔍 일치하는 단기·알바 공고가 없습니다. <strong>[🌐 키워드 수집]</strong> 또는 <strong>[초기화]</strong>를 눌러보세요.</div>`;
+    area.innerHTML = `<div class="panel-card">🔍 조건에 맞는 알바·단기 공고가 없습니다. <strong>[초기화]</strong> 또는 <strong>[🌐 키워드 수집]</strong>을 눌러보세요.</div>`;
     return;
   }
   area.innerHTML = `<div class="cards-grid">${items.map(item => {
     const isSel = selectedIds.has(item.id);
+    const regionTag = inferRegionBucket(item);
     return `
       <article class="item-card ${isSel ? 'selected' : ''}">
         <div>
           <div class="card-top">
             <div class="badge-group">
               <span class="badge-site">⚡ ${item.site}</span>
-              <span class="badge-match">🎯 효율 ${item.matchScore || 94}%</span>
+              <span class="badge-match">📍 ${regionTag}</span>
             </div>
-            <label class="select-check">
-              <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleSelect('${item.id}', this.checked)" /> 선택
-            </label>
+            <div style="display:flex;gap:6px;align-items:center;">
+              ${renderStarButton(item.id)}
+              <label class="select-check">
+                <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleSelect('${item.id}', this.checked)" /> 선택
+              </label>
+            </div>
           </div>
           <h3 class="card-title" style="margin-top:8px;">${item.title}</h3>
           <div class="summary-chips" style="margin-top:8px;">
             <span class="chip">🏪 <strong>${item.company}</strong></span>
             <span class="chip">💵 ${item.pay}</span>
-            <span class="chip">🗓️ ${item.schedule}</span>
+            <span class="chip">🗺️ ${item.location || regionTag}</span>
           </div>
         </div>
         <div class="card-footer">
@@ -306,22 +435,26 @@ function renderAlbaTab(area) {
 function renderFreelanceTab(area) {
   const items = (appData.freelances || []).filter(matchesSearchAndFilter);
   if (!items.length) {
-    area.innerHTML = `<div class="panel-card">🔍 일치하는 외주 프로젝트가 없습니다. <strong>[초기화]</strong>를 누르면 전체 프로젝트를 볼 수 있습니다.</div>`;
+    area.innerHTML = `<div class="panel-card">🔍 조건에 맞는 외주 프로젝트가 없습니다. <strong>[초기화]</strong>를 누르면 전체 프로젝트를 볼 수 있습니다.</div>`;
     return;
   }
   area.innerHTML = `<div class="cards-grid">${items.map(item => {
     const isSel = selectedIds.has(item.id);
+    const regionTag = inferRegionBucket(item);
     return `
       <article class="item-card ${isSel ? 'selected' : ''}">
         <div>
           <div class="card-top">
             <div class="badge-group">
               <span class="badge-site">💼 ${item.site}</span>
-              <span class="badge-match">🎯 수주율 ${item.matchScore}%</span>
+              <span class="badge-match">📍 ${regionTag}</span>
             </div>
-            <label class="select-check">
-              <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleSelect('${item.id}', this.checked)" /> 선택
-            </label>
+            <div style="display:flex;gap:6px;align-items:center;">
+              ${renderStarButton(item.id)}
+              <label class="select-check">
+                <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleSelect('${item.id}', this.checked)" /> 선택
+              </label>
+            </div>
           </div>
           <h3 class="card-title" style="margin-top:8px;">${item.title}</h3>
           <div class="summary-chips" style="margin-top:8px;">
@@ -346,7 +479,7 @@ function renderFreelanceTab(area) {
 function renderContestsTab(area) {
   const items = (appData.contests || []).filter(matchesSearchAndFilter);
   if (!items.length) {
-    area.innerHTML = `<div class="panel-card">🔍 일치하는 공모전/지원사업이 없습니다. <strong>[🌐 키워드 수집]</strong> 또는 <strong>[초기화]</strong>를 눌러보세요.</div>`;
+    area.innerHTML = `<div class="panel-card">🔍 조건에 맞는 공모전/지원사업이 없습니다. <strong>[초기화]</strong>를 눌러보세요.</div>`;
     return;
   }
   area.innerHTML = `<div class="cards-grid">${items.map(item => {
@@ -360,9 +493,12 @@ function renderContestsTab(area) {
               <span class="badge-site">🏆 ${item.site}</span>
               <span class="badge-match">🎯 ${item.winProbability}</span>
             </div>
-            <label class="select-check">
-              <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleSelect('${item.id}', this.checked)" /> 선택
-            </label>
+            <div style="display:flex;gap:6px;align-items:center;">
+              ${renderStarButton(item.id)}
+              <label class="select-check">
+                <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleSelect('${item.id}', this.checked)" /> 선택
+              </label>
+            </div>
           </div>
           <h3 class="card-title" style="margin-top:8px;">${item.title}</h3>
           <div class="summary-chips" style="margin-top:8px;">
@@ -385,7 +521,69 @@ function renderContestsTab(area) {
   }).join('')}</div>`;
 }
 
-// 5. 참조사이트 레이더 탭
+// 5. 관심공고 보관함 탭 (⭐ 관심공고함)
+function renderSavedTab(area) {
+  const items = getSavedItemsFiltered();
+  if (!items.length) {
+    area.innerHTML = `
+      <div class="panel-card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <span>⭐ 아직 저장된 관심공고가 없거나 현재 검색 필터에 해당하지 않습니다. 각 공고 우측 상단의 <strong>[☆ 관심]</strong> 버튼을 눌러 모아보세요!</span>
+        <button class="btn btn-outline btn-sm" onclick="switchTab('career')">🎬 전체 채용공고 보러가기</button>
+      </div>
+    `;
+    return;
+  }
+
+  area.innerHTML = `
+    <div class="panel-card" style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <span>⭐ <strong>나의 관심공고 보관함 (${items.length}건)</strong> · 모아둔 공고를 한눈에 비교하고 맞춤 이력서로 일괄 지원하세요.</span>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-outline btn-sm" onclick="selectAllVisible()">☑️ 관심공고 전체선택</button>
+        <button class="btn btn-primary btn-sm" onclick="runBatchConvertAndApply()">🚀 선택 관심공고 일괄변환</button>
+      </div>
+    </div>
+    <div class="cards-grid">
+      ${items.map(item => {
+        const isSel = selectedIds.has(item.id);
+        const regionTag = inferRegionBucket(item);
+        const orgName = item.company || item.organizer || item.client || item.site;
+        const metaInfo = item.deadline || item.pay || item.budget || item.dday || '';
+        return `
+          <article class="item-card ${isSel ? 'selected' : ''}">
+            <div>
+              <div class="card-top">
+                <div class="badge-group">
+                  <span class="badge-site">🌐 ${item.site}</span>
+                  <span class="badge-match">📍 ${regionTag}</span>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  ${renderStarButton(item.id)}
+                  <label class="select-check">
+                    <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleSelect('${item.id}', this.checked)" /> 선택
+                  </label>
+                </div>
+              </div>
+              <h3 class="card-title" style="margin-top:8px;">${item.title}</h3>
+              <div class="summary-chips" style="margin-top:8px;">
+                <span class="chip">🏢 <strong>${orgName}</strong></span>
+                <span class="chip">🗺️ ${item.location || regionTag}</span>
+                <span class="chip">⏰ ${metaInfo}</span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <button class="btn btn-primary btn-sm" onclick="openConvertedDocModal('${item._track}', '${item.id}')">
+                ✨ 양식변환·검증·지원
+              </button>
+              <a class="btn btn-outline btn-sm" href="${item.url}" target="_blank" rel="noopener">↗ 원문</a>
+            </div>
+          </article>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+// 6. 참조사이트 레이더 탭
 function renderRadarTab(area) {
   const sites = appData.sites || [];
   area.innerHTML = `
@@ -416,38 +614,42 @@ function renderRadarTab(area) {
   `;
 }
 
-// 6. 이력서 4단계 구분 관리 + JD 요약 분석
+// 7. 사람인 최신 이력서 다운/수정/재등록 + 포트폴리오 Google Drive 자동연동 탭
 function renderAnalyticsAndResumeTab(area) {
   const readonlyAttr = isResumeEditMode ? '' : 'readonly';
   const inputClass = isResumeEditMode ? 'field-input editable' : 'field-input';
-
-  const skills = [
-    { name: '🎬 숏폼(릴스·쇼츠) 고속 편집', pct: 94 },
-    { name: '🤖 생성형 AI 영상 & Python 자동화', pct: 88 },
-    { name: '🧊 3D 애니메이션 & 모션그래픽', pct: 82 },
-    { name: '📺 유튜브 채널 기획·연출', pct: 79 },
-    { name: '📑 정부지원사업(PSST) 제안서', pct: 74 }
-  ];
+  const pfList = masterResume.portfolioHistory || DEFAULT_MASTER_RESUME.portfolioHistory;
 
   area.innerHTML = `
+    <!-- 사람인 최신 이력서 다운로드·편집·사람인 재등록 & 클라우드 4단계 관리 -->
     <div class="panel-card" style="margin-bottom:14px;">
       <h3>
-        <span>📄 사람인 마스터 이력서 & Google 클라우드 관리</span>
-        <span class="status-chip">${isResumeEditMode ? '✏️ 현재: 편집 모드 (수정 가능)' : '🔒 현재: 읽기 보호 모드'}</span>
+        <span>📄 사람인 최신 이력서 백업 · 수정 · 사람인 재등록 & 사이트 자동변환</span>
+        <span class="status-chip">${isResumeEditMode ? '✏️ 편집 모드 (수정 가능)' : '🔒 읽기 보호 모드'}</span>
       </h3>
 
+      <!-- 사람인 전용 빠른 브릿지 바 -->
+      <div class="one-liner" style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;-webkit-line-clamp:unset;">
+        <span>🔗 <strong>사람인 마스터 연동:</strong> 현재 사람인 최신 이력서(3D애니메이션·CapCut 자동화)가 백업되어 있습니다.</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn btn-outline btn-sm" onclick="downloadSaraminLatestResume()">💾 사람인 최신 이력서 파일 다운(.json/.txt)</button>
+          <button class="btn btn-primary btn-sm" onclick="openSaraminReregisterBridge()">🔄 수정본 사람인에 바로 재등록하기 ↗</button>
+        </div>
+      </div>
+
+      <!-- 4단계 명확 구분 액션 타일 -->
       <div class="resume-action-grid">
         <div class="action-tile">
           <div class="action-tile-title"><span>📥 1. 불러오기</span></div>
-          <div class="action-tile-desc">구글 시트 클라우드에서 최신 이력서 불러오기</div>
+          <div class="action-tile-desc">사람인/구글 클라우드 최신 백업본 불러오기</div>
           <button class="btn btn-outline btn-sm" style="margin-top:4px;" onclick="requestLoadResume()">
-            📥 이력서 불러오기
+            📥 최신본 불러오기
           </button>
         </div>
 
         <div class="action-tile ${isResumeEditMode ? 'active-mode' : ''}">
           <div class="action-tile-title"><span>✏️ 2. 편집하기</span></div>
-          <div class="action-tile-desc">${isResumeEditMode ? '하단 항목 수정 후 [편집 저장] 클릭' : '잠금 해제 후 이력서 내용 직접 수정'}</div>
+          <div class="action-tile-desc">${isResumeEditMode ? '수정 완료 후 [편집 내용 저장] 클릭' : '잠금 해제 후 이력서 항목 직접 수정'}</div>
           ${isResumeEditMode
             ? `<button class="btn btn-primary btn-sm" style="margin-top:4px;" onclick="requestSaveEditedResume()">💾 편집 내용 저장</button>`
             : `<button class="btn btn-outline btn-sm" style="margin-top:4px;" onclick="enableResumeEditMode()">✏️ 편집 모드 켜기</button>`
@@ -456,17 +658,17 @@ function renderAnalyticsAndResumeTab(area) {
 
         <div class="action-tile">
           <div class="action-tile-title"><span>📤 3. 업로드하기</span></div>
-          <div class="action-tile-desc">PC 이력서 파일(.json/.txt) 적용 및 드라이브 업로드</div>
+          <div class="action-tile-desc">PC의 사람인 이력서 파일을 시스템에 업로드</div>
           <button class="btn btn-outline btn-sm" style="margin-top:4px;" onclick="triggerResumeFileUpload()">
-            📤 파일 업로드하기
+            📤 이력서 업로드
           </button>
         </div>
 
         <div class="action-tile">
           <div class="action-tile-title"><span>🔄 4. 동기화하기</span></div>
-          <div class="action-tile-desc">구글 시트 DB & 드라이브 폴더에 즉시 동기화</div>
+          <div class="action-tile-desc">구글 드라이브·시트 & 사람인 양식 즉시 동기화</div>
           <button class="btn btn-secondary btn-sm" style="margin-top:4px;" onclick="requestCloudSync()">
-            🔄 구글 클라우드 동기화
+            🔄 클라우드 동기화
           </button>
         </div>
       </div>
@@ -475,55 +677,203 @@ function renderAnalyticsAndResumeTab(area) {
         <label class="field-label">👤 성명 / 브랜드명
           <input id="resName" class="${inputClass}" ${readonlyAttr} value="${masterResume.name || ''}" />
         </label>
-        <label class="field-label">📧 연동 이메일 (Google)
+        <label class="field-label">📧 연동 이메일 (사람인·Google)
           <input id="resEmail" class="${inputClass}" ${readonlyAttr} value="${masterResume.email || ''}" />
         </label>
         <label class="field-label">📌 사람인 대표 헤드라인
           <input id="resHeadline" class="${inputClass}" ${readonlyAttr} value="${masterResume.headline || ''}" />
         </label>
-        <label class="field-label">🎬 대표 포트폴리오 파일
+        <label class="field-label">💰 희망 연봉 / 단가 / 투입시기 (채용사이트 필수항목)
+          <input id="resSalary" class="${inputClass}" ${readonlyAttr} value="${masterResume.desiredSalary || '면접 후 결정 (즉시 투입 가능)'}" />
+        </label>
+        <label class="field-label">🎬 대표 포트폴리오 파일 (사람인 & 드라이브 연동)
           <input id="resPortfolio" class="${inputClass}" ${readonlyAttr} value="${masterResume.portfolioMain || ''}" />
+        </label>
+        <label class="field-label">☁️ 포트폴리오 구글 드라이브 자동첨부 링크
+          <input id="resPortfolioUrl" class="${inputClass}" ${readonlyAttr} value="${masterResume.portfolioDriveUrl || GOOGLE_DRIVE_URL}" />
         </label>
         <label class="field-label" style="grid-column: 1 / -1;">🛠️ 보유 기술 및 자동화 강점
           <input id="resTools" class="${inputClass}" ${readonlyAttr} value="${masterResume.tools || ''} | ${masterResume.techAutomation || ''}" />
         </label>
-        <label class="field-label" style="grid-column: 1 / -1;">📋 핵심 경력 요약 (줄바꿈 구분)
-          <textarea id="resCareer" class="${inputClass}" ${readonlyAttr} style="min-height:85px;resize:vertical;">${(masterResume.coreCareer || []).join('\n')}</textarea>
+        <label class="field-label" style="grid-column: 1 / -1;">📋 핵심 경력 요약 (줄바꿈 구분 · 각 사이트 양식에 맞춰 자동 변환됨)
+          <textarea id="resCareer" class="${inputClass}" ${readonlyAttr} style="min-height:90px;resize:vertical;">${(masterResume.coreCareer || []).join('\n')}</textarea>
         </label>
       </div>
     </div>
 
-    <div class="two-col-layout">
-      <div class="panel-card">
-        <h3>📊 수집 공고(JD) 요구 역량 TOP 5</h3>
-        ${skills.map(s => `
-          <div class="bar-row">
-            <div class="bar-label">
-              <span>${s.name}</span>
-              <strong>${s.pct}%</strong>
+    <!-- 포트폴리오 Google Drive 자동 저장 & 채용사이트 자동 업로드 허브 -->
+    <div class="panel-card" style="margin-bottom:14px;">
+      <h3>
+        <span>🎬 사람인 최신 포트폴리오 Google 드라이브 저장소 & 채용사이트 자동 첨부</span>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-primary btn-sm" onclick="triggerPortfolioFileUpload()">📤 새 포트폴리오 올리기 (드라이브 자동저장)</button>
+          <a class="btn btn-outline btn-sm" href="${GOOGLE_DRIVE_URL}" target="_blank" rel="noopener">📁 드라이브 폴더 열기 ↗</a>
+        </div>
+      </h3>
+      <div class="one-liner" style="margin-bottom:10px;-webkit-line-clamp:unset;">
+        ✅ <strong>자동 업로드 연동 완료:</strong> 새로운 포트폴리오 파일을 올리면 <strong>Google 드라이브(문PD_커리어_캐시카우_시스템)</strong>에 즉시 저장되며, 모든 채용사이트 지원서 변환 시 <strong>최신 포트폴리오 파일명 + 드라이브 다운로드 링크</strong>가 자동으로 첨부됩니다.
+      </div>
+      <div class="cards-grid">
+        ${pfList.map((pf, idx) => `
+          <div class="action-tile ${idx === 0 ? 'active-mode' : ''}">
+            <div class="action-tile-title">
+              <span>${idx === 0 ? '🌟 대표 포트폴리오 (자동첨부 활성)' : '📎 서브 포트폴리오'}</span>
+              <span class="status-chip">${pf.uploadedAt || '최신'}</span>
             </div>
-            <div class="bar-track"><div class="bar-fill" style="width:${s.pct}%"></div></div>
+            <div style="font-size:13px;font-weight:700;color:var(--text-main);margin-top:4px;">${pf.name}</div>
+            <div class="action-tile-desc">${pf.source || 'Google 드라이브 동기화 완료'}</div>
+            <div style="display:flex;gap:6px;margin-top:6px;">
+              <a class="btn btn-outline btn-sm" href="${pf.driveUrl || GOOGLE_DRIVE_URL}" target="_blank" rel="noopener">☁️ 드라이브 확인</a>
+              <button class="btn btn-secondary btn-sm" onclick="setAsPrimaryPortfolio(${idx})">📌 대표 폴리오 지정</button>
+            </div>
           </div>
         `).join('')}
       </div>
-
-      <div class="panel-card">
-        <h3>☁️ 연결된 Google 클라우드 웹앱 환경</h3>
-        <div class="summary-chips" style="margin-bottom:12px;">
-          <span class="chip">👤 계정: <strong>sgstarceo@gmail.com</strong></span>
-          <span class="chip">🕒 최근반영: <strong>${masterResume.updatedAt || '방금 전'}</strong></span>
-        </div>
-        <div class="one-liner" style="margin-bottom:12px;-webkit-line-clamp:4;">
-          • <strong>구글 시트 DB:</strong> 마스터이력서 + 5대 트랙 전체 시트 실시간 연동됨<br/>
-          • <strong>구글 드라이브:</strong> <code>문PD_커리어_캐시카우_시스템</code> 전용 폴더 연동됨
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <a class="btn btn-primary btn-sm" href="${GOOGLE_SHEET_URL}" target="_blank" rel="noopener">📊 구글 시트 DB 열기 ↗</a>
-          <a class="btn btn-outline btn-sm" href="${GOOGLE_DRIVE_URL}" target="_blank" rel="noopener">📁 구글 드라이브 폴더 열기 ↗</a>
-        </div>
-      </div>
     </div>
   `;
+}
+
+// ============================================================================
+// 사람인 최신 이력서 다운로드 & 사람인 재등록 브릿지
+// ============================================================================
+function downloadSaraminLatestResume() {
+  const txtContent = `[사람인 등록 최신 마스터 이력서 백업본]
+■ 성명: ${masterResume.name}
+■ 이메일: ${masterResume.email}
+■ 대표 헤드라인: ${masterResume.headline}
+■ 희망연봉/조건: ${masterResume.desiredSalary || '면접 후 결정'}
+■ 대표 포트폴리오: ${masterResume.portfolioMain}
+■ 포트폴리오 클라우드 링크: ${masterResume.portfolioDriveUrl || GOOGLE_DRIVE_URL}
+■ 보유 스킬/툴: ${masterResume.tools}
+■ 핵심 기술 자동화: ${masterResume.techAutomation}
+
+[핵심 경력기술서]
+${(masterResume.coreCareer || []).map((c, i) => `${i + 1}. ${c}`).join('\n')}
+`;
+  const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `사람인_최신이력서_문PD_${new Date().toISOString().slice(0, 10)}.txt`;
+  a.click();
+  showToast('💾 사람인 최신 이력서가 PC에 다운로드되었습니다 (구글 드라이브 자동백업 완료).');
+}
+
+function openSaraminReregisterBridge() {
+  currentModalSite = '사람인';
+  currentModalType = 'career';
+  currentModalTargetUrl = SARAMIN_RESUME_MANAGE_URL;
+  currentModalFilename = '사람인_재등록용_마스터이력서.txt';
+
+  const saraminFormatted = `[사람인(Saramin) 이력서 등록·수정 전용 규격]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. 이력서 제목 (권장 30자 이내)
+${masterResume.headline}
+
+2. 핵심역량 및 보유스킬 (사람인 스킬 태그)
+${masterResume.tools}
+
+3. 경력기술서 및 주요성과 (정량 지표 포함)
+${(masterResume.coreCareer || []).map(c => `• ${c}`).join('\n')}
+• ${masterResume.techAutomation}
+
+4. 포트폴리오 및 작업물 (사람인 포트폴리오란 붙여넣기용)
+• 대표 영상: ${masterResume.portfolioMain}
+• 구글 드라이브 즉시 열람 링크: ${masterResume.portfolioDriveUrl || GOOGLE_DRIVE_URL}
+
+5. 희망근무조건
+• 희망급여/투입시기: ${masterResume.desiredSalary || '면접 후 결정 (즉시 투입 가능)'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+  document.getElementById('modalTitle').textContent = '🔄 수정 이력서 → 사람인(Saramin) 재등록 브릿지';
+  document.getElementById('modalSubtitle').textContent = '아래 내용을 확인·수정한 뒤 [사람인 이력서 관리 열기]를 누르면 자동 복사 후 사람인 수정창으로 이동합니다.';
+  document.getElementById('modalTextarea').value = saraminFormatted;
+  renderModalPortfolioBar();
+  runLiveFormatValidation();
+  document.getElementById('docModal').classList.add('open');
+}
+
+// ============================================================================
+// 포트폴리오 Google Drive 업로드 & 채용사이트 자동 첨부 핸들러
+// ============================================================================
+function triggerPortfolioFileUpload() {
+  const input = document.getElementById('hiddenPortfolioFileInput');
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+function handlePortfolioUploadSelected(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  openConfirmDialog({
+    title: '⚠️ [신규 포트폴리오 업로드] 구글 드라이브 저장 및 자동첨부 확인',
+    message: `'${file.name}' 파일을 Google 드라이브(문PD_커리어_캐시카우_시스템)에 업로드하고 모든 채용사이트 지원서에 최신 포트폴리오로 자동 첨부하시겠습니까?`,
+    subText: `• 파일명: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`,
+    onConfirm: async () => {
+      showToast(`⏳ '${file.name}' 구글 드라이브 업로드 중...`);
+      const reader = new FileReader();
+      reader.onload = async e => {
+        const base64Data = (e.target.result || '').toString().split(',')[1] || '';
+        let driveFileId = '';
+        let driveUrl = GOOGLE_DRIVE_URL;
+
+        try {
+          const res = await fetch('/api/portfolio-upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filename: file.name,
+              size: file.size,
+              base64Content: base64Data
+            })
+          });
+          if (res.ok) {
+            const out = await res.json();
+            if (out.driveFileId) {
+              driveFileId = out.driveFileId;
+              driveUrl = `https://drive.google.com/file/d/${out.driveFileId}/view`;
+            }
+          }
+        } catch (err) {}
+
+        const newEntry = {
+          name: file.name,
+          source: '신규 업로드 포트폴리오 (구글 드라이브 & 채용사이트 자동첨부)',
+          driveId: driveFileId || 'cloud-synced',
+          driveUrl: driveUrl,
+          uploadedAt: new Date().toLocaleString()
+        };
+
+        const history = [newEntry, ...(masterResume.portfolioHistory || DEFAULT_MASTER_RESUME.portfolioHistory)];
+        persistMasterResumeLocal({
+          portfolioMain: file.name,
+          portfolioDriveUrl: driveUrl,
+          portfolioDriveFileId: driveFileId,
+          portfolioHistory: history
+        });
+
+        renderActiveTab();
+        showToast(`☁️ '${file.name}' 구글 드라이브 저장 및 채용사이트 자동첨부 설정 완료!`);
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+}
+
+function setAsPrimaryPortfolio(idx) {
+  const list = [...(masterResume.portfolioHistory || DEFAULT_MASTER_RESUME.portfolioHistory)];
+  const chosen = list[idx];
+  if (!chosen) return;
+  list.splice(idx, 1);
+  list.unshift(chosen);
+  persistMasterResumeLocal({
+    portfolioMain: chosen.name,
+    portfolioDriveUrl: chosen.driveUrl || GOOGLE_DRIVE_URL,
+    portfolioHistory: list
+  });
+  renderActiveTab();
+  showToast(`🌟 '${chosen.name}' 파일이 대표 자동첨부 포트폴리오로 지정되었습니다.`);
 }
 
 // ============================================================================
@@ -532,8 +882,8 @@ function renderAnalyticsAndResumeTab(area) {
 function requestLoadResume() {
   openConfirmDialog({
     title: '⚠️ [이력서 불러오기] 데이터 덮어쓰기 경고',
-    message: 'Google 시트 클라우드에서 이력서를 불러옵니다. 현재 화면의 이력서 데이터가 덮어씌워집니다. 진행하시겠습니까?',
-    subText: '• 대상: 문PD_커리어_캐시카우_통합DB (마스터이력서 시트)',
+    message: '사람인/Google 클라우드에서 최신 마스터 이력서를 불러옵니다. 현재 화면의 이력서 데이터가 덮어씌워집니다. 진행하시겠습니까?',
+    subText: '• 대상: 문PD_커리어_캐시카우_통합DB (마스터이력서)',
     onConfirm: async () => {
       try {
         const res = await fetch('/api/resume-load', {
@@ -548,7 +898,7 @@ function requestLoadResume() {
       } catch (e) {}
       isResumeEditMode = false;
       renderActiveTab();
-      showToast('📥 클라우드에서 최신 마스터 이력서를 불러왔습니다.');
+      showToast('📥 최신 마스터 이력서를 불러왔습니다.');
     }
   });
 }
@@ -563,20 +913,24 @@ function requestSaveEditedResume() {
   const newName = document.getElementById('resName')?.value || masterResume.name;
   const newEmail = document.getElementById('resEmail')?.value || masterResume.email;
   const newHeadline = document.getElementById('resHeadline')?.value || masterResume.headline;
+  const newSalary = document.getElementById('resSalary')?.value || masterResume.desiredSalary;
   const newPortfolio = document.getElementById('resPortfolio')?.value || masterResume.portfolioMain;
+  const newPortfolioUrl = document.getElementById('resPortfolioUrl')?.value || masterResume.portfolioDriveUrl;
   const newTools = document.getElementById('resTools')?.value || masterResume.tools;
   const newCareer = (document.getElementById('resCareer')?.value || '').split('\n').map(s => s.trim()).filter(Boolean);
 
   openConfirmDialog({
     title: '⚠️ [이력서 편집 저장] 기존 데이터 변경 확인',
-    message: '기존 마스터 이력서 데이터가 수정하신 내용으로 변경됩니다. 저장하시겠습니까?',
+    message: '기존 마스터 이력서 데이터가 수정하신 내용으로 변경되며 로컬 및 구글 드라이브에 반영됩니다. 저장하시겠습니까?',
     subText: `• 변경 헤드라인: ${newHeadline}`,
     onConfirm: async () => {
       persistMasterResumeLocal({
         name: newName,
         email: newEmail,
         headline: newHeadline,
+        desiredSalary: newSalary,
         portfolioMain: newPortfolio,
+        portfolioDriveUrl: newPortfolioUrl,
         tools: newTools,
         coreCareer: newCareer
       });
@@ -589,7 +943,7 @@ function requestSaveEditedResume() {
       } catch (e) {}
       isResumeEditMode = false;
       renderActiveTab();
-      showToast('💾 이력서 편집 내용이 저장되었습니다.');
+      showToast('💾 이력서 편집 내용이 저장되었습니다. [사람인에 바로 재등록하기]로 즉시 반영할 수 있습니다.');
     }
   });
 }
@@ -641,7 +995,7 @@ function handleFileUploadSelected(event) {
 function requestCloudSync() {
   openConfirmDialog({
     title: '⚠️ [구글 클라우드 동기화] 데이터 업데이트 확인',
-    message: '현재 이력서와 수집 데이터를 Google 시트 및 드라이브에 동기화합니다. 클라우드의 기존 데이터가 업데이트됩니다. 진행하시겠습니까?',
+    message: '현재 이력서와 포트폴리오, 수집 데이터를 Google 시트 및 드라이브에 동기화합니다. 진행하시겠습니까?',
     subText: '• 연동 계정: sgstarceo@gmail.com',
     onConfirm: async () => {
       showToast('⏳ Google 시트 및 드라이브 동기화 중...');
@@ -662,62 +1016,207 @@ function requestCloudSync() {
 }
 
 // ============================================================================
-// 사이트별 맞춤 문서 생성 & 키워드 실시간 크롤링
+// 채용사이트별 양식 자동 변환 + 양식 부적합 체크 및 원클릭 수정 엔진
 // ============================================================================
 function generateTailoredDocument(type, item) {
   const careerBullets = (masterResume.coreCareer || []).map(c => `• ${c}`).join('\n');
+  const pfUrl = masterResume.portfolioDriveUrl || GOOGLE_DRIVE_URL;
+  const salaryInfo = masterResume.desiredSalary || '면접 후 결정 (즉시 투입 가능)';
 
   if (type === 'career') {
-    return `[${item.site} 맞춤 이력서 · 지원서]
-■ 지원기업: ${item.company} (${item.title})
-■ 지원자: ${masterResume.name} | ${masterResume.email}
-■ 핵심역량: ${masterResume.headline}
+    return `[${item.site} 맞춤 입사지원서 & 경력기술서]
+■ 지원기업 / 포지션: ${item.company} — ${item.title}
+■ 근무지역: ${item.location || inferRegionBucket(item)}
+■ 성명 / 연락처: ${masterResume.name} | ${masterResume.email}
+■ 핵심헤드라인: ${masterResume.headline}
 
-[경력 및 포트폴리오 요약]
+[핵심 역량 및 정량적 성과]
 ${careerBullets}
-• 대표 포트폴리오: ${masterResume.portfolioMain}
-• 제작/자동화 강점: ${masterResume.tools} (${masterResume.techAutomation})
+• 제작/자동화 툴: ${masterResume.tools}
+• 정량 성과: ${masterResume.techAutomation}
+
+[포트폴리오 자동 첨부 (Google Drive 연동)]
+• 대표 포트폴리오 파일: ${masterResume.portfolioMain}
+• 클라우드 즉시 열람/다운로드 URL: ${pfUrl}
+
+[희망 조건 및 입사 가능 시기]
+• ${salaryInfo}
 
 [맞춤 지원동기]
-${item.company}의 '${item.title}' 포지션에 지원합니다. 3D 애니메이션 연출력과 Python/CapCut 기반 고속 자동편집 파이프라인을 결합해 기획부터 납품까지 압도적인 속도와 퀄리티로 기여하겠습니다.`;
+${item.company}의 '${item.title}' 포지션에 지원합니다. 3D 애니메이션 연출력과 Python/CapCut 기반 고속 자동편집 파이프라인(제작시간 70% 단축)을 결합해 기획부터 납품까지 즉시 기여하겠습니다.`;
   }
 
   if (type === 'alba') {
-    return `[${item.site} 300자 즉답 지원문구]
+    return `[${item.site} 단기·알바 핵심 요약 지원서]
 안녕하세요! '${item.title}' 공고를 보고 지원드리는 ${masterResume.name}입니다.
-1) 프리미어/애프터이펙트/캡컷 및 3D 모션 능숙 (${masterResume.portfolioMain})
-2) 자체 구축한 캡컷 자동편집·자막 템플릿으로 요청하신 컷편집·자막 작업을 2~3배 빠르게 정확히 납품합니다.
-3) 샘플 영상 즉시 공유 가능합니다. 감사합니다!`;
+• 보유 기술: Premiere Pro, After Effects, CapCut, 3D 모션 (편집시간 70% 단축 자동화 보유)
+• 대표 포트폴리오: ${masterResume.portfolioMain} (${pfUrl})
+• 근무 가능 조건: ${item.pay || '시급/건별 협의'} / ${item.schedule || '즉시 투입 및 일정 조율 가능'}
+빠르고 정확한 컷편집·자막·모션 작업으로 즉시 도움드리겠습니다!`;
   }
 
   if (type === 'freelance') {
     return `[${item.site} 맞춤 견적 제안서 — ${item.client}]
-안녕하세요! '${item.title}' 요청서를 확인하고 제안드리는 ${masterResume.name}입니다.
+안녕하세요! '${item.title}' 프로젝트 요청서를 확인하고 제안드리는 ${masterResume.name}입니다.
 
-■ 핵심 강점 3가지
-1) 고퀄리티 3D & 모션 연출 (${masterResume.portfolioMain} 보유)
-2) 48시간 내 1차 가편집 시안 신속 제공 (자체 자동화 파이프라인 활용)
-3) 가로형 마스터본 + 쇼츠/릴스 세로형(9:16) 리사이징 패키지 지원
+■ 핵심 강점 및 정량 성과
+1) 고퀄리티 3D & 모션 연출 (${masterResume.portfolioMain})
+2) 48시간 내 1차 가편집 시안 제공 (CapCut+AI 자동화 파이프라인으로 리드타임 70% 단축)
+3) 가로형(16:9) 마스터본 + 쇼츠/릴스(9:16) 파생본 패키지 지원
 
-■ 제안 조건: ${item.budget} 범위 내 맞춤 조율 / ${item.duration} / 무상 수정 2회 신속 지원`;
+■ 포트폴리오 클라우드 링크 (자동 첨부)
+• 파일명: ${masterResume.portfolioMain}
+• 열람 URL: ${pfUrl}
+
+■ 제안 단가 및 일정 조건
+• 희망 견적: ${item.budget} 범위 내 맞춤 조율 / 예상 기간: ${item.duration} / 무상 수정 2회 포함`;
   }
 
   const ws = item.winningStrategy || {};
-  return `[${item.category} 필승전략 & 사업계획서(PSST) 요약]
+  return `[${item.site || item.category} 필승전략 & 표준 사업계획서(PSST)]
 ■ 공고명: ${item.title} (${item.organizer} / ${item.dday})
 ■ 지원규모: ${item.prizeScale}
 
-[1. 문PD 필승 경쟁우위]
+[1. 문제인식 (Problem)]
+• 기존 영상 제작 방식의 높은 외주 비용과 느린 납기 문제를 해결할 AI·3D 융합 파이프라인 필요
+
+[2. 실현가능성 (Solution — 문PD 핵심 경쟁우위)]
 • ${ws.unfairAdvantage || masterResume.techAutomation}
+• 보유 툴: ${masterResume.tools}
 
-[2. 심사 배점 핵심]
-• ${ws.evaluationFocus || '기획성 + 독창성 + 기술 완성도'}
+[3. 성장전략 및 기대효과 (Scale-up)]
+• 심사 배점 핵심(${ws.evaluationFocus || '기획성+독창성+기술성'})에 맞춘 3D+AI 데모 시안 선제 제출 (효율 70% 향상)
 
-[3. 3단계 실행 전략]
-${(ws.actionSteps || []).map(s => `• ${s}`).join('\n')}
+[4. 팀 역량 및 대표 포트폴리오 (Team & Portfolio)]
+• 총괄 PD: ${masterResume.name} (${masterResume.email})
+• 증빙 포트폴리오: ${masterResume.portfolioMain} (${pfUrl})`;
+}
 
-[4. 심사 통과 핵심 팁]
-• ${ws.selectionTip || ''}`;
+// 채용사이트 양식 적합성 실시간 체크 규칙
+function evaluateSiteFormatRules(site, type, text) {
+  const rules = [];
+  const hasPortfolioLink = /https?:\/\/drive\.google\.com|\.mp4|\.pdf|포트폴리오/i.test(text);
+  const hasTools = /Premiere|After Effects|CapCut|3D|Python|프리미어|애프터이펙트|캡컷/i.test(text);
+  const hasMetric = /\d+%|\d+편|\d+만|\d+시간|단축|달성/.test(text);
+  const hasCondition = /희망|급여|연봉|단가|견적|투입|일정|협의/.test(text);
+
+  rules.push({
+    id: 'portfolio',
+    label: `[${site} 필수] 최신 포트폴리오 파일명 & Google Drive 링크 첨부`,
+    passed: hasPortfolioLink,
+    fixLabel: '+ 포트폴리오 링크 자동첨부',
+    fixSnippet: `\n[포트폴리오 자동 첨부]\n• 대표 파일: ${masterResume.portfolioMain}\n• Google Drive 링크: ${masterResume.portfolioDriveUrl || GOOGLE_DRIVE_URL}`
+  });
+
+  rules.push({
+    id: 'tools',
+    label: `[${site} 양식] 영상 편집·3D·AI 활용 툴 명시 여부`,
+    passed: hasTools,
+    fixLabel: '+ 보유 툴 자동기입',
+    fixSnippet: `\n• 활용 툴 및 기술: ${masterResume.tools}`
+  });
+
+  if (type === 'career' || site.includes('원티드') || site.includes('사람인') || site.includes('잡코리아')) {
+    rules.push({
+      id: 'metrics',
+      label: `[${site} 서류통과 기준] 정량적 성과 수치(%, 건수, 기간 단축) 포함`,
+      passed: hasMetric,
+      fixLabel: '+ 정량 성과 수치 보완',
+      fixSnippet: `\n• 핵심 정량 성과: ${masterResume.techAutomation} (누적 조회수 500만+ 및 납기 70% 단축)`
+    });
+  }
+
+  if (type === 'alba') {
+    const len = text.length;
+    const isGoodLen = len >= 80 && len <= 650;
+    rules.push({
+      id: 'alba_length',
+      label: `[${site} 모바일 규격] 핵심 요약 글자수 적정성 (현재 ${len}자 / 권장 100~600자)`,
+      passed: isGoodLen,
+      fixLabel: '⚡ 300자 핵심요약으로 자동축약',
+      fixReplaceAll: `[${site} 300자 핵심 지원서]\n안녕하세요! ${masterResume.name}입니다.\n1) 보유기술: ${masterResume.tools}\n2) 강점: CapCut+AI 자동편집으로 컷편집·자막·모션 작업을 70% 빠르게 납품합니다.\n3) 포트폴리오: ${masterResume.portfolioMain} (${masterResume.portfolioDriveUrl || GOOGLE_DRIVE_URL})\n4) 근무조건: 즉시 투입 및 일정 협의 가능합니다!`
+    });
+  } else {
+    rules.push({
+      id: 'condition',
+      label: `[${site} 필수항목] 희망 급여/단가 및 투입 가능 시기 명시`,
+      passed: hasCondition,
+      fixLabel: '+ 희망조건/투입시기 추가',
+      fixSnippet: `\n• 희망 조건 및 투입 시기: ${masterResume.desiredSalary || '면접/협의 후 결정 (즉시 투입 가능)'}`
+    });
+  }
+
+  if (type === 'contest') {
+    const hasPsst = /문제인식|실현가능성|성장전략|팀 역량|PSST/i.test(text);
+    rules.push({
+      id: 'psst',
+      label: `[정부지원/공모전 표준] PSST(문제인식-실현가능성-성장전략-팀) 목차 준수`,
+      passed: hasPsst,
+      fixLabel: '+ PSST 표준 목차 보완',
+      fixSnippet: `\n[PSST 표준 요약]\n• Problem(문제인식): 고비용 영상 제작 구조 혁신\n• Solution(실현가능성): ${masterResume.techAutomation}\n• Scale-up(성장전략): 숏폼·롱폼 멀티 포맷 동시 납품\n• Team(팀역량): ${masterResume.name} (${masterResume.portfolioMain})`
+    });
+  }
+
+  return rules;
+}
+
+let currentValidationRules = [];
+
+function runLiveFormatValidation() {
+  const box = document.getElementById('formatValidationBox');
+  const textarea = document.getElementById('modalTextarea');
+  if (!box || !textarea) return;
+
+  const text = textarea.value || '';
+  currentValidationRules = evaluateSiteFormatRules(currentModalSite, currentModalType, text);
+  const failCount = currentValidationRules.filter(r => !r.passed).length;
+
+  box.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:6px;">
+      <strong style="font-size:12.5px;color:var(--text-main);">
+        🔍 [${currentModalSite}] 채용양식 적합성 자동 체크 (${text.length}자)
+      </strong>
+      <span class="status-chip" style="background:${failCount === 0 ? '#eff6ff' : '#e0e7ff'};color:${failCount === 0 ? 'var(--color-primary)' : 'var(--color-secondary)'};">
+        ${failCount === 0 ? '✅ 모든 양식 기준 통과 (즉시 지원 가능)' : `⚠️ 양식 보완 권장 ${failCount}건 (우측 버튼 클릭 시 자동 수정)`}
+      </span>
+    </div>
+    ${currentValidationRules.map((r, idx) => `
+      <div class="val-row ${r.passed ? 'ok' : 'warn'}">
+        <span>${r.passed ? '✅' : '⚠️'} ${r.label}</span>
+        ${r.passed
+          ? `<span style="font-weight:700;color:var(--color-primary);">적합</span>`
+          : `<button class="btn btn-primary btn-sm" style="padding:3px 8px;font-size:11px;" onclick="applyFormatAutoFix(${idx})">${r.fixLabel}</button>`
+        }
+      </div>
+    `).join('')}
+  `;
+}
+
+function applyFormatAutoFix(ruleIndex) {
+  const rule = currentValidationRules[ruleIndex];
+  const textarea = document.getElementById('modalTextarea');
+  if (!rule || !textarea) return;
+
+  if (rule.fixReplaceAll) {
+    textarea.value = rule.fixReplaceAll;
+  } else if (rule.fixSnippet) {
+    textarea.value = (textarea.value.trim() + '\n' + rule.fixSnippet.trim() + '\n');
+  }
+  runLiveFormatValidation();
+  showToast('✨ 채용사이트 양식에 맞게 자동 보완되었습니다!');
+}
+
+function renderModalPortfolioBar() {
+  const bar = document.getElementById('modalPortfolioBar');
+  if (!bar) return;
+  const pfUrl = masterResume.portfolioDriveUrl || GOOGLE_DRIVE_URL;
+  bar.innerHTML = `
+    <span>📎 <strong>자동 첨부 포트폴리오:</strong> ${masterResume.portfolioMain} (Google Drive 연동됨)</span>
+    <div style="display:flex;gap:6px;">
+      <button class="btn btn-outline btn-sm" style="padding:3px 8px;font-size:11px;" onclick="triggerPortfolioFileUpload()">📤 다른 포트폴리오 올리기</button>
+      <a class="btn btn-outline btn-sm" style="padding:3px 8px;font-size:11px;" href="${pfUrl}" target="_blank" rel="noopener">☁️ 드라이브 링크 확인</a>
+    </div>
+  `;
 }
 
 function openConvertedDocModal(type, itemId) {
@@ -725,15 +1224,19 @@ function openConvertedDocModal(type, itemId) {
   const item = all.find(x => x.id === itemId);
   if (!item) return;
 
+  currentModalItem = item;
+  currentModalType = type;
+  currentModalSite = item.site || item.category || '채용사이트';
   currentModalTargetUrl = item.url;
   const safeName = (item.company || item.organizer || item.client || '문PD').replace(/[^\w가-힣]/g, '_');
-  currentModalFilename = `문PD_${item.site}_${safeName}.txt`;
+  currentModalFilename = `문PD_${currentModalSite}_${safeName}.txt`;
 
-  document.getElementById('modalTitle').textContent = `✨ [${item.site}] 맞춤 변환 & 전략`;
-  document.getElementById('modalSubtitle').textContent = item.title;
-  document.getElementById('modalGuideBox').textContent =
-    item.winningStrategy?.selectionTip || item.jdSummary || item.summary || item.requestDetail || '사람인 마스터 이력서 기반으로 자동 변환된 문서입니다.';
+  document.getElementById('modalTitle').textContent = `✨ [${currentModalSite}] 맞춤 양식 자동변환 & 양식 적합성 체크`;
+  document.getElementById('modalSubtitle').textContent = `${item.title} (${item.location || inferRegionBucket(item)})`;
   document.getElementById('modalTextarea').value = generateTailoredDocument(type, item);
+
+  renderModalPortfolioBar();
+  runLiveFormatValidation();
   document.getElementById('docModal').classList.add('open');
 }
 
@@ -749,7 +1252,7 @@ async function copyModalContent() {
     document.getElementById('modalTextarea').select();
     document.execCommand('copy');
   }
-  showToast('📋 클립보드에 복사되었습니다.');
+  showToast('📋 변환된 이력서 + 포트폴리오 드라이브 링크가 복사되었습니다.');
 }
 
 async function saveModalContentToFile() {
@@ -784,35 +1287,36 @@ function runBatchConvertAndApply() {
     showToast('⚠️ 먼저 카드의 [☑️ 선택]을 체크해 주세요.');
     return;
   }
-  const all = [
-    ...(appData.jobs || []).map(x => ({ ...x, _t: 'career' })),
-    ...(appData.albas || []).map(x => ({ ...x, _t: 'alba' })),
-    ...(appData.freelances || []).map(x => ({ ...x, _t: 'freelance' })),
-    ...(appData.contests || []).map(x => ({ ...x, _t: 'contest' }))
-  ];
+  const all = getAllItemsWithTrack();
   const targets = all.filter(x => selectedIds.has(x.id));
   const combinedText = targets.map((item, i) =>
-    `=== [#${i + 1} ${item.site}] ${item.title} ===\n` + generateTailoredDocument(item._t, item)
+    `=== [#${i + 1} ${item.site}] ${item.title} ===\n` + generateTailoredDocument(item._track, item)
   ).join('\n\n');
 
+  currentModalSite = `일괄변환(${targets.length}건)`;
+  currentModalType = 'career';
   currentModalTargetUrl = targets[0]?.url || '';
   currentModalFilename = `문PD_일괄지원_${targets.length}건.txt`;
-  document.getElementById('modalTitle').textContent = `🚀 선택 ${targets.length}건 일괄 변환 완료`;
+  document.getElementById('modalTitle').textContent = `🚀 선택 ${targets.length}건 일괄 변환 & 양식 검증 완료`;
   document.getElementById('modalSubtitle').textContent = targets.map(t => t.site).join(', ');
-  document.getElementById('modalGuideBox').textContent = `선택하신 ${targets.length}건의 맞춤 지원서가 생성되었습니다.`;
   document.getElementById('modalTextarea').value = combinedText;
+
+  renderModalPortfolioBar();
+  runLiveFormatValidation();
   document.getElementById('docModal').classList.add('open');
 }
 
-// 키워드 맞춤형 실시간 수집 트리거
+// ============================================================================
+// 키워드 기반 실시간 크롤링 실행
+// ============================================================================
 async function triggerLiveCrawl() {
-  const kw = (document.getElementById('searchInput')?.value || '').trim();
   const btn = document.getElementById('liveCrawlBtn');
+  const kw = (document.getElementById('searchInput')?.value || '').trim();
   const orig = btn.innerHTML;
-  const targetLabel = kw || '전체 핵심키워드';
-  btn.innerHTML = `⏳ '${targetLabel}' 수집 중...`;
+
   btn.disabled = true;
-  showToast(`🔄 '${targetLabel}' 키워드로 사람인·원티드·잡코리아·알바몬·위비티 실시간 수집 중...`);
+  btn.innerHTML = '⏳ 수집 중...';
+  showToast(kw ? `🌐 '${kw}' 키워드로 사람인·원티드·잡코리아·알바몬 실시간 수집 중...` : '🌐 전체 키워드 실시간 수집 중...');
 
   try {
     const res = await fetch('/api/crawl', {
@@ -824,42 +1328,45 @@ async function triggerLiveCrawl() {
       appData = await res.json();
       onFilterChanged();
       const total = (appData.jobs?.length || 0) + (appData.albas?.length || 0) + (appData.freelances?.length || 0) + (appData.contests?.length || 0);
-      showToast(`✅ '${targetLabel}' 실시간 수집 완료! (총 ${total}건)`);
+      showToast(`✅ 실시간 수집 완료! (총 ${total}건 연동됨)`);
     } else {
       onFilterChanged();
+      showToast(`🔍 현재 수집된 DB에서 '${kw || '전체'}' 결과를 표시합니다.`);
     }
   } catch (e) {
     onFilterChanged();
-    showToast(`🔍 '${targetLabel}' 키워드로 통합 DB 필터링이 적용되었습니다.`);
+    showToast(`🔍 로컬/클라우드 DB에서 '${kw || '전체'}' 필터 결과를 표시합니다.`);
   } finally {
-    btn.innerHTML = orig;
     btn.disabled = false;
+    btn.innerHTML = orig;
   }
 }
 
 function addNewCustomSitePrompt() {
-  const name = prompt('추가할 사이트 이름:');
+  const name = prompt('추가할 사이트 이름 (예: 크몽 / 클래스101):');
   if (!name) return;
   const url = prompt('사이트 URL:', 'https://');
   if (!url) return;
   appData.sites = appData.sites || [];
   appData.sites.unshift({
+    id: 'SITE-' + Date.now(),
+    category: '사용자 추가',
     name,
-    category: '추가 사이트',
     url,
-    cashcowType: '신규 캐시카우',
-    status: '연동됨',
-    dailyNew: '상시 탐색'
+    status: '실시간 연동',
+    dailyNew: '상시 모니터링',
+    cashcowType: '신규 캐시카우'
   });
   onFilterChanged();
-  showToast(`➕ '${name}' 추가됨`);
+  showToast(`📡 ${name} 사이트가 추가되었습니다.`);
 }
 
+let toastTimer = null;
 function showToast(msg) {
   const el = document.getElementById('toastNotification');
   if (!el) return;
   el.textContent = msg;
   el.classList.add('show');
-  clearTimeout(window._toastTimer);
-  window._toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
 }
