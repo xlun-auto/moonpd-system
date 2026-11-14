@@ -703,9 +703,10 @@ function initCosmosBackground() {
   });
 
   const nebulae = [
-    { bx: 0.16, by: 0.18, rScale: 0.56, color: 'rgba(37, 99, 235, 0.48)', dx: 0.09, dy: 0.06, freq: 0.00032, phase: 0.2 },
-    { bx: 0.82, by: 0.24, rScale: 0.50, color: 'rgba(14, 165, 233, 0.40)', dx: 0.10, dy: 0.07, freq: 0.00028, phase: 2.1 },
-    { bx: 0.64, by: 0.80, rScale: 0.58, color: 'rgba(99, 102, 241, 0.38)', dx: 0.09, dy: 0.06, freq: 0.00030, phase: 4.0 }
+    { bx: 0.18, by: 0.22, rScale: 0.58, color: 'rgba(56, 189, 248, 0.34)', dx: 0.10, dy: 0.06, freq: 0.00035, phase: 0.2 },
+    { bx: 0.52, by: 0.48, rScale: 0.62, color: 'rgba(99, 102, 241, 0.30)', dx: 0.08, dy: 0.07, freq: 0.00028, phase: 1.4 },
+    { bx: 0.84, by: 0.26, rScale: 0.52, color: 'rgba(14, 165, 233, 0.36)', dx: 0.11, dy: 0.07, freq: 0.00030, phase: 2.5 },
+    { bx: 0.72, by: 0.82, rScale: 0.56, color: 'rgba(139, 92, 246, 0.26)', dx: 0.09, dy: 0.06, freq: 0.00032, phase: 4.0 }
   ];
 
   const meteors = [];
@@ -1928,7 +1929,7 @@ function renderCareerAnalysisTab(area) {
         </div>
       ` : ''}
 
-      <div class="cards-grid">
+      <div class="cards-grid career-cards-grid">
         ${roleProfiles.map(rp => {
           const safeKwAttr = escapeHtml(rp.keyword).replace(/&#39;/g, "\\'");
           return `
@@ -1960,7 +1961,7 @@ function renderCareerAnalysisTab(area) {
                   </div>
                 ` : ''}
 
-                <div class="fit-mini-box" style="line-height:1.55;">
+                <div class="fit-mini-box career-fit-box" style="line-height:1.55;">
                   <div><strong style="color:var(--color-primary);">나의 강점</strong>
                     <ul style="margin:3px 0 6px 16px;padding:0;">
                       ${rp.strengths.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
