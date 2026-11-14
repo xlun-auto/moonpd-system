@@ -1689,23 +1689,23 @@ function renderCareerAnalysisTab(area) {
                 </div>
 
                 ${rp.marketTrend ? `
-                  <div style="font-size:12px;color:#cbd5e1;margin-bottom:8px;line-height:1.45;">
-                    📊 <strong>시장 트렌드:</strong> ${escapeHtml(rp.marketTrend)}
+                  <div style="font-size:12px;color:var(--text-sub);margin-bottom:8px;line-height:1.45;">
+                    📊 <strong style="color:var(--text-main);">시장 트렌드:</strong> ${escapeHtml(rp.marketTrend)}
                   </div>
                 ` : ''}
 
                 <div class="fit-mini-box" style="line-height:1.5;">
-                  <div>💪 <strong style="color:#93c5fd;">나의 강점:</strong>
+                  <div>💪 <strong style="color:var(--color-primary);">나의 강점:</strong>
                     <ul style="margin:3px 0 6px 16px;padding:0;">
                       ${rp.strengths.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
                     </ul>
                   </div>
-                  <div>⚡ <strong style="color:#c7d2fe;">약점 / 보완 지표:</strong>
+                  <div>⚡ <strong style="color:var(--color-secondary);">약점 / 보완 지표:</strong>
                     <ul style="margin:3px 0 6px 16px;padding:0;">
                       ${rp.weaknesses.map(w => `<li>${escapeHtml(w)}</li>`).join('')}
                     </ul>
                   </div>
-                  <div>🧭 <strong style="color:#a5b4fc;">실행 액션:</strong>
+                  <div>🧭 <strong style="color:#0369a1;">실행 액션:</strong>
                     <ul style="margin:3px 0 6px 16px;padding:0;">
                       ${rp.howToImprove.map(h => `<li>${escapeHtml(h)}</li>`).join('')}
                     </ul>
@@ -2225,7 +2225,7 @@ function renderModalFitAnalysisBox(item) {
   box.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
       <strong style="font-size:12.5px;color:var(--text-main);">
-        🎯 [문PD 맞춤 합격진단] 현재 채용예측률 <span style="color:#93c5fd;">${fit.hireProb}%</span> → 보완 시 <span style="color:#c7d2fe;">${fit.boostedProb}%</span>
+        🎯 [문PD 맞춤 합격진단] 현재 채용예측률 <span style="color:var(--color-primary);">${fit.hireProb}%</span> → 보완 시 <span style="color:var(--color-secondary);">${fit.boostedProb}%</span>
       </strong>
       <span class="chip">📅 ${escapeHtml(sched.applyPeriod)}</span>
     </div>
@@ -2238,7 +2238,7 @@ function renderModalFitAnalysisBox(item) {
         + 보완 문구 즉시 삽입 (합격률 ↑)
       </button>
     </div>
-    <div class="val-row" style="color:#cbd5e1;">
+    <div class="val-row" style="color:var(--text-sub);">
       <span>🧭 <strong>연마 추천 기술:</strong> ${escapeHtml(fit.skillToPolish)}</span>
     </div>
   `;
@@ -2413,7 +2413,7 @@ function runLiveFormatValidation() {
       <div class="val-row ${r.passed ? 'val-ok' : 'val-warn'}">
         <span>${r.passed ? '✅' : '⚠️'} ${escapeHtml(r.label)}</span>
         ${r.passed
-          ? `<span style="font-weight:700;color:#93c5fd;">적합</span>`
+          ? `<span style="font-weight:700;color:var(--color-primary);">적합</span>`
           : `<button type="button" class="btn btn-primary btn-sm" style="padding:3px 8px;font-size:11px;" onclick="applyFormatAutoFix(${idx})">${escapeHtml(r.fixLabel)}</button>`
         }
       </div>
