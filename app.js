@@ -2040,37 +2040,120 @@ function setAsPrimaryPortfolio(idx) {
 // ============================================================================
 // 12. 이력서 4대 작업 핸들러
 // ============================================================================
+function getSaraminResumeList() {
+  if (typeof window !== 'undefined' && Array.isArray(window.MOONPD_SARAMIN_RESUMES) && window.MOONPD_SARAMIN_RESUMES.length) {
+    return window.MOONPD_SARAMIN_RESUMES;
+  }
+  return [];
+}
+
+async function selectSaraminResume(idx) {
+  const list = getSaraminResumeList();
+  const picked = list[idx];
+  if (!picked || !picked.resumeData) {
+    showToast('⚠️ 선택한 이력서 데이터를 찾을 수 없습니다.');
+    return;
+  }
+  const rd = picked.resumeData;
+  const updated = {
+    ...DEFAULT_MASTER_RESUME,
+    ...masterResume,
+    name: rd.name || masterResume.name,
+    email: rd.email || masterResume.email,
+    headline: rd.headline || picked.title,
+    desiredSalary: rd.desiredSalary || picked.desiredSalary || '면접 후 결정',
+    portfolioMain: rd.portfolioMain || masterResume.portfolioMain,
+    tools: rd.tools || masterResume.tools,
+    techAutomation: rd.techAutomation || masterResume.techAutomation,
+    coreCareer: Array.isArray(rd.coreCareer) && rd.coreCareer.length ? rd.coreCareer : masterResume.coreCareer,
+    saraminResIdx: picked.res_idx,
+    saraminTitle: picked.title,
+    updatedAt: new Date().toISOString().slice(0, 10)
+  };
+  persistMasterResumeLocal(updated);
+  if (IS_LOCAL_SERVER) {
+    try {
+      await fetch('/api/resume-save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+      });
+    } catch (e) {}
+  }
+  isResumeEditMode = true;
+  closeAppModal();
+  renderActiveTab();
+  showToast(`✏️ '${picked.title}' 이력서를 불러와 편집 모드로 열었습니다!`);
+}
+
+async function restoreDefaultOrServerResume() {
+  let loadedFromServer = false;
+  if (IS_LOCAL_SERVER) {
+    try {
+      const res = await fetch('/api/resume-load', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: 'cloud' })
+      });
+      if (res.ok) {
+        const loaded = await res.json();
+        persistMasterResumeLocal(loaded);
+        loadedFromServer = true;
+      }
+    } catch (e) {}
+  }
+  if (!loadedFromServer) {
+    persistMasterResumeLocal({ ...DEFAULT_MASTER_RESUME });
+  }
+  isResumeEditMode = true;
+  closeAppModal();
+  renderActiveTab();
+  showToast(loadedFromServer ? '📥 로컬 서버 백업본을 불러와 편집 모드로 열었습니다.' : '📥 기본 마스터 백업본으로 복원했습니다.');
+}
+
 function requestLoadResume() {
-  openConfirmDialog({
-    title: '⚠️ [이력서 불러오기] 데이터 덮어쓰기 확인',
-    message: IS_LOCAL_SERVER
-      ? '로컬 서버에서 최신 마스터 이력서를 불러옵니다. 현재 화면의 수정 내용이 덮어씌워집니다.'
-      : '기본 마스터 이력서로 초기화합니다. 현재 브라우저에 수정한 내용이 덮어씌워집니다.',
-    subText: '• 대상: 마스터 이력서',
-    onConfirm: async () => {
-      let loadedFromServer = false;
-      if (IS_LOCAL_SERVER) {
-        try {
-          const res = await fetch('/api/resume-load', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ source: 'cloud' })
-          });
-          if (res.ok) {
-            const loaded = await res.json();
-            persistMasterResumeLocal(loaded);
-            loadedFromServer = true;
-          }
-        } catch (e) {}
-      }
-      if (!loadedFromServer) {
-        persistMasterResumeLocal({ ...DEFAULT_MASTER_RESUME });
-      }
-      isResumeEditMode = false;
-      renderActiveTab();
-      showToast(loadedFromServer ? '📥 로컬 서버에서 최신 이력서를 불러왔습니다.' : '📥 기본 마스터 이력서로 복원되었습니다.');
-    }
-  });
+  const list = getSaraminResumeList();
+  if (!list.length) {
+    restoreDefaultOrServerResume();
+    return;
+  }
+
+  const overlay = document.getElementById('appModal');
+  const titleEl = document.getElementById('modalTitle');
+  const bodyEl = document.getElementById('modalBody');
+  const footEl = document.getElementById('modalFooter');
+
+  titleEl.textContent = `📥 사람인 등록 이력서 불러오기 (총 ${list.length}건)`;
+  bodyEl.innerHTML = `
+    <div class="one-liner" style="margin-bottom:12px;-webkit-line-clamp:unset;">
+      💡 불러오고 싶은 사람인 이력서를 클릭하면 <strong>전체 항목이 마스터 이력서에 채워지고 즉시 편집 가능한 상태</strong>로 열립니다.
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;max-height:54vh;overflow-y:auto;padding-right:4px;">
+      ${list.map((item, idx) => `
+        <div class="action-tile ${item.isRepresentative ? 'active-mode' : ''}" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;" onclick="selectSaraminResume(${idx})">
+          <div style="flex:1;min-width:240px;">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:4px;">
+              ${item.isRepresentative ? '<span class="badge-match high">🌟 대표·공개</span>' : '<span class="chip">📄 등록본</span>'}
+              <span class="chip">${escapeHtml(item.careerYears || '')}</span>
+              <span class="chip">🕒 ${escapeHtml(item.lastUpdated || '')}</span>
+              <span class="chip">📍 ${escapeHtml(item.desiredRegion || '')}</span>
+            </div>
+            <div style="font-size:13.5px;font-weight:700;color:var(--text-main);line-height:1.4;">${escapeHtml(item.title)}</div>
+            <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;">${escapeHtml(item.resumeData?.headline || '')}</div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;" onclick="event.stopPropagation()">
+            <a class="btn btn-outline btn-sm" href="${safeUrl(item.editUrl)}" target="_blank" rel="noopener">↗ 사람인</a>
+            <button type="button" class="btn btn-primary btn-sm" onclick="selectSaraminResume(${idx})">✏️ 불러와 편집</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  footEl.innerHTML = `
+    <button type="button" class="btn btn-outline btn-sm" onclick="restoreDefaultOrServerResume()">🔄 기본/서버 백업본 복원</button>
+    <button type="button" class="btn btn-outline btn-sm" onclick="closeAppModal()">닫기</button>
+  `;
+  overlay.classList.add('open');
 }
 
 function enableResumeEditMode() {
