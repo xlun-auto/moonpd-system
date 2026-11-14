@@ -74,7 +74,8 @@ const LUCIDE_PATHS = {
   sparkles: '<path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>',
   key: '<path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/>',
   bell: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
-  folder: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>'
+  folder: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
+  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'
 };
 
 function icon(name, size = 14) {
@@ -832,7 +833,7 @@ function toggleHighProbFilter() {
   const btn = document.getElementById('highProbToggleBtn');
   if (btn) {
     btn.classList.toggle('btn-toggle-active', highProbOnly);
-    btn.textContent = highProbOnly ? '90%+ 고확률 ON' : '90%+ 고확률만';
+    btn.textContent = highProbOnly ? '90%+ ON' : '90%+';
   }
   onFilterChanged();
 }
@@ -873,7 +874,7 @@ function resetSearchFilter() {
   const btn = document.getElementById('highProbToggleBtn');
   if (btn) {
     btn.classList.remove('btn-toggle-active');
-    btn.textContent = '90%+ 고확률만';
+    btn.textContent = '90%+';
   }
   activeSavedCategoryFilter = 'ALL';
   onFilterChanged();
@@ -926,15 +927,15 @@ function updateKpiAndCounts() {
   const expBadge = document.getElementById('hiddenExpiredBadge');
   if (expBadge) {
     expBadge.textContent = expiredTotalCount > 0
-      ? `마감 ${expiredTotalCount}건 자동숨김`
-      : '마감 자동숨김 ON';
+      ? `마감 ${expiredTotalCount}숨김`
+      : '마감숨김';
   }
 
   const badge = document.getElementById('syncStatusBadge');
   if (badge) {
     badge.classList.toggle('web-mode', !IS_LOCAL_SERVER);
-    const modeLabel = IS_LOCAL_SERVER ? '로컬 서버 연동' : '웹 뷰어 (브라우저 저장)';
-    badge.textContent = `${modeLabel} · 활성 ${visibleAll.length}건 · 평균 ${avgProb}%`;
+    const modeLabel = IS_LOCAL_SERVER ? '로컬' : '웹';
+    badge.textContent = `${modeLabel} · ${visibleAll.length}건 · ${avgProb}%`;
   }
 }
 
@@ -1085,9 +1086,8 @@ function renderStarAndCategoryControl(item, showExpireToggle = false) {
 
   return `
     <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
-      <button type="button" class="btn-star ${saved ? 'saved' : ''}" onclick="toggleStar('${id}')" title="관심공고함에 저장/해제">
-        ${icon(saved ? 'starFilled' : 'star', 12)}
-        <span>${saved ? '관심' : '저장'}</span>
+      <button type="button" class="btn-star ${saved ? 'saved' : ''}" onclick="toggleStar('${id}')" title="${saved ? '관심 해제' : '관심 저장'}" aria-label="${saved ? '관심 해제' : '관심 저장'}">
+        ${icon(saved ? 'starFilled' : 'star', 13)}
       </button>
       ${saved ? `
         <select class="cat-select" onchange="changeSavedItemCategory('${id}', this.value)" title="관심공고 카테고리 변경">
@@ -1097,7 +1097,7 @@ function renderStarAndCategoryControl(item, showExpireToggle = false) {
       ` : ''}
       ${showExpireToggle ? `
         <button type="button" class="btn btn-outline btn-sm" style="padding:3px 7px;font-size:11px;" onclick="toggleManualExpired('${id}')" title="마감 여부 수동 전환">
-          ${sched.isExpired ? '마감해제' : '마감처리'}
+          ${sched.isExpired ? '복구' : '마감'}
         </button>
       ` : ''}
     </div>
@@ -1124,7 +1124,7 @@ function renderEmptySearchPrompt(trackLabel) {
 
 function renderUrgencyBadge(sched) {
   if (sched.isExpired) return '';
-  if (sched.dDaySort === 0) return `<span class="badge-urgent">오늘마감</span>`;
+  if (sched.dDaySort === 0) return `<span class="badge-urgent">오늘</span>`;
   if (sched.dDaySort > 0 && sched.dDaySort <= 3) return `<span class="badge-urgent">D-${sched.dDaySort}</span>`;
   return '';
 }
@@ -1156,10 +1156,11 @@ function renderPostingCard(item, trackType, ctaLabel) {
       ? (item.organizer || item.site)
       : (item.company || item.site);
 
+  const shortSched = sched.dDayText === '오늘마감 (D-Day)' ? 'D-Day' : sched.dDayText;
   const metaParts = [
     `<strong>${escapeHtml(orgName)}</strong>`,
     (trackType !== 'freelance' && trackType !== 'contest') ? escapeHtml(regionTag) : null,
-    escapeHtml(sched.applyPeriod)
+    escapeHtml(shortSched)
   ].filter(Boolean);
 
   return `
@@ -1173,15 +1174,16 @@ function renderPostingCard(item, trackType, ctaLabel) {
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
             ${renderStarAndCategoryControl(item)}
-            <label class="select-check">
-              <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleSelect('${safeId}', this.checked)" /> 선택
+            <label class="select-check" title="일괄 선택">
+              <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleSelect('${safeId}', this.checked)" aria-label="공고 선택" />
             </label>
           </div>
         </div>
         <h3 class="card-title" style="margin-top:10px;">${escapeHtml(item.title)}</h3>
         <div class="card-meta-line" style="margin-top:6px;">${metaParts.join(' · ')}</div>
-        <div class="fit-mini-box" style="margin-top:10px;">
-          <strong>강점</strong> · ${escapeHtml(fit.strengthPoint)}
+        <div class="fit-mini-box" style="margin-top:8px;">
+          ${icon('zap', 12)}
+          <span>${escapeHtml(fit.strengthPoint)}</span>
         </div>
       </div>
       <div class="card-footer">
@@ -1202,7 +1204,7 @@ function renderCareerTab(area) {
     area.innerHTML = renderEmptySearchPrompt('정규·계약직');
     return;
   }
-  area.innerHTML = `<div class="cards-grid">${items.map(it => renderPostingCard(it, 'career', '합격진단 · 지원서')).join('')}</div>`;
+  area.innerHTML = `<div class="cards-grid">${items.map(it => renderPostingCard(it, 'career', '진단·지원')).join('')}</div>`;
 }
 
 function renderAlbaTab(area) {
@@ -1211,7 +1213,7 @@ function renderAlbaTab(area) {
     area.innerHTML = renderEmptySearchPrompt('알바·단기');
     return;
   }
-  area.innerHTML = `<div class="cards-grid">${items.map(it => renderPostingCard(it, 'alba', '합격진단 · 300자지원')).join('')}</div>`;
+  area.innerHTML = `<div class="cards-grid">${items.map(it => renderPostingCard(it, 'alba', '진단·지원')).join('')}</div>`;
 }
 
 function renderFreelanceTab(area) {
@@ -1220,7 +1222,7 @@ function renderFreelanceTab(area) {
     area.innerHTML = renderEmptySearchPrompt('외주·프리랜서');
     return;
   }
-  area.innerHTML = `<div class="cards-grid">${items.map(it => renderPostingCard(it, 'freelance', '수주진단 · 견적제안')).join('')}</div>`;
+  area.innerHTML = `<div class="cards-grid">${items.map(it => renderPostingCard(it, 'freelance', '진단·견적')).join('')}</div>`;
 }
 
 function renderContestsTab(area) {
@@ -1229,7 +1231,7 @@ function renderContestsTab(area) {
     area.innerHTML = renderEmptySearchPrompt('공모전·지원사업');
     return;
   }
-  area.innerHTML = `<div class="cards-grid">${items.map(it => renderPostingCard(it, 'contest', '선정진단 · 계획서')).join('')}</div>`;
+  area.innerHTML = `<div class="cards-grid">${items.map(it => renderPostingCard(it, 'contest', '진단·계획')).join('')}</div>`;
 }
 
 // 5. 관심공고 보관함 탭
@@ -1264,8 +1266,8 @@ function renderSavedCardHtml(item) {
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
             ${renderStarAndCategoryControl(item, true)}
-            <label class="select-check">
-              <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleSelect('${safeId}', this.checked)" /> 선택
+            <label class="select-check" title="일괄 선택">
+              <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleSelect('${safeId}', this.checked)" aria-label="공고 선택" />
             </label>
           </div>
         </div>
@@ -1273,12 +1275,12 @@ function renderSavedCardHtml(item) {
           ${sched.isExpired ? '[마감] ' : ''}${escapeHtml(item.title)}
         </h3>
         <div class="card-meta-line" style="margin-top:6px;">
-          <strong>${escapeHtml(orgName)}</strong> · ${escapeHtml(regionTag)} · ${escapeHtml(sched.applyPeriod)}
+          <strong>${escapeHtml(orgName)}</strong> · ${escapeHtml(regionTag)} · ${escapeHtml(sched.dDayText === '오늘마감 (D-Day)' ? 'D-Day' : sched.dDayText)}
         </div>
       </div>
       <div class="card-footer">
         <button type="button" class="btn btn-primary btn-sm" onclick="openConvertedDocModal('${escapeHtml(item._track)}', '${safeId}')">
-          ${icon('sparkles', 13)} 합격진단 · 지원서
+          ${icon('sparkles', 13)} 진단·지원
         </button>
         <a class="btn btn-outline btn-sm" href="${safeUrl(item.url)}" target="_blank" rel="noopener">
           원문 ${icon('external', 12)}
@@ -2503,7 +2505,7 @@ function openConvertedDocModal(type, itemId) {
 
   const saveBtn = document.getElementById('modalSaveBtn');
   if (saveBtn) {
-    saveBtn.textContent = IS_LOCAL_SERVER ? '서버·로컬 저장' : '텍스트 파일 저장';
+    saveBtn.textContent = IS_LOCAL_SERVER ? '서버저장' : '저장';
   }
 
   renderModalFitAnalysisBox(item);
