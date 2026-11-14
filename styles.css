@@ -5,10 +5,10 @@
    3. Luminous Sapphire-Cyan Jewel Accents & High-Contrast White/Silver Text
    ============================================================================ */
 :root {
-  --bg-glass-slab: rgba(8, 13, 30, 0.28);
-  --bg-glass: rgba(10, 16, 36, 0.32);
-  --bg-glass-card: rgba(12, 19, 42, 0.36);
-  --bg-glass-hover: rgba(20, 31, 62, 0.52);
+  --bg-glass-slab: rgba(8, 13, 30, 0.14);
+  --bg-glass: rgba(12, 19, 42, 0.24);
+  --bg-glass-card: rgba(14, 22, 48, 0.28);
+  --bg-glass-hover: rgba(22, 34, 68, 0.44);
   --bg-glass-crystal: rgba(255, 255, 255, 0.08);
   --bg-glass-modal: rgba(11, 17, 36, 0.88);
   --bg-glass-input: rgba(7, 12, 26, 0.68);
@@ -107,12 +107,12 @@ body::after {
 
 /* 2. Floating Smoked Cosmic Liquid Glass Slab (.app-shell) */
 .app-shell {
-  max-width: 1360px;
-  width: calc(100% - 56px);
-  margin: 24px auto 36px;
+  max-width: 1320px;
+  width: calc(100% - 72px);
+  margin: 28px auto 40px;
   background: var(--bg-glass-slab);
-  backdrop-filter: blur(12px) saturate(150%);
-  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  backdrop-filter: blur(5px) saturate(140%);
+  -webkit-backdrop-filter: blur(5px) saturate(140%);
   border-radius: 28px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   box-shadow:
