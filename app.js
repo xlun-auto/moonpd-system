@@ -657,7 +657,233 @@ function mergeNewItemsIntoAppData(bundle) {
   invalidateCaches();
 }
 
+function initCosmosBackground() {
+  const canvas = document.getElementById('cosmosCanvas');
+  if (!canvas || !canvas.getContext) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let width = 0;
+  let height = 0;
+  let dpr = 1;
+  let rafId = null;
+  let lastTs = 0;
+  let nextMeteorAt = 2400 + Math.random() * 3200;
+
+  let targetMouseX = 0;
+  let targetMouseY = 0;
+  let mouseX = 0;
+  let mouseY = 0;
+
+  const starColors = ['#ffffff', '#bae6fd', '#e0e7ff', '#fef3c7'];
+  const layerConfigs = [
+    { count: 70, rMin: 0.5, rMax: 1.0, speed: 0.0022, parallax: 6, alphaMin: 0.28, alphaMax: 0.62 },
+    { count: 48, rMin: 0.9, rMax: 1.5, speed: 0.0045, parallax: 14, alphaMin: 0.45, alphaMax: 0.82 },
+    { count: 22, rMin: 1.3, rMax: 2.1, speed: 0.0080, parallax: 24, alphaMin: 0.65, alphaMax: 0.96 }
+  ];
+
+  const stars = [];
+  layerConfigs.forEach((cfg, layerIdx) => {
+    for (let i = 0; i < cfg.count; i++) {
+      stars.push({
+        layer: layerIdx,
+        x: Math.random(),
+        y: Math.random(),
+        r: cfg.rMin + Math.random() * (cfg.rMax - cfg.rMin),
+        baseAlpha: cfg.alphaMin + Math.random() * (cfg.alphaMax - cfg.alphaMin),
+        twinkleSpeed: 0.6 + Math.random() * 1.6,
+        twinklePhase: Math.random() * Math.PI * 2,
+        speed: cfg.speed * (0.8 + Math.random() * 0.4),
+        parallax: cfg.parallax,
+        color: starColors[Math.floor(Math.random() * starColors.length)],
+        glint: layerIdx === 2 && i % 4 === 0
+      });
+    }
+  });
+
+  const nebulae = [
+    { bx: 0.16, by: 0.18, rScale: 0.46, color: 'rgba(37, 99, 235, 0.22)', dx: 0.04, dy: 0.03, freq: 0.00011, phase: 0.2 },
+    { bx: 0.82, by: 0.24, rScale: 0.40, color: 'rgba(14, 165, 233, 0.16)', dx: 0.05, dy: 0.035, freq: 0.00009, phase: 2.1 },
+    { bx: 0.64, by: 0.80, rScale: 0.48, color: 'rgba(99, 102, 241, 0.16)', dx: 0.045, dy: 0.03, freq: 0.00010, phase: 4.0 }
+  ];
+
+  const meteors = [];
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    width = window.innerWidth || document.documentElement.clientWidth || 1280;
+    height = window.innerHeight || document.documentElement.clientHeight || 800;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function spawnMeteor() {
+    const startX = width * (0.15 + Math.random() * 0.75);
+    const startY = height * (0.04 + Math.random() * 0.30);
+    const angle = (Math.PI / 180) * (24 + Math.random() * 18);
+    const speed = 520 + Math.random() * 260;
+    meteors.push({
+      x: startX,
+      y: startY,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      len: 95 + Math.random() * 65,
+      life: 0,
+      maxLife: 0.75 + Math.random() * 0.35
+    });
+  }
+
+  function drawFrame(now, dt) {
+    ctx.clearRect(0, 0, width, height);
+
+    mouseX += (targetMouseX - mouseX) * Math.min(1, dt * 4.5);
+    mouseY += (targetMouseY - mouseY) * Math.min(1, dt * 4.5);
+
+    // 1. Drifting Nebula Clouds
+    for (const neb of nebulae) {
+      const cx = (neb.bx + Math.sin(now * neb.freq + neb.phase) * neb.dx) * width - mouseX * 10;
+      const cy = (neb.by + Math.cos(now * neb.freq * 0.85 + neb.phase) * neb.dy) * height - mouseY * 10;
+      const rad = Math.max(width, height) * neb.rScale;
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+      grad.addColorStop(0, neb.color);
+      grad.addColorStop(0.55, neb.color.replace(/[\d.]+\)$/, '0.05)'));
+      grad.addColorStop(1, 'rgba(4, 7, 20, 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 2. Parallax Starfield
+    const sec = now * 0.001;
+    for (const s of stars) {
+      if (!prefersReducedMotion) {
+        s.x -= s.speed * dt * 0.45;
+        s.y += s.speed * dt * 0.14;
+        if (s.x < -0.02) s.x += 1.04;
+        if (s.y > 1.02) s.y -= 1.04;
+      }
+
+      const px = s.x * width - mouseX * s.parallax;
+      const py = s.y * height - mouseY * s.parallax;
+      const twinkle = prefersReducedMotion ? 1 : (0.68 + 0.32 * Math.sin(sec * s.twinkleSpeed + s.twinklePhase));
+      ctx.globalAlpha = Math.max(0.1, Math.min(1, s.baseAlpha * twinkle));
+      ctx.fillStyle = s.color;
+      ctx.beginPath();
+      ctx.arc(px, py, s.r, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (s.glint) {
+        ctx.strokeStyle = s.color;
+        ctx.lineWidth = 0.7;
+        ctx.globalAlpha *= 0.65;
+        const arm = s.r * 3.2;
+        ctx.beginPath();
+        ctx.moveTo(px - arm, py);
+        ctx.lineTo(px + arm, py);
+        ctx.moveTo(px, py - arm);
+        ctx.lineTo(px, py + arm);
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    // 3. Occasional Shooting Stars
+    if (!prefersReducedMotion) {
+      if (now >= nextMeteorAt) {
+        spawnMeteor();
+        nextMeteorAt = now + 3500 + Math.random() * 3500;
+      }
+      for (let i = meteors.length - 1; i >= 0; i--) {
+        const m = meteors[i];
+        m.life += dt;
+        if (m.life >= m.maxLife) {
+          meteors.splice(i, 1);
+          continue;
+        }
+        m.x += m.vx * dt;
+        m.y += m.vy * dt;
+
+        const progress = m.life / m.maxLife;
+        const alpha = Math.sin(progress * Math.PI);
+        const speedMag = Math.hypot(m.vx, m.vy) || 1;
+        const tailX = m.x - (m.vx / speedMag) * m.len;
+        const tailY = m.y - (m.vy / speedMag) * m.len;
+
+        const grad = ctx.createLinearGradient(tailX, tailY, m.x, m.y);
+        grad.addColorStop(0, 'rgba(186, 230, 253, 0)');
+        grad.addColorStop(0.7, `rgba(125, 211, 252, ${(0.45 * alpha).toFixed(3)})`);
+        grad.addColorStop(1, `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})`);
+
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 1.6;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(tailX, tailY);
+        ctx.lineTo(m.x, m.y);
+        ctx.stroke();
+
+        ctx.fillStyle = `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  function loop(ts) {
+    if (document.hidden) {
+      rafId = null;
+      return;
+    }
+    if (!lastTs) lastTs = ts;
+    const dt = Math.min(0.05, Math.max(0.001, (ts - lastTs) / 1000));
+    lastTs = ts;
+    drawFrame(ts, dt);
+    rafId = requestAnimationFrame(loop);
+  }
+
+  resize();
+  window.addEventListener('resize', () => {
+    resize();
+    if (prefersReducedMotion) drawFrame(performance.now(), 0.016);
+  }, { passive: true });
+
+  if (prefersReducedMotion) {
+    drawFrame(performance.now(), 0.016);
+    return;
+  }
+
+  window.addEventListener('mousemove', (e) => {
+    if (!width || !height) return;
+    targetMouseX = (e.clientX / width - 0.5) * 2;
+    targetMouseY = (e.clientY / height - 0.5) * 2;
+  }, { passive: true });
+
+  window.addEventListener('mouseleave', () => {
+    targetMouseX = 0;
+    targetMouseY = 0;
+  }, { passive: true });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    } else if (!rafId) {
+      lastTs = 0;
+      rafId = requestAnimationFrame(loop);
+    }
+  });
+
+  rafId = requestAnimationFrame(loop);
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
+  initCosmosBackground();
   await Promise.all([fetchLatestDataFromServer(), refreshAiCareerDataFromServer()]);
   mergeBrowserCrawledCache();
   populateSiteFilterOptions();
