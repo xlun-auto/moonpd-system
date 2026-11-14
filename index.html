@@ -3,176 +3,184 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>문PD 커리어 &amp; 캐시카우 통합 시스템</title>
+  <title>문PD 커리어 · 캐시카우 시스템</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div class="app-shell">
-  <!-- 상단 심플 헤더 -->
-  <header class="top-header">
-    <div class="header-inner">
-      <div class="brand-area">
-        <div class="brand-logo">문PD</div>
-        <div class="brand-title">
-          <h1>
-            문PD 커리어 · 캐시카우
-            <span class="status-chip" id="syncStatusBadge">⏳ 데이터 불러오는 중...</span>
-          </h1>
+    <!-- 상단 헤더 -->
+    <header class="top-header">
+      <div class="header-inner">
+        <div class="brand-area">
+          <div class="brand-logo" aria-hidden="true">M</div>
+          <div class="brand-title">
+            <h1>
+              문PD 커리어 · 캐시카우
+              <span class="status-chip" id="syncStatusBadge">데이터 불러오는 중</span>
+            </h1>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <a class="btn btn-outline btn-sm" href="https://docs.google.com/spreadsheets/d/1wReNF82GUdAZb4c0_bFFI2kbU6grpapVz7fZqD2EFQE/edit" target="_blank" rel="noopener" title="구글 시트 DB 열기">
+            <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+            시트
+          </a>
+          <a class="btn btn-outline btn-sm" href="https://drive.google.com/drive/folders/1iLuXv3tbem-SzHNn-erlbLdtH2Yxyf5K" target="_blank" rel="noopener" title="구글 드라이브 폴더 열기">
+            <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            드라이브
+          </a>
+          <button type="button" class="btn btn-outline btn-sm" onclick="switchTab('saved')">
+            <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            관심 (<span id="headerSavedCount" class="num">0</span>)
+          </button>
+          <button type="button" class="btn btn-outline btn-sm" id="headerBatchBtn" onclick="runBatchConvertAndApply()">
+            <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            일괄지원 (<span id="selectedCount" class="num">0</span>)
+          </button>
         </div>
       </div>
+    </header>
 
-      <div class="header-actions">
-        <a class="btn btn-outline btn-sm" href="https://docs.google.com/spreadsheets/d/1wReNF82GUdAZb4c0_bFFI2kbU6grpapVz7fZqD2EFQE/edit" target="_blank" rel="noopener" title="구글 시트 DB 열기">
-          📊 시트
-        </a>
-        <a class="btn btn-outline btn-sm" href="https://drive.google.com/drive/folders/1iLuXv3tbem-SzHNn-erlbLdtH2Yxyf5K" target="_blank" rel="noopener" title="구글 드라이브 폴더 열기">
-          📁 드라이브
-        </a>
-        <button class="btn btn-outline btn-sm" onclick="switchTab('saved')">
-          ⭐ 관심 (<span id="headerSavedCount">0</span>)
+    <main class="container">
+      <!-- KPI 요약 바 -->
+      <section class="kpi-grid" aria-label="트랙별 현황">
+        <button type="button" class="kpi-card" onclick="switchTab('career')">
+          <span class="kpi-label">정규 · 계약직</span>
+          <span class="kpi-value num" id="kpiCareerCount">0</span>
         </button>
-        <button class="btn btn-secondary btn-sm" id="headerBatchBtn" onclick="runBatchConvertAndApply()">
-          🚀 일괄지원 (<span id="selectedCount">0</span>)
+        <button type="button" class="kpi-card" onclick="switchTab('alba')">
+          <span class="kpi-label">알바 · 당근</span>
+          <span class="kpi-value num" id="kpiAlbaCount">0</span>
         </button>
-      </div>
-    </div>
-  </header>
-
-  <main class="container">
-    <!-- 심플 KPI 요약 바 (클릭 시 해당 탭 즉시 이동) -->
-    <section class="kpi-grid" aria-label="트랙별 현황">
-      <button type="button" class="kpi-card" onclick="switchTab('career')">
-        <span class="kpi-label">🎬 정규·계약직</span>
-        <span class="kpi-value" id="kpiCareerCount">0</span>
-      </button>
-      <button type="button" class="kpi-card indigo" onclick="switchTab('alba')">
-        <span class="kpi-label">⚡ 알바·당근</span>
-        <span class="kpi-value" id="kpiAlbaCount">0</span>
-      </button>
-      <button type="button" class="kpi-card" onclick="switchTab('freelance')">
-        <span class="kpi-label">💰 숨고·외주</span>
-        <span class="kpi-value" id="kpiFreelanceCount">0</span>
-      </button>
-      <button type="button" class="kpi-card indigo" onclick="switchTab('contests')">
-        <span class="kpi-label">🏆 공모·지원금</span>
-        <span class="kpi-value" id="kpiContestCount">0</span>
-      </button>
-      <button type="button" class="kpi-card" onclick="switchTab('career_analysis')">
-        <span class="kpi-label">📈 평균 합격예측</span>
-        <span class="kpi-value" id="kpiAvgProb">91%</span>
-      </button>
-    </section>
-
-    <!-- 통합 검색 · 필터 · 실시간 수집 툴바 -->
-    <section class="toolbar" aria-label="공고 검색 및 필터">
-      <div class="search-box">
-        <input
-          type="text"
-          id="searchInput"
-          class="search-input"
-          placeholder="🔍 키워드 검색 (마케팅, 영상 PD, 3D, AI...) — 엔터 시 실시간 수집"
-          oninput="onFilterChanged()"
-          onkeydown="if(event.key==='Enter') triggerLiveCrawl()"
-        />
-        <button class="btn btn-primary btn-sm" id="liveCrawlBtn" onclick="triggerLiveCrawl()">
-          🔄 실시간 수집
+        <button type="button" class="kpi-card" onclick="switchTab('freelance')">
+          <span class="kpi-label">숨고 · 외주</span>
+          <span class="kpi-value num" id="kpiFreelanceCount">0</span>
         </button>
-        <button class="btn btn-outline btn-sm" onclick="resetSearchFilter()">초기화</button>
-      </div>
-
-      <div class="filter-row">
-        <select id="regionFilter" class="filter-select" onchange="onFilterChanged()" aria-label="지역 필터">
-          <option value="ALL">📍 전체 지역</option>
-          <option value="서울">서울</option>
-          <option value="경기·인천">경기·인천</option>
-          <option value="부산·울산·경남">부산·울산·경남</option>
-          <option value="대구·경북">대구·경북</option>
-          <option value="대전·충청">대전·충청</option>
-          <option value="광주·전라">광주·전라</option>
-          <option value="강원·제주">강원·제주</option>
-          <option value="재택·전국">재택·전국</option>
-        </select>
-        <select id="siteFilter" class="filter-select" onchange="onFilterChanged()" aria-label="사이트 필터">
-          <option value="ALL">🌐 전체 사이트</option>
-        </select>
-        <select id="sortFilter" class="filter-select" onchange="onFilterChanged()" aria-label="정렬 기준">
-          <option value="DEADLINE_ASC">⏰ 마감일 임박순</option>
-          <option value="REG_DESC">🆕 최신 등록순</option>
-          <option value="PROB_DESC">🎯 채용확률 높은순</option>
-        </select>
-        <button type="button" class="btn btn-outline btn-sm" id="highProbToggleBtn" onclick="toggleHighProbFilter()" title="채용·수주 예측률 90% 이상 공고만 보기">
-          🎯 90%+ 고확률만
+        <button type="button" class="kpi-card" onclick="switchTab('contests')">
+          <span class="kpi-label">공모 · 지원금</span>
+          <span class="kpi-value num" id="kpiContestCount">0</span>
         </button>
-      </div>
+        <button type="button" class="kpi-card" onclick="switchTab('career_analysis')">
+          <span class="kpi-label">평균 합격예측</span>
+          <span class="kpi-value num" id="kpiAvgProb">91%</span>
+        </button>
+      </section>
 
-      <!-- 빠른 키워드 칩 + 마감공고 자동숨김 상태 & 선택 도구 -->
-      <div class="toolbar-bottom">
-        <div class="summary-chips" id="quickKeywordBar"></div>
-        <div class="toolbar-meta-actions">
-          <span class="chip" id="hiddenExpiredBadge" title="일반 목록에서는 마감·기간경과 공고를 자동 숨김 처리하며, 관심공고함에서는 마감 표시와 함께 유지합니다.">
-            🧹 마감공고 자동숨김 ON
-          </span>
-          <button class="btn btn-outline btn-sm" onclick="selectAllVisible()">☑️ 현재목록 선택</button>
-          <button class="btn btn-outline btn-sm" onclick="clearSelection()">✖ 해제</button>
+      <!-- 통합 검색 · 필터 · 실시간 수집 툴바 -->
+      <section class="toolbar" aria-label="공고 검색 및 필터">
+        <div class="search-box">
+          <div class="search-input-wrap">
+            <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input
+              type="text"
+              id="searchInput"
+              class="search-input"
+              placeholder="키워드 검색 (마케팅, 영상 PD, 3D, AI 등) · 엔터 시 실시간 수집"
+              oninput="onFilterChanged()"
+              onkeydown="if(event.key==='Enter') triggerLiveCrawl()"
+            />
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" id="liveCrawlBtn" onclick="triggerLiveCrawl()">
+            <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            실시간 수집
+          </button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="resetSearchFilter()">초기화</button>
         </div>
-      </div>
-    </section>
 
-    <!-- 8개 트랙 탭 -->
-    <nav class="tabs-nav" aria-label="메인 메뉴">
-      <button class="tab-btn active" data-tab="career" onclick="switchTab('career')">
-        🎬 정규·계약직 <span class="tab-count" id="tabCountCareer">0</span>
-      </button>
-      <button class="tab-btn" data-tab="alba" onclick="switchTab('alba')">
-        ⚡ 알바·당근 <span class="tab-count" id="tabCountAlba">0</span>
-      </button>
-      <button class="tab-btn" data-tab="freelance" onclick="switchTab('freelance')">
-        💰 숨고·외주 <span class="tab-count" id="tabCountFreelance">0</span>
-      </button>
-      <button class="tab-btn" data-tab="contests" onclick="switchTab('contests')">
-        🏆 공모·지원사업 <span class="tab-count" id="tabCountContests">0</span>
-      </button>
-      <button class="tab-btn" data-tab="saved" onclick="switchTab('saved')">
-        ⭐ 관심공고함 <span class="tab-count" id="tabCountSaved">0</span>
-      </button>
-      <button class="tab-btn" data-tab="career_analysis" onclick="switchTab('career_analysis')">
-        🎯 커리어 직군분석
-      </button>
-      <button class="tab-btn" data-tab="analytics" onclick="switchTab('analytics')">
-        📄 이력서·폴리오
-      </button>
-      <button class="tab-btn" data-tab="radar" onclick="switchTab('radar')">
-        📡 사이트 레이더 <span class="tab-count" id="tabCountRadar">0</span>
-      </button>
-    </nav>
+        <div class="filter-row">
+          <select id="regionFilter" class="filter-select" onchange="onFilterChanged()" aria-label="지역 필터">
+            <option value="ALL">전체 지역</option>
+            <option value="서울">서울</option>
+            <option value="경기·인천">경기·인천</option>
+            <option value="부산·울산·경남">부산·울산·경남</option>
+            <option value="대구·경북">대구·경북</option>
+            <option value="대전·충청">대전·충청</option>
+            <option value="광주·전라">광주·전라</option>
+            <option value="강원·제주">강원·제주</option>
+            <option value="재택·전국">재택·전국</option>
+          </select>
+          <select id="siteFilter" class="filter-select" onchange="onFilterChanged()" aria-label="사이트 필터">
+            <option value="ALL">전체 사이트</option>
+          </select>
+          <select id="sortFilter" class="filter-select" onchange="onFilterChanged()" aria-label="정렬 기준">
+            <option value="DEADLINE_ASC">마감일 임박순</option>
+            <option value="REG_DESC">최신 등록순</option>
+            <option value="PROB_DESC">채용확률 높은순</option>
+          </select>
+          <button type="button" class="btn btn-outline btn-sm" id="highProbToggleBtn" onclick="toggleHighProbFilter()" title="채용·수주 예측률 90% 이상 공고만 보기">
+            90%+ 고확률만
+          </button>
+        </div>
 
-    <!-- 컨텐츠 영역 -->
-    <section id="tabContentArea"></section>
-  </main>
+        <!-- 빠른 키워드 칩 + 마감공고 자동숨김 상태 & 선택 도구 -->
+        <div class="toolbar-bottom">
+          <div class="summary-chips" id="quickKeywordBar"></div>
+          <div class="toolbar-meta-actions">
+            <span class="chip num" id="hiddenExpiredBadge" title="일반 목록에서는 마감·기간경과 공고를 자동 숨김 처리하며, 관심공고함에서는 마감 표시와 함께 유지합니다.">
+              마감 자동숨김 ON
+            </span>
+            <button type="button" class="btn btn-outline btn-sm" onclick="selectAllVisible()">현재목록 선택</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="clearSelection()">해제</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8개 트랙 탭 -->
+      <nav class="tabs-nav" aria-label="메인 메뉴">
+        <button type="button" class="tab-btn active" data-tab="career" onclick="switchTab('career')">
+          정규 · 계약직 <span class="tab-count num" id="tabCountCareer">0</span>
+        </button>
+        <button type="button" class="tab-btn" data-tab="alba" onclick="switchTab('alba')">
+          알바 · 당근 <span class="tab-count num" id="tabCountAlba">0</span>
+        </button>
+        <button type="button" class="tab-btn" data-tab="freelance" onclick="switchTab('freelance')">
+          숨고 · 외주 <span class="tab-count num" id="tabCountFreelance">0</span>
+        </button>
+        <button type="button" class="tab-btn" data-tab="contests" onclick="switchTab('contests')">
+          공모 · 지원사업 <span class="tab-count num" id="tabCountContests">0</span>
+        </button>
+        <button type="button" class="tab-btn" data-tab="saved" onclick="switchTab('saved')">
+          관심공고함 <span class="tab-count num" id="tabCountSaved">0</span>
+        </button>
+        <button type="button" class="tab-btn" data-tab="career_analysis" onclick="switchTab('career_analysis')">
+          커리어 직군분석
+        </button>
+        <button type="button" class="tab-btn" data-tab="analytics" onclick="switchTab('analytics')">
+          이력서 · 폴리오
+        </button>
+        <button type="button" class="tab-btn" data-tab="radar" onclick="switchTab('radar')">
+          사이트 레이더 <span class="tab-count num" id="tabCountRadar">0</span>
+        </button>
+      </nav>
+
+      <!-- 컨텐츠 영역 -->
+      <section id="tabContentArea"></section>
+    </main>
   </div>
 
   <!-- 선택된 공고 일괄 처리 플로팅 바 -->
   <div class="batch-floating-bar" id="batchFloatingBar" aria-live="polite">
-    <span>☑️ <strong id="floatingSelectedCount">0</strong>건 선택됨</span>
+    <span><strong id="floatingSelectedCount" class="num">0</strong>건 선택됨</span>
     <div class="batch-floating-actions">
-      <button class="btn btn-primary btn-sm" onclick="runBatchConvertAndApply()">🚀 일괄변환·지원</button>
-      <button class="btn btn-outline btn-sm" onclick="clearSelection()">선택 해제</button>
+      <button type="button" class="btn btn-primary btn-sm" onclick="runBatchConvertAndApply()">일괄변환 · 지원</button>
+      <button type="button" class="btn btn-outline btn-sm" onclick="clearSelection()">선택 해제</button>
     </div>
   </div>
 
-  <!-- 숨겨진 파일 인풋 (이력서 업로드 / 포트폴리오 업로드) -->
+  <!-- 숨겨진 파일 인풋 -->
   <input type="file" id="hiddenResumeFileInput" accept=".json,.txt,.md,.html" style="display:none;" onchange="handleFileUploadSelected(event)" />
   <input type="file" id="hiddenPortfolioFileInput" accept=".mp4,.mov,.pdf,.pptx,.zip,.json,.txt" style="display:none;" onchange="handlePortfolioUploadSelected(event)" />
 
-  <!-- 1) 공고 대비 나의 장단점·합격확률 진단 + 사이트 맞춤 변환 & 양식 검증 모달 -->
+  <!-- 1) 공고 합격진단 & 사이트 맞춤 변환 모달 -->
   <div class="modal-backdrop" id="docModal" onclick="if(event.target===this) closeDocModal()">
     <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-header">
         <div>
-          <h3 id="modalTitle" style="font-size:15px;font-weight:800;">✨ 공고 합격진단 &amp; 사이트 맞춤 양식 변환</h3>
-          <p id="modalSubtitle" style="font-size:12px;color:var(--text-sub);margin-top:2px;"></p>
+          <h3 id="modalTitle" style="font-size:15px;font-weight:600;">공고 합격진단 · 맞춤 지원서</h3>
+          <p id="modalSubtitle" style="font-size:12px;color:var(--text-muted);margin-top:2px;"></p>
         </div>
-        <button class="btn btn-outline btn-sm" onclick="closeDocModal()">✕ 닫기</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeDocModal()">닫기</button>
       </div>
       <div class="modal-body">
         <div id="modalFitAnalysisBox" class="validation-panel"></div>
@@ -181,9 +189,9 @@
         <textarea id="modalTextarea" class="modal-textarea" oninput="runLiveFormatValidation()"></textarea>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-outline btn-sm" onclick="copyModalContent()">📋 변환본 복사</button>
-        <button class="btn btn-secondary btn-sm" id="modalSaveBtn" onclick="saveModalContentToFile()">💾 저장·다운로드</button>
-        <button class="btn btn-primary btn-sm" onclick="copyAndOpenTargetSite()">🚀 복사 후 지원창 열기</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="copyModalContent()">변환본 복사</button>
+        <button type="button" class="btn btn-outline btn-sm" id="modalSaveBtn" onclick="saveModalContentToFile()">텍스트 파일 저장</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="copyAndOpenTargetSite()">복사 후 지원창 열기</button>
       </div>
     </div>
   </div>
@@ -192,8 +200,8 @@
   <div class="modal-backdrop" id="confirmModal" onclick="if(event.target===this) closeConfirmModal()">
     <div class="modal-content confirm-box" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
       <div class="modal-header">
-        <h3 id="confirmModalTitle" style="font-size:15px;font-weight:800;">⚠️ 확인</h3>
-        <button class="btn btn-outline btn-sm" onclick="closeConfirmModal()">✕</button>
+        <h3 id="confirmModalTitle" style="font-size:15px;font-weight:600;">확인</h3>
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeConfirmModal()">닫기</button>
       </div>
       <div class="modal-body">
         <p id="confirmModalMessage" style="font-size:13.5px;color:var(--text-main);line-height:1.5;white-space:pre-line;"></p>
@@ -203,21 +211,9 @@
         <div id="confirmModalSub" class="one-liner" style="font-size:12px;"></div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-outline btn-sm" onclick="closeConfirmModal()">취소</button>
-        <button class="btn btn-primary btn-sm" id="confirmProceedBtn">확인</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeConfirmModal()">취소</button>
+        <button type="button" class="btn btn-primary btn-sm" id="confirmProceedBtn">확인</button>
       </div>
-    </div>
-  </div>
-
-  <!-- 3) 사람인 등록 이력서 선택 모달 -->
-  <div class="modal-backdrop" id="saraminResumeModal" onclick="if(event.target===this) closeSaraminResumeModal()">
-    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="saraminModalTitle">
-      <div class="modal-header">
-        <h3 id="saraminModalTitle" style="font-size:15px;font-weight:800;">📥 사람인 등록 이력서 불러오기</h3>
-        <button class="btn btn-outline btn-sm" onclick="closeSaraminResumeModal()">✕ 닫기</button>
-      </div>
-      <div class="modal-body" id="saraminModalBody"></div>
-      <div class="modal-footer" id="saraminModalFooter"></div>
     </div>
   </div>
 
@@ -225,7 +221,6 @@
 
   <script src="data/db_seed.js"></script>
   <script src="data/ai_career_seed.js"></script>
-  <script src="data/saramin_resumes_seed.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
