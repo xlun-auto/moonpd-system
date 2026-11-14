@@ -2040,6 +2040,11 @@ function setAsPrimaryPortfolio(idx) {
 // ============================================================================
 // 12. 이력서 4대 작업 핸들러
 // ============================================================================
+function closeSaraminResumeModal() {
+  const overlay = document.getElementById('saraminResumeModal');
+  if (overlay) overlay.classList.remove('open');
+}
+
 function getSaraminResumeList() {
   if (typeof window !== 'undefined' && Array.isArray(window.MOONPD_SARAMIN_RESUMES) && window.MOONPD_SARAMIN_RESUMES.length) {
     return window.MOONPD_SARAMIN_RESUMES;
@@ -2081,7 +2086,7 @@ async function selectSaraminResume(idx) {
     } catch (e) {}
   }
   isResumeEditMode = true;
-  closeAppModal();
+  closeSaraminResumeModal();
   renderActiveTab();
   showToast(`✏️ '${picked.title}' 이력서를 불러와 편집 모드로 열었습니다!`);
 }
@@ -2106,7 +2111,7 @@ async function restoreDefaultOrServerResume() {
     persistMasterResumeLocal({ ...DEFAULT_MASTER_RESUME });
   }
   isResumeEditMode = true;
-  closeAppModal();
+  closeSaraminResumeModal();
   renderActiveTab();
   showToast(loadedFromServer ? '📥 로컬 서버 백업본을 불러와 편집 모드로 열었습니다.' : '📥 기본 마스터 백업본으로 복원했습니다.');
 }
@@ -2118,10 +2123,14 @@ function requestLoadResume() {
     return;
   }
 
-  const overlay = document.getElementById('appModal');
-  const titleEl = document.getElementById('modalTitle');
-  const bodyEl = document.getElementById('modalBody');
-  const footEl = document.getElementById('modalFooter');
+  const overlay = document.getElementById('saraminResumeModal');
+  const titleEl = document.getElementById('saraminModalTitle');
+  const bodyEl = document.getElementById('saraminModalBody');
+  const footEl = document.getElementById('saraminModalFooter');
+  if (!overlay || !titleEl || !bodyEl || !footEl) {
+    restoreDefaultOrServerResume();
+    return;
+  }
 
   titleEl.textContent = `📥 사람인 등록 이력서 불러오기 (총 ${list.length}건)`;
   bodyEl.innerHTML = `
@@ -2151,7 +2160,7 @@ function requestLoadResume() {
   `;
   footEl.innerHTML = `
     <button type="button" class="btn btn-outline btn-sm" onclick="restoreDefaultOrServerResume()">🔄 기본/서버 백업본 복원</button>
-    <button type="button" class="btn btn-outline btn-sm" onclick="closeAppModal()">닫기</button>
+    <button type="button" class="btn btn-outline btn-sm" onclick="closeSaraminResumeModal()">닫기</button>
   `;
   overlay.classList.add('open');
 }
