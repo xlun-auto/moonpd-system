@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>문PD 커리어 · 캐시카우 시스템</title>
+  <title>문PD 커리어 · 캐시카우</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -15,8 +15,8 @@
           <div class="brand-logo" aria-hidden="true">M</div>
           <div class="brand-title">
             <h1>
-              문PD 커리어 · 캐시카우
-              <span class="status-chip" id="syncStatusBadge">데이터 불러오는 중</span>
+              문PD
+              <span class="status-chip" id="syncStatusBadge">로딩중</span>
             </h1>
           </div>
         </div>
@@ -30,13 +30,13 @@
             <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
             드라이브
           </a>
-          <button type="button" class="btn btn-outline btn-sm" onclick="switchTab('saved')">
+          <button type="button" class="btn btn-outline btn-sm" onclick="switchTab('saved')" title="관심공고함">
             <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-            관심 (<span id="headerSavedCount" class="num">0</span>)
+            <span id="headerSavedCount" class="num">0</span>
           </button>
-          <button type="button" class="btn btn-outline btn-sm" id="headerBatchBtn" onclick="runBatchConvertAndApply()">
+          <button type="button" class="btn btn-outline btn-sm" id="headerBatchBtn" onclick="runBatchConvertAndApply()" title="선택 공고 일괄 지원서 변환">
             <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            일괄지원 (<span id="selectedCount" class="num">0</span>)
+            <span id="selectedCount" class="num">0</span>
           </button>
         </div>
       </div>
@@ -45,29 +45,44 @@
     <main class="container">
       <!-- KPI 요약 바 -->
       <section class="kpi-grid" aria-label="트랙별 현황">
-        <button type="button" class="kpi-card" onclick="switchTab('career')">
-          <span class="kpi-label">정규 · 계약직</span>
+        <button type="button" class="kpi-card" onclick="switchTab('career')" title="정규·계약직">
+          <span class="kpi-label">
+            <svg class="ui-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+            정규
+          </span>
           <span class="kpi-value num" id="kpiCareerCount">0</span>
         </button>
-        <button type="button" class="kpi-card" onclick="switchTab('alba')">
-          <span class="kpi-label">알바 · 당근</span>
+        <button type="button" class="kpi-card" onclick="switchTab('alba')" title="알바·단기">
+          <span class="kpi-label">
+            <svg class="ui-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            알바
+          </span>
           <span class="kpi-value num" id="kpiAlbaCount">0</span>
         </button>
-        <button type="button" class="kpi-card" onclick="switchTab('freelance')">
-          <span class="kpi-label">숨고 · 외주</span>
+        <button type="button" class="kpi-card" onclick="switchTab('freelance')" title="숨고·외주">
+          <span class="kpi-label">
+            <svg class="ui-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
+            외주
+          </span>
           <span class="kpi-value num" id="kpiFreelanceCount">0</span>
         </button>
-        <button type="button" class="kpi-card" onclick="switchTab('contests')">
-          <span class="kpi-label">공모 · 지원금</span>
+        <button type="button" class="kpi-card" onclick="switchTab('contests')" title="공모·지원사업">
+          <span class="kpi-label">
+            <svg class="ui-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+            공모
+          </span>
           <span class="kpi-value num" id="kpiContestCount">0</span>
         </button>
-        <button type="button" class="kpi-card" onclick="switchTab('career_analysis')">
-          <span class="kpi-label">평균 합격예측</span>
+        <button type="button" class="kpi-card" onclick="switchTab('career_analysis')" title="평균 채용예측률">
+          <span class="kpi-label">
+            <svg class="ui-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            평균
+          </span>
           <span class="kpi-value num" id="kpiAvgProb">91%</span>
         </button>
       </section>
 
-      <!-- 통합 검색 · 필터 · 실시간 수집 툴바 -->
+      <!-- 검색 · 필터 · 실시간 수집 툴바 -->
       <section class="toolbar" aria-label="공고 검색 및 필터">
         <div class="search-box">
           <div class="search-input-wrap">
@@ -76,16 +91,16 @@
               type="text"
               id="searchInput"
               class="search-input"
-              placeholder="키워드 검색 (마케팅, 영상 PD, 3D, AI 등) · 엔터 시 실시간 수집"
+              placeholder="키워드 검색"
               oninput="onFilterChanged()"
               onkeydown="if(event.key==='Enter') triggerLiveCrawl()"
             />
           </div>
-          <button type="button" class="btn btn-primary btn-sm" id="liveCrawlBtn" onclick="triggerLiveCrawl()">
+          <button type="button" class="btn btn-primary btn-sm" id="liveCrawlBtn" onclick="triggerLiveCrawl()" title="키워드 실시간 수집">
             <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-            실시간 수집
+            수집
           </button>
-          <button type="button" class="btn btn-outline btn-sm" onclick="resetSearchFilter()">초기화</button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="resetSearchFilter()" title="필터 초기화">초기화</button>
         </div>
 
         <div class="filter-row">
@@ -104,23 +119,21 @@
             <option value="ALL">전체 사이트</option>
           </select>
           <select id="sortFilter" class="filter-select" onchange="onFilterChanged()" aria-label="정렬 기준">
-            <option value="DEADLINE_ASC">마감일 임박순</option>
-            <option value="REG_DESC">최신 등록순</option>
-            <option value="PROB_DESC">채용확률 높은순</option>
+            <option value="DEADLINE_ASC">마감임박순</option>
+            <option value="REG_DESC">최신등록순</option>
+            <option value="PROB_DESC">합격확률순</option>
           </select>
           <button type="button" class="btn btn-outline btn-sm" id="highProbToggleBtn" onclick="toggleHighProbFilter()" title="채용·수주 예측률 90% 이상 공고만 보기">
-            90%+ 고확률만
+            90%+
           </button>
         </div>
 
-        <!-- 빠른 키워드 칩 + 마감공고 자동숨김 상태 & 선택 도구 -->
+        <!-- 빠른 키워드 칩 + 마감 숨김 & 선택 도구 -->
         <div class="toolbar-bottom">
           <div class="summary-chips" id="quickKeywordBar"></div>
           <div class="toolbar-meta-actions">
-            <span class="chip num" id="hiddenExpiredBadge" title="일반 목록에서는 마감·기간경과 공고를 자동 숨김 처리하며, 관심공고함에서는 마감 표시와 함께 유지합니다.">
-              마감 자동숨김 ON
-            </span>
-            <button type="button" class="btn btn-outline btn-sm" onclick="selectAllVisible()">현재목록 선택</button>
+            <span class="chip num" id="hiddenExpiredBadge" title="일반 목록에서는 마감 공고를 자동 숨김 처리합니다.">마감숨김</span>
+            <button type="button" class="btn btn-outline btn-sm" onclick="selectAllVisible()">전체선택</button>
             <button type="button" class="btn btn-outline btn-sm" onclick="clearSelection()">해제</button>
           </div>
         </div>
@@ -129,28 +142,28 @@
       <!-- 8개 트랙 탭 -->
       <nav class="tabs-nav" aria-label="메인 메뉴">
         <button type="button" class="tab-btn active" data-tab="career" onclick="switchTab('career')">
-          정규 · 계약직 <span class="tab-count num" id="tabCountCareer">0</span>
+          정규직 <span class="tab-count num" id="tabCountCareer">0</span>
         </button>
         <button type="button" class="tab-btn" data-tab="alba" onclick="switchTab('alba')">
-          알바 · 당근 <span class="tab-count num" id="tabCountAlba">0</span>
+          알바 <span class="tab-count num" id="tabCountAlba">0</span>
         </button>
         <button type="button" class="tab-btn" data-tab="freelance" onclick="switchTab('freelance')">
-          숨고 · 외주 <span class="tab-count num" id="tabCountFreelance">0</span>
+          외주 <span class="tab-count num" id="tabCountFreelance">0</span>
         </button>
         <button type="button" class="tab-btn" data-tab="contests" onclick="switchTab('contests')">
-          공모 · 지원사업 <span class="tab-count num" id="tabCountContests">0</span>
+          공모 <span class="tab-count num" id="tabCountContests">0</span>
         </button>
         <button type="button" class="tab-btn" data-tab="saved" onclick="switchTab('saved')">
-          관심공고함 <span class="tab-count num" id="tabCountSaved">0</span>
+          관심 <span class="tab-count num" id="tabCountSaved">0</span>
         </button>
         <button type="button" class="tab-btn" data-tab="career_analysis" onclick="switchTab('career_analysis')">
-          커리어 직군분석
+          직군분석
         </button>
         <button type="button" class="tab-btn" data-tab="analytics" onclick="switchTab('analytics')">
-          이력서 · 폴리오
+          이력서
         </button>
         <button type="button" class="tab-btn" data-tab="radar" onclick="switchTab('radar')">
-          사이트 레이더 <span class="tab-count num" id="tabCountRadar">0</span>
+          사이트 <span class="tab-count num" id="tabCountRadar">0</span>
         </button>
       </nav>
 
@@ -161,10 +174,10 @@
 
   <!-- 선택된 공고 일괄 처리 플로팅 바 -->
   <div class="batch-floating-bar" id="batchFloatingBar" aria-live="polite">
-    <span><strong id="floatingSelectedCount" class="num">0</strong>건 선택됨</span>
+    <span><strong id="floatingSelectedCount" class="num">0</strong>건 선택</span>
     <div class="batch-floating-actions">
-      <button type="button" class="btn btn-primary btn-sm" onclick="runBatchConvertAndApply()">일괄변환 · 지원</button>
-      <button type="button" class="btn btn-outline btn-sm" onclick="clearSelection()">선택 해제</button>
+      <button type="button" class="btn btn-primary btn-sm" onclick="runBatchConvertAndApply()">일괄지원</button>
+      <button type="button" class="btn btn-outline btn-sm" onclick="clearSelection()">해제</button>
     </div>
   </div>
 
@@ -177,7 +190,7 @@
     <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-header">
         <div>
-          <h3 id="modalTitle" style="font-size:15px;font-weight:600;">공고 합격진단 · 맞춤 지원서</h3>
+          <h3 id="modalTitle" style="font-size:15px;font-weight:600;">합격진단 · 맞춤 지원서</h3>
           <p id="modalSubtitle" style="font-size:12px;color:var(--text-muted);margin-top:2px;"></p>
         </div>
         <button type="button" class="btn btn-outline btn-sm" onclick="closeDocModal()">닫기</button>
@@ -189,9 +202,9 @@
         <textarea id="modalTextarea" class="modal-textarea" oninput="runLiveFormatValidation()"></textarea>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline btn-sm" onclick="copyModalContent()">변환본 복사</button>
-        <button type="button" class="btn btn-outline btn-sm" id="modalSaveBtn" onclick="saveModalContentToFile()">텍스트 파일 저장</button>
-        <button type="button" class="btn btn-primary btn-sm" onclick="copyAndOpenTargetSite()">복사 후 지원창 열기</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="copyModalContent()">복사</button>
+        <button type="button" class="btn btn-outline btn-sm" id="modalSaveBtn" onclick="saveModalContentToFile()">저장</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="copyAndOpenTargetSite()">복사 후 지원창</button>
       </div>
     </div>
   </div>
