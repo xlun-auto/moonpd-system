@@ -107,12 +107,12 @@ body::after {
 
 /* 2. Floating Smoked Cosmic Liquid Glass Slab (.app-shell) */
 .app-shell {
-  max-width: 1320px;
-  width: calc(100% - 72px);
+  max-width: 1260px;
+  width: calc(100% - 96px);
   margin: 28px auto 40px;
   background: var(--bg-glass-slab);
-  backdrop-filter: blur(4px) saturate(145%);
-  -webkit-backdrop-filter: blur(4px) saturate(145%);
+  backdrop-filter: blur(3px) saturate(145%);
+  -webkit-backdrop-filter: blur(3px) saturate(145%);
   border-radius: 28px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   box-shadow:
