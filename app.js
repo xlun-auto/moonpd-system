@@ -1333,45 +1333,148 @@ async function refreshAiCareerDataFromServer() {
   } catch (e) {}
 }
 
-async function triggerGeminiCareerAnalysis(askKey = false) {
-  if (location.protocol === 'file:' || !location.hostname.includes('localhost')) {
-    alert('실시간 Gemini AI 재분석은 로컬 서버(http://localhost:8090) 환경에서 실행할 수 있습니다.');
-    return;
+async function runBrowserDirectGeminiAnalysis(apiKey, keywords) {
+  const allPostings = getAllItemsWithTrack();
+  const keywordContext = {};
+  keywords.forEach(kw => {
+    const tokens = kw.trim().split(/\s+/).filter(t => t.length >= 2);
+    const matched = allPostings.filter(it => {
+      const txt = `${it.title || ''} ${it.company || ''} ${it.category || ''} ${it.summary || ''}`.toLowerCase();
+      return tokens.some(t => txt.includes(t.toLowerCase()));
+    });
+    keywordContext[kw] = {
+      matchedCount: matched.length,
+      samples: matched.slice(0, 10).map(m => `${m.company || ''} - ${m.title || ''}`)
+    };
+  });
+
+  const promptText = `당신은 대한민국 최고 수준의 커리어 전략가이자 1인 미디어·마케팅·콘텐츠 파이프라인 컨설턴트입니다.
+아래 [지원자 이력서]와 [실제 수집된 채용공고 샘플]을 비교해, 각 키워드 직군별 현실적이고 구체적인 커리어 & 캐시카우 분석을 JSON으로 작성하세요.
+추상적 일반론을 금지하고, 반드시 실제 회사명/공고명과 지원자의 실제 보유 역량을 연결해 구체적 수치·액션플랜을 제시하세요.
+
+[지원자 이력서]
+${JSON.stringify(masterResume)}
+
+[등록 키워드별 실제 수집 공고]
+${JSON.stringify(keywordContext)}
+
+반드시 아래 JSON 스키마로만 응답하세요:
+{
+  "executiveSummary": "전체 포트폴리오 총평 (2~3문장)",
+  "roles": {
+    "키워드명": {
+      "roleCategory": "직군 카테고리명",
+      "hireProb": 85,
+      "boostedProb": 94,
+      "sampleCompanies": ["실제 공고 회사명1", "회사명2", "회사명3"],
+      "marketTrend": "실제 공고 기반 시장 트렌드 1~2문장",
+      "strengths": ["구체적 강점 1", "구체적 강점 2"],
+      "weaknesses": ["구체적 약점/보완지표 1", "구체적 약점 2"],
+      "howToImprove": ["즉시 실행 가능한 보완 액션 1", "보완 액션 2", "보완 액션 3"],
+      "polishSkill": "가장 임팩트가 큰 1순위 보완 스킬 (단문)"
+    }
   }
+}`;
+
+  const models = ['gemini-3-flash-preview', 'gemini-flash-latest', 'gemini-2.5-flash-lite'];
+  let parsedAi = null;
+  let usedModel = '';
+  let lastErr = '';
+  for (const m of models) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: promptText }] }],
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.4 }
+        })
+      });
+      if (!res.ok) {
+        lastErr = `HTTP ${res.status}`;
+        continue;
+      }
+      const gData = await res.json();
+      const rawText = gData?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!rawText) { lastErr = 'Empty response'; continue; }
+      parsedAi = JSON.parse(rawText);
+      usedModel = m;
+      break;
+    } catch (e) {
+      lastErr = e.message;
+    }
+  }
+  if (!parsedAi) throw new Error('Gemini API 호출 실패: ' + lastErr);
+
+  const current = getAiCareerData();
+  const merged = {
+    generatedAt: new Date().toISOString().slice(0, 19) + '+09:00',
+    model: usedModel,
+    sourceCount: allPostings.length,
+    executiveSummary: parsedAi.executiveSummary || current.executiveSummary,
+    roles: { ...(current.roles || {}), ...(parsedAi.roles || {}) }
+  };
+  return merged;
+}
+
+async function triggerGeminiCareerAnalysis(askKey = false) {
+  const isLocalServer = location.protocol !== 'file:' && location.hostname.includes('localhost');
+  const keywords = (quickKeywords && quickKeywords.length) ? quickKeywords : DEFAULT_QUICK_KEYWORDS;
   let apiKey = '';
-  const currentAi = getAiCareerData();
-  if (askKey || !currentAi.hasApiKey) {
-    const input = prompt(
-      'Google AI Studio (https://aistudio.google.com/apikey)에서 발급받은 무료 Gemini API 키를 입력하세요.\n' +
-      '(1회 입력 시 PC의 moonpd_system/data/gemini_config.json에 안전하게 저장됩니다.)'
-    );
-    if (input === null) return;
-    apiKey = input.trim();
-    if (!apiKey && !currentAi.hasApiKey) {
-      alert('API 키가 입력되지 않았습니다.');
-      return;
+
+  if (!isLocalServer) {
+    apiKey = localStorage.getItem('moonpd_gemini_api_key') || '';
+    if (askKey || !apiKey) {
+      const input = prompt(
+        '웹 버전에서 실시간 Gemini AI 재분석을 실행하려면 Google AI Studio(https://aistudio.google.com/apikey) Gemini API 키를 1회 입력하세요.\n' +
+        '(입력한 키는 이 브라우저의 localStorage에만 저장되며 외부로 공개되지 않습니다.)',
+        apiKey
+      );
+      if (input === null) return;
+      apiKey = input.trim();
+      if (!apiKey) { alert('API 키가 입력되지 않았습니다.'); return; }
+      localStorage.setItem('moonpd_gemini_api_key', apiKey);
+    }
+  } else {
+    const currentAi = getAiCareerData();
+    if (askKey || !currentAi.hasApiKey) {
+      const input = prompt(
+        'Google AI Studio (https://aistudio.google.com/apikey)에서 발급받은 무료 Gemini API 키를 입력하세요.\n' +
+        '(1회 입력 시 PC의 moonpd_system/data/gemini_config.json에 안전하게 저장됩니다.)'
+      );
+      if (input === null) return;
+      apiKey = input.trim();
+      if (!apiKey && !currentAi.hasApiKey) {
+        alert('API 키가 입력되지 않았습니다.');
+        return;
+      }
     }
   }
 
   const btn = document.getElementById('btn-gemini-reanalyze');
   if (btn) {
     btn.disabled = true;
-    btn.textContent = '🤖 Gemini 2.5 Flash 심층 분석 중...';
+    btn.textContent = '🤖 Gemini AI 심층 분석 중...';
   }
   try {
-    const keywords = (quickKeywords && quickKeywords.length) ? quickKeywords : DEFAULT_QUICK_KEYWORDS;
-    const res = await fetch('/api/ai-career-analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey, keywords, resume: masterResume })
-    });
-    const data = await res.json();
-    if (!res.ok || data.ok === false) {
-      if (data.needApiKey) {
-        if (btn) { btn.disabled = false; btn.textContent = '🤖 Gemini AI 실시간 심층분석'; }
-        return triggerGeminiCareerAnalysis(true);
+    let data;
+    if (isLocalServer) {
+      const res = await fetch('/api/ai-career-analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey, keywords, resume: masterResume })
+      });
+      data = await res.json();
+      if (!res.ok || data.ok === false) {
+        if (data.needApiKey) {
+          if (btn) { btn.disabled = false; btn.textContent = '🤖 Gemini AI 실시간 심층분석'; }
+          return triggerGeminiCareerAnalysis(true);
+        }
+        throw new Error(data.message || 'AI 분석 요청 실패');
       }
-      throw new Error(data.message || 'AI 분석 요청 실패');
+    } else {
+      data = await runBrowserDirectGeminiAnalysis(apiKey, keywords);
     }
     aiCareerCache = data;
     localStorage.setItem('moonpd_ai_career_v1', JSON.stringify(data));
