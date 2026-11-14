@@ -42,6 +42,10 @@
   padding: 0;
 }
 
+html {
+  background-color: #040714;
+}
+
 html, body {
   width: 100%;
   max-width: 100vw;
@@ -54,8 +58,11 @@ html, body {
   line-height: 1.5;
   word-break: keep-all;
   overflow-wrap: break-word;
-  background-color: #040714;
   position: relative;
+}
+
+body {
+  background: transparent;
 }
 
 .num {
@@ -74,7 +81,7 @@ html, body {
   inset: 0;
   width: 100%;
   height: 100%;
-  z-index: -1;
+  z-index: 0;
   pointer-events: none;
   display: block;
 }
@@ -107,6 +114,8 @@ body::after {
 
 /* 2. Floating Smoked Cosmic Liquid Glass Slab (.app-shell) */
 .app-shell {
+  position: relative;
+  z-index: 1;
   max-width: 1260px;
   width: calc(100% - 96px);
   margin: 28px auto 40px;
