@@ -669,7 +669,7 @@ function initCosmosBackground() {
   let dpr = 1;
   let rafId = null;
   let lastTs = 0;
-  let nextMeteorAt = 2400 + Math.random() * 3200;
+  let nextMeteorAt = 600;
 
   let targetMouseX = 0;
   let targetMouseY = 0;
@@ -678,9 +678,9 @@ function initCosmosBackground() {
 
   const starColors = ['#ffffff', '#bae6fd', '#e0e7ff', '#fef3c7'];
   const layerConfigs = [
-    { count: 70, rMin: 0.5, rMax: 1.0, speed: 0.0022, parallax: 6, alphaMin: 0.28, alphaMax: 0.62 },
-    { count: 48, rMin: 0.9, rMax: 1.5, speed: 0.0045, parallax: 14, alphaMin: 0.45, alphaMax: 0.82 },
-    { count: 22, rMin: 1.3, rMax: 2.1, speed: 0.0080, parallax: 24, alphaMin: 0.65, alphaMax: 0.96 }
+    { count: 110, rMin: 0.7, rMax: 1.3, speed: 0.008, parallax: 10, alphaMin: 0.40, alphaMax: 0.78 },
+    { count: 70, rMin: 1.2, rMax: 2.0, speed: 0.016, parallax: 22, alphaMin: 0.60, alphaMax: 0.92 },
+    { count: 35, rMin: 1.8, rMax: 2.8, speed: 0.028, parallax: 38, alphaMin: 0.78, alphaMax: 1.00 }
   ];
 
   const stars = [];
@@ -703,9 +703,9 @@ function initCosmosBackground() {
   });
 
   const nebulae = [
-    { bx: 0.16, by: 0.18, rScale: 0.46, color: 'rgba(37, 99, 235, 0.22)', dx: 0.04, dy: 0.03, freq: 0.00011, phase: 0.2 },
-    { bx: 0.82, by: 0.24, rScale: 0.40, color: 'rgba(14, 165, 233, 0.16)', dx: 0.05, dy: 0.035, freq: 0.00009, phase: 2.1 },
-    { bx: 0.64, by: 0.80, rScale: 0.48, color: 'rgba(99, 102, 241, 0.16)', dx: 0.045, dy: 0.03, freq: 0.00010, phase: 4.0 }
+    { bx: 0.16, by: 0.18, rScale: 0.52, color: 'rgba(37, 99, 235, 0.36)', dx: 0.08, dy: 0.05, freq: 0.00028, phase: 0.2 },
+    { bx: 0.82, by: 0.24, rScale: 0.46, color: 'rgba(14, 165, 233, 0.28)', dx: 0.09, dy: 0.06, freq: 0.00024, phase: 2.1 },
+    { bx: 0.64, by: 0.80, rScale: 0.54, color: 'rgba(99, 102, 241, 0.28)', dx: 0.08, dy: 0.05, freq: 0.00026, phase: 4.0 }
   ];
 
   const meteors = [];
