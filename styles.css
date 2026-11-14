@@ -1,42 +1,41 @@
 /* ============================================================================
-   문PD 커리어 & 캐시카우 웹앱 - Liquid Glass Foundations 디자인 시스템
-   1. Light-Dappled Architectural Wall Background (ice-silver to slate-blue)
-   2. Spatial Translucent Glass Panels (frosted blur + specular top/left rim)
-   3. Jewel-Like Translucent Buttons & Badges (milky glass & luminous gradients)
-   4. High-Contrast Legible Typography (#0f172a ink / #475569 slate)
+   문PD 커리어 & 캐시카우 웹앱 - Liquid Glass Foundations (Crystal & Jewel Edition)
+   1. 3D Faceted Architectural Wall SVG + Diagonal Sunlight Beam & Shadow Cast
+   2. Floating Spatial Liquid Glass Slab (.app-shell)
+   3. Deep Translucent Crystal Cards & Double-Bevel Specular Rims
+   4. Jewel-Like Translucent Buttons & Badges with Ambient Glow
    ============================================================================ */
 :root {
-  --bg-glass: rgba(255, 255, 255, 0.36);
-  --bg-glass-strong: rgba(255, 255, 255, 0.54);
-  --bg-glass-hover: rgba(255, 255, 255, 0.50);
-  --bg-glass-modal: rgba(245, 249, 255, 0.82);
-  --bg-glass-input: rgba(255, 255, 255, 0.62);
-  --bg-glass-sub: rgba(255, 255, 255, 0.28);
+  --bg-glass-slab: rgba(235, 244, 255, 0.22);
+  --bg-glass: rgba(255, 255, 255, 0.26);
+  --bg-glass-card: rgba(255, 255, 255, 0.24);
+  --bg-glass-hover: rgba(255, 255, 255, 0.38);
+  --bg-glass-crystal: rgba(255, 255, 255, 0.34);
+  --bg-glass-modal: rgba(240, 247, 255, 0.78);
+  --bg-glass-input: rgba(255, 255, 255, 0.52);
 
-  --glass-border: rgba(255, 255, 255, 0.58);
+  --glass-border: rgba(255, 255, 255, 0.62);
   --glass-rim:
-    inset 0 1.5px 1px rgba(255, 255, 255, 0.88),
-    inset 1px 0 1px rgba(255, 255, 255, 0.45),
-    inset 0 -1px 1px rgba(15, 28, 46, 0.08),
-    inset -1px 0 1px rgba(15, 28, 46, 0.05);
+    inset 0 2px 2px rgba(255, 255, 255, 0.94),
+    inset 1px 0 1px rgba(255, 255, 255, 0.52),
+    inset 0 -3px 8px rgba(15, 30, 55, 0.12),
+    inset -1px 0 2px rgba(15, 30, 55, 0.06);
   --glass-shadow:
-    0 18px 44px rgba(15, 28, 46, 0.16),
-    0 4px 12px rgba(15, 28, 46, 0.08);
+    0 16px 38px rgba(10, 22, 40, 0.18),
+    0 4px 12px rgba(10, 22, 40, 0.08);
   --glass-shadow-hover:
-    0 24px 54px rgba(15, 28, 46, 0.22),
-    0 6px 16px rgba(15, 28, 46, 0.10);
+    0 24px 52px rgba(10, 22, 40, 0.26),
+    0 8px 18px rgba(10, 22, 40, 0.12);
 
   --text-main: #0f172a;
-  --text-sub: #334155;
+  --text-sub: #1e293b;
   --text-muted: #475569;
 
   --color-primary: #2563eb;
-  --color-primary-soft: rgba(37, 99, 235, 0.14);
   --color-secondary: #4f46e5;
-  --color-secondary-soft: rgba(79, 70, 229, 0.14);
 
-  --radius-lg: 16px;
-  --radius-md: 11px;
+  --radius-lg: 18px;
+  --radius-md: 12px;
 }
 
 *, *::before, *::after {
@@ -56,70 +55,70 @@ html, body {
   line-height: 1.48;
   word-break: keep-all;
   overflow-wrap: break-word;
-  background-color: #9ab0c7;
+  background-color: #2b3f57;
   position: relative;
 }
 
-/* Light-Dappled Architectural Wall Background */
+/* 1. 3D Faceted Architectural Wall SVG Background Pattern */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
   z-index: -2;
-  background:
-    /* Diagonal sunlight beam top-left to bottom-right */
-    linear-gradient(128deg,
-      rgba(255, 255, 255, 0.72) 0%,
-      rgba(235, 244, 252, 0.45) 22%,
-      rgba(219, 230, 240, 0.10) 44%,
-      rgba(30, 45, 61, 0.28) 78%,
-      rgba(20, 33, 48, 0.56) 100%),
-    /* Geometric architectural wall facets */
-    linear-gradient(35deg,
-      #1e2d3d 0%,
-      #4a607a 32%,
-      #8da4bc 60%,
-      #dbe6f0 100%);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'%3E%3Cdefs%3E%3ClinearGradient id='g1' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%23f1f7fc'/%3E%3Cstop offset='100%25' stop-color='%23c4d6e8'/%3E%3C/linearGradient%3E%3ClinearGradient id='g2' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%23b5cae0'/%3E%3Cstop offset='100%25' stop-color='%236f8aa8'/%3E%3C/linearGradient%3E%3ClinearGradient id='g3' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%23536d8a'/%3E%3Cstop offset='100%25' stop-color='%2323364d'/%3E%3C/linearGradient%3E%3ClinearGradient id='g4' x1='1' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%23d8e6f3'/%3E%3Cstop offset='100%25' stop-color='%2388a2bd'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpolygon points='120,0 240,60 120,120 0,60' fill='url(%23g1)' opacity='0.88'/%3E%3Cpolygon points='0,60 120,120 120,240 0,180' fill='url(%23g2)' opacity='0.90'/%3E%3Cpolygon points='240,60 240,180 120,240 120,120' fill='url(%23g3)' opacity='0.92'/%3E%3Cpolygon points='120,0 240,60 240,0' fill='url(%23g4)' opacity='0.75'/%3E%3Cpolygon points='0,0 120,0 0,60' fill='url(%23g1)' opacity='0.92'/%3E%3Cpolygon points='0,180 120,240 0,240' fill='url(%23g3)' opacity='0.85'/%3E%3Cpolygon points='240,180 240,240 120,240' fill='url(%23g2)' opacity='0.82'/%3E%3Cpath d='M120 0 L240 60 L120 120 L0 60 Z M120 120 L120 240' fill='none' stroke='rgba(255,255,255,0.42)' stroke-width='1.2'/%3E%3C/svg%3E"),
+    linear-gradient(135deg, #e2ecf5 0%, #7d98b6 48%, #1e2d3d 100%);
+  background-size: 240px 240px, cover;
+  background-position: 0 0, center;
   pointer-events: none;
 }
 
+/* Dramatic Diagonal Sunlight Beam & Shadow Cast */
 body::after {
   content: '';
   position: fixed;
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(ellipse 65% 48% at 14% 10%, rgba(255, 255, 255, 0.68) 0%, transparent 65%),
-    radial-gradient(ellipse 50% 40% at 82% 24%, rgba(186, 218, 245, 0.36) 0%, transparent 62%),
-    radial-gradient(ellipse 55% 45% at 72% 88%, rgba(15, 28, 46, 0.34) 0%, transparent 70%),
-    conic-gradient(from 142deg at 36% 22%,
-      rgba(255, 255, 255, 0.24) 0deg,
-      rgba(255, 255, 255, 0.02) 52deg,
-      rgba(30, 45, 61, 0.14) 118deg,
-      rgba(255, 255, 255, 0.16) 210deg,
-      rgba(255, 255, 255, 0.24) 360deg);
+    linear-gradient(125deg,
+      rgba(255, 255, 255, 0.56) 0%,
+      rgba(240, 248, 255, 0.24) 24%,
+      rgba(255, 255, 255, 0.02) 48%,
+      rgba(15, 28, 46, 0.28) 76%,
+      rgba(10, 20, 36, 0.58) 100%),
+    radial-gradient(ellipse 60% 45% at 15% 12%, rgba(255, 255, 255, 0.52) 0%, transparent 65%),
+    radial-gradient(ellipse 55% 45% at 85% 88%, rgba(10, 22, 40, 0.45) 0%, transparent 70%);
   pointer-events: none;
 }
 
-/* 상단 헤더 (Spatial Frosted Glass) */
-.top-header {
-  background: rgba(255, 255, 255, 0.38);
-  backdrop-filter: blur(24px) saturate(165%);
-  -webkit-backdrop-filter: blur(24px) saturate(165%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.62);
+/* 2. Floating Liquid Glass Slab (.app-shell) */
+.app-shell {
+  max-width: 1400px;
+  width: calc(100% - 32px);
+  margin: 18px auto 32px;
+  background: var(--bg-glass-slab);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.64);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    0 10px 30px rgba(15, 28, 46, 0.12);
-  padding: 10px 20px;
-  position: sticky;
-  top: 0;
-  z-index: 100;
+    inset 0 2px 3px rgba(255, 255, 255, 0.92),
+    inset 1px 0 2px rgba(255, 255, 255, 0.52),
+    inset 0 -3px 10px rgba(15, 28, 46, 0.16),
+    0 32px 80px rgba(10, 22, 40, 0.38);
+  overflow: hidden;
+}
+
+/* 상단 헤더 (Airy Glass Bar inside Slab) */
+.top-header {
+  background: rgba(255, 255, 255, 0.18);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  padding: 12px 24px;
   width: 100%;
 }
 
 .header-inner {
-  max-width: 1360px;
-  margin: 0 auto;
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
@@ -137,12 +136,13 @@ body::after {
 .brand-logo {
   width: 38px;
   height: 38px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.92), rgba(37, 99, 235, 0.94));
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.85), rgba(37, 99, 235, 0.92));
   box-shadow:
-    inset 0 1.5px 1px rgba(255, 255, 255, 0.72),
-    0 6px 16px rgba(37, 99, 235, 0.34);
-  border: 1px solid rgba(255, 255, 255, 0.55);
+    inset 0 2px 2px rgba(255, 255, 255, 0.88),
+    inset 0 -2px 4px rgba(10, 30, 80, 0.24),
+    0 10px 22px -4px rgba(37, 99, 235, 0.50);
+  border: 1px solid rgba(255, 255, 255, 0.62);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -165,34 +165,34 @@ body::after {
 
 .status-chip {
   font-size: 11px;
-  background: rgba(255, 255, 255, 0.52);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: #1e40af;
-  border: 1px solid rgba(255, 255, 255, 0.78);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  padding: 2px 9px;
+  background: var(--bg-glass-crystal);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #1e3a8a;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 1.5px 1px rgba(255, 255, 255, 0.92);
+  padding: 3px 10px;
   border-radius: 999px;
   font-weight: 700;
   white-space: nowrap;
 }
 
 .status-chip.web-mode {
-  background: rgba(238, 242, 255, 0.58);
-  color: #3730a3;
-  border-color: rgba(199, 210, 254, 0.85);
+  background: rgba(224, 231, 255, 0.42);
+  color: #312e81;
+  border-color: rgba(255, 255, 255, 0.75);
 }
 
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   flex-wrap: wrap;
 }
 
-/* Jewel-Like Translucent Buttons */
+/* 3. Jewel-Like Translucent Buttons & Clear Frosted Crystal Buttons */
 .btn {
-  border: 1px solid rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.65);
   border-radius: var(--radius-md);
   padding: 8px 13px;
   font-size: 12.5px;
@@ -207,73 +207,84 @@ body::after {
   text-decoration: none;
   color: var(--text-main);
   font-family: inherit;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, border-color 0.16s ease;
 }
 
 .btn:disabled {
-  opacity: 0.52;
+  opacity: 0.50;
   cursor: not-allowed;
   transform: none !important;
 }
 
+/* Sapphire-Cyan Jewel Glass Tile */
 .btn-primary {
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.88), rgba(37, 99, 235, 0.92));
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.80) 0%, rgba(14, 165, 233, 0.84) 45%, rgba(37, 99, 235, 0.88) 100%);
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.48);
+  border-color: rgba(255, 255, 255, 0.62);
   box-shadow:
-    inset 0 1.5px 1px rgba(255, 255, 255, 0.62),
-    0 8px 20px rgba(37, 99, 235, 0.28);
+    inset 0 2px 3px rgba(255, 255, 255, 0.92),
+    inset 0 -2px 4px rgba(10, 30, 80, 0.24),
+    0 10px 24px -4px rgba(56, 189, 248, 0.52);
+  text-shadow: 0 1px 2px rgba(10, 30, 80, 0.25);
 }
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, rgba(2, 132, 199, 0.95), rgba(29, 78, 216, 0.96));
-  transform: translateY(-1px);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.92) 0%, rgba(37, 99, 235, 0.95) 100%);
+  transform: translateY(-1.5px);
   box-shadow:
-    inset 0 1.5px 1px rgba(255, 255, 255, 0.72),
-    0 12px 26px rgba(37, 99, 235, 0.38);
+    inset 0 2px 3px rgba(255, 255, 255, 0.96),
+    inset 0 -2px 4px rgba(10, 30, 80, 0.28),
+    0 14px 28px -4px rgba(37, 99, 235, 0.58);
 }
 
+/* Indigo-Violet Jewel Glass Tile */
 .btn-secondary {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.88), rgba(79, 70, 229, 0.92));
+  background: linear-gradient(135deg, rgba(129, 140, 248, 0.82) 0%, rgba(99, 102, 241, 0.86) 50%, rgba(79, 70, 229, 0.90) 100%);
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.48);
+  border-color: rgba(255, 255, 255, 0.60);
   box-shadow:
-    inset 0 1.5px 1px rgba(255, 255, 255, 0.60),
-    0 8px 20px rgba(79, 70, 229, 0.26);
+    inset 0 2px 3px rgba(255, 255, 255, 0.88),
+    inset 0 -2px 4px rgba(30, 20, 80, 0.24),
+    0 10px 24px -4px rgba(99, 102, 241, 0.48);
+  text-shadow: 0 1px 2px rgba(20, 15, 70, 0.25);
 }
 .btn-secondary:hover:not(:disabled) {
-  background: linear-gradient(135deg, rgba(79, 70, 229, 0.95), rgba(67, 56, 202, 0.96));
-  transform: translateY(-1px);
+  background: linear-gradient(135deg, rgba(129, 140, 248, 0.94) 0%, rgba(79, 70, 229, 0.96) 100%);
+  transform: translateY(-1.5px);
   box-shadow:
-    inset 0 1.5px 1px rgba(255, 255, 255, 0.70),
-    0 12px 26px rgba(79, 70, 229, 0.36);
+    inset 0 2px 3px rgba(255, 255, 255, 0.94),
+    inset 0 -2px 4px rgba(30, 20, 80, 0.28),
+    0 14px 28px -4px rgba(79, 70, 229, 0.56);
 }
 
+/* Clear Frosted Crystal Glass Button */
 .btn-outline {
-  background: rgba(255, 255, 255, 0.48);
+  background: var(--bg-glass-crystal);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-color: rgba(255, 255, 255, 0.68);
   color: var(--text-main);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.88),
-    0 4px 12px rgba(15, 28, 46, 0.08);
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.90),
+    inset 0 -2px 4px rgba(15, 30, 55, 0.08),
+    0 4px 12px rgba(10, 22, 40, 0.10);
 }
 .btn-outline:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.52);
   border-color: rgba(255, 255, 255, 0.92);
   transform: translateY(-1px);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.96),
-    0 8px 18px rgba(15, 28, 46, 0.12);
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.96),
+    inset 0 -2px 4px rgba(15, 30, 55, 0.10),
+    0 8px 18px rgba(10, 22, 40, 0.15);
 }
 
 .btn-toggle-active {
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.22), rgba(37, 99, 235, 0.24));
-  border-color: rgba(37, 99, 235, 0.55);
-  color: #1e40af;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.34), rgba(37, 99, 235, 0.30));
+  border-color: rgba(37, 99, 235, 0.65);
+  color: #1e3a8a;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    0 6px 16px rgba(37, 99, 235, 0.18);
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.92),
+    0 8px 18px -4px rgba(37, 99, 235, 0.32);
 }
 
 .btn-sm {
@@ -283,13 +294,13 @@ body::after {
 
 /* 관심공고 별표 버튼 */
 .btn-star {
-  background: rgba(255, 255, 255, 0.48);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  background: var(--bg-glass-crystal);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  box-shadow: inset 0 1.5px 1px rgba(255, 255, 255, 0.88);
   color: var(--text-sub);
-  padding: 3px 8px;
+  padding: 3px 9px;
   border-radius: 999px;
   font-size: 11.5px;
   font-weight: 700;
@@ -299,48 +310,46 @@ body::after {
   transition: all 0.15s ease;
 }
 .btn-star:hover {
-  background: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.56);
   color: var(--text-main);
 }
 .btn-star.saved,
 .btn-star.active {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.88), rgba(234, 88, 12, 0.88));
-  border-color: rgba(255, 255, 255, 0.55);
+  background: linear-gradient(135deg, rgba(251, 146, 60, 0.86), rgba(244, 63, 94, 0.86));
+  border-color: rgba(255, 255, 255, 0.65);
   color: #ffffff;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.65),
-    0 4px 12px rgba(234, 88, 12, 0.28);
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.85),
+    0 6px 16px -3px rgba(244, 63, 94, 0.42);
 }
 
 /* 메인 컨테이너 */
 .container {
-  max-width: 1360px;
   width: 100%;
-  margin: 0 auto;
-  padding: 16px 20px 84px;
+  padding: 16px 24px 36px;
 }
 
-/* 심플 아이콘 KPI 바 (Spatial Glass Cards) */
+/* Compact Sleek Glass KPI Pills */
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .kpi-card {
   background: var(--bg-glass);
-  backdrop-filter: blur(22px) saturate(160%);
-  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(165%);
+  -webkit-backdrop-filter: blur(18px) saturate(165%);
   border: 1px solid var(--glass-border);
-  border-left: 3.5px solid rgba(37, 99, 235, 0.85);
-  box-shadow: var(--glass-rim), var(--glass-shadow);
-  border-radius: var(--radius-md);
-  padding: 11px 13px;
+  border-left: 3.5px solid rgba(14, 165, 233, 0.88);
+  box-shadow: var(--glass-rim), 0 8px 20px rgba(10, 22, 40, 0.12);
+  border-radius: 14px;
+  padding: 8px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   cursor: pointer;
   color: var(--text-main);
@@ -356,11 +365,11 @@ body::after {
 }
 
 .kpi-card.indigo {
-  border-left-color: rgba(79, 70, 229, 0.85);
+  border-left-color: rgba(99, 102, 241, 0.88);
 }
 
 .kpi-label {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-sub);
   font-weight: 700;
   white-space: nowrap;
@@ -369,25 +378,25 @@ body::after {
 }
 
 .kpi-value {
-  font-size: 17px;
+  font-size: 15.5px;
   font-weight: 800;
   color: var(--text-main);
   white-space: nowrap;
 }
 
-/* 검색 & 지역 & 사이트 필터 툴바 */
+/* 검색 & 지역 & 사이트 필터 툴바 (Tightened Airy Glass) */
 .toolbar {
   background: var(--bg-glass);
-  backdrop-filter: blur(24px) saturate(165%);
-  -webkit-backdrop-filter: blur(24px) saturate(165%);
+  backdrop-filter: blur(20px) saturate(170%);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-rim), var(--glass-shadow);
   border-radius: var(--radius-lg);
-  padding: 13px 15px;
+  padding: 10px 14px;
   margin-bottom: 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .search-box {
@@ -401,7 +410,7 @@ body::after {
 .filter-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   flex-wrap: wrap;
   width: 100%;
 }
@@ -411,11 +420,11 @@ body::after {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.72);
-  box-shadow: inset 0 1px 2px rgba(15, 28, 46, 0.06);
+  box-shadow: inset 0 1.5px 2px rgba(15, 28, 46, 0.06);
   color: var(--text-main);
-  padding: 8px 12px;
-  border-radius: var(--radius-md);
-  font-size: 13px;
+  padding: 7px 11px;
+  border-radius: 10px;
+  font-size: 12.5px;
   font-weight: 600;
   font-family: inherit;
   transition: background 0.15s ease, border-color 0.15s ease;
@@ -432,14 +441,14 @@ body::after {
 }
 
 .filter-select {
-  min-width: 120px;
+  min-width: 118px;
 }
 
 .search-input:focus, .filter-select:focus {
   outline: none;
-  background: rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.84);
   border-color: rgba(37, 99, 235, 0.65);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.22);
 }
 
 .toolbar-bottom {
@@ -449,8 +458,8 @@ body::after {
   width: 100%;
   justify-content: space-between;
   align-items: center;
-  padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.42);
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.38);
 }
 
 .toolbar-meta-actions {
@@ -460,7 +469,7 @@ body::after {
   flex-wrap: wrap;
 }
 
-/* 탭 네비게이션 (Glass Pills) */
+/* 탭 네비게이션 (Airy Crystal Pills) */
 .tabs-nav {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
@@ -470,14 +479,17 @@ body::after {
 }
 
 .tab-btn {
-  background: var(--bg-glass);
-  backdrop-filter: blur(18px) saturate(150%);
-  -webkit-backdrop-filter: blur(18px) saturate(150%);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-rim), 0 6px 18px rgba(15, 28, 46, 0.10);
+  background: var(--bg-glass-crystal);
+  backdrop-filter: blur(14px) saturate(155%);
+  -webkit-backdrop-filter: blur(14px) saturate(155%);
+  border: 1px solid rgba(255, 255, 255, 0.66);
+  box-shadow:
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.88),
+    inset 0 -2px 4px rgba(15, 30, 55, 0.08),
+    0 6px 16px rgba(10, 22, 40, 0.10);
   color: var(--text-sub);
-  padding: 10px 10px;
-  border-radius: var(--radius-md);
+  padding: 9px 10px;
+  border-radius: 13px;
   font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
@@ -487,22 +499,24 @@ body::after {
   gap: 6px;
   white-space: nowrap;
   font-family: inherit;
-  transition: all 0.15s ease;
+  transition: all 0.16s ease;
 }
 
 .tab-btn:hover {
-  background: var(--bg-glass-hover);
+  background: rgba(255, 255, 255, 0.50);
   color: var(--text-main);
   transform: translateY(-1px);
 }
 
 .tab-btn.active {
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.90), rgba(37, 99, 235, 0.94));
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.82) 0%, rgba(14, 165, 233, 0.86) 45%, rgba(37, 99, 235, 0.90) 100%);
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.52);
+  border-color: rgba(255, 255, 255, 0.65);
   box-shadow:
-    inset 0 1.5px 1px rgba(255, 255, 255, 0.68),
-    0 10px 24px rgba(37, 99, 235, 0.34);
+    inset 0 2px 3px rgba(255, 255, 255, 0.92),
+    inset 0 -2px 4px rgba(10, 30, 80, 0.24),
+    0 10px 24px -4px rgba(56, 189, 248, 0.52);
+  text-shadow: 0 1px 2px rgba(10, 30, 80, 0.25);
 }
 
 .tab-count {
@@ -514,11 +528,11 @@ body::after {
 }
 
 .tab-btn.active .tab-count {
-  background: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.28);
   color: #ffffff;
 }
 
-/* 심플 요약형 카드 그리드 (Spatial Frosted Glass Cards) */
+/* 4. Deep Translucent Crystal Cards Grid */
 .cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
@@ -527,10 +541,10 @@ body::after {
 }
 
 .item-card {
-  background: var(--bg-glass);
-  backdrop-filter: blur(24px) saturate(165%);
-  -webkit-backdrop-filter: blur(24px) saturate(165%);
-  border: 1px solid var(--glass-border);
+  background: var(--bg-glass-card);
+  backdrop-filter: blur(18px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  border: 1px solid rgba(255, 255, 255, 0.60);
   box-shadow: var(--glass-rim), var(--glass-shadow);
   border-radius: var(--radius-lg);
   padding: 15px 17px;
@@ -539,21 +553,22 @@ body::after {
   justify-content: space-between;
   gap: 10px;
   min-width: 0;
-  transition: transform 0.16s ease, background 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+  transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
 .item-card:hover {
   background: var(--bg-glass-hover);
-  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.84);
+  transform: translateY(-3px);
   box-shadow: var(--glass-rim), var(--glass-shadow-hover);
 }
 
 .item-card.selected {
-  background: rgba(239, 246, 255, 0.56);
-  border-color: rgba(37, 99, 235, 0.72);
+  background: rgba(224, 242, 254, 0.44);
+  border-color: rgba(56, 189, 248, 0.85);
   box-shadow:
-    inset 0 1.5px 1px rgba(255, 255, 255, 0.92),
-    0 0 0 2px rgba(37, 99, 235, 0.35),
+    inset 0 2px 3px rgba(255, 255, 255, 0.96),
+    0 0 0 2px rgba(56, 189, 248, 0.42),
     var(--glass-shadow-hover);
 }
 
@@ -572,51 +587,59 @@ body::after {
   flex-wrap: wrap;
 }
 
-/* Jewel-Like Translucent Badges */
+/* Jewel & Crystal Badges */
 .badge-site {
   font-size: 11px;
   font-weight: 700;
-  padding: 2px 8px;
+  padding: 2px 9px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.58);
-  color: #1e40af;
-  border: 1px solid rgba(255, 255, 255, 0.82);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  background: var(--bg-glass-crystal);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #1e3a8a;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  box-shadow: inset 0 1.5px 1px rgba(255, 255, 255, 0.90);
   white-space: nowrap;
 }
 
 .badge-match {
   font-size: 11px;
   font-weight: 700;
-  padding: 2px 8px;
+  padding: 2px 9px;
   border-radius: 999px;
-  background: rgba(238, 242, 255, 0.65);
-  color: #3730a3;
-  border: 1px solid rgba(199, 210, 254, 0.85);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  background: rgba(224, 231, 255, 0.44);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #312e81;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 1.5px 1px rgba(255, 255, 255, 0.88);
   white-space: nowrap;
 }
 
 .badge-match.high {
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.88), rgba(37, 99, 235, 0.92));
+  background: linear-gradient(135deg, rgba(45, 212, 191, 0.82) 0%, rgba(14, 165, 233, 0.86) 55%, rgba(37, 99, 235, 0.88) 100%);
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.52);
+  border-color: rgba(255, 255, 255, 0.65);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.68),
-    0 4px 12px rgba(37, 99, 235, 0.28);
+    inset 0 1.5px 2px rgba(255, 255, 255, 0.90),
+    inset 0 -2px 3px rgba(10, 40, 80, 0.22),
+    0 6px 16px -3px rgba(14, 165, 233, 0.48);
+  text-shadow: 0 1px 1px rgba(10, 30, 80, 0.25);
 }
 
 .badge-urgent {
   font-size: 10.5px;
   font-weight: 800;
-  padding: 2px 8px;
+  padding: 2px 9px;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.90), rgba(239, 68, 68, 0.90));
+  background: linear-gradient(135deg, rgba(251, 146, 60, 0.86) 0%, rgba(244, 63, 94, 0.88) 100%);
   color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.65);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.65),
-    0 4px 12px rgba(239, 68, 68, 0.26);
+    inset 0 1.5px 2px rgba(255, 255, 255, 0.88),
+    inset 0 -2px 3px rgba(120, 20, 30, 0.22),
+    0 6px 16px -3px rgba(244, 63, 94, 0.45);
+  text-shadow: 0 1px 1px rgba(100, 15, 25, 0.25);
   white-space: nowrap;
 }
 
@@ -641,12 +664,14 @@ body::after {
 
 .chip {
   font-size: 11.5px;
-  background: rgba(255, 255, 255, 0.44);
+  background: var(--bg-glass-crystal);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.68);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  box-shadow: inset 0 1.5px 1px rgba(255, 255, 255, 0.88);
   color: var(--text-sub);
   padding: 3px 8px;
-  border-radius: 7px;
+  border-radius: 8px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -663,11 +688,14 @@ body::after {
 .one-liner {
   font-size: 12.5px;
   color: var(--text-sub);
-  background: rgba(255, 255, 255, 0.44);
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  border-left: 3px solid rgba(37, 99, 235, 0.85);
+  background: rgba(255, 255, 255, 0.30);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-left: 3.5px solid rgba(14, 165, 233, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
   padding: 7px 10px;
-  border-radius: 8px;
+  border-radius: 10px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -680,7 +708,7 @@ body::after {
   align-items: center;
   gap: 6px;
   padding-top: 9px;
-  border-top: 1px solid rgba(255, 255, 255, 0.48);
+  border-top: 1px solid rgba(255, 255, 255, 0.44);
   flex-wrap: wrap;
 }
 
@@ -710,13 +738,13 @@ body::after {
   bottom: 18px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(24px) saturate(170%);
-  -webkit-backdrop-filter: blur(24px) saturate(170%);
-  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: rgba(240, 248, 255, 0.72);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.86);
   box-shadow:
-    inset 0 1.5px 1px rgba(255, 255, 255, 0.95),
-    0 18px 40px rgba(15, 28, 46, 0.25);
+    inset 0 2px 2px rgba(255, 255, 255, 0.96),
+    0 18px 44px rgba(10, 22, 40, 0.30);
   color: var(--text-main);
   border-radius: 999px;
   padding: 8px 16px;
@@ -746,11 +774,11 @@ body::after {
 }
 
 .action-tile {
-  background: rgba(255, 255, 255, 0.36);
+  background: rgba(255, 255, 255, 0.26);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88), 0 6px 16px rgba(15, 28, 46, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  box-shadow: var(--glass-rim), 0 6px 18px rgba(10, 22, 40, 0.10);
   border-radius: var(--radius-md);
   padding: 12px 14px;
   display: flex;
@@ -760,8 +788,8 @@ body::after {
 }
 
 .action-tile.active-mode {
-  border-color: rgba(37, 99, 235, 0.65);
-  background: rgba(219, 234, 254, 0.56);
+  border-color: rgba(56, 189, 248, 0.78);
+  background: rgba(224, 242, 254, 0.44);
 }
 
 .action-tile-title {
@@ -782,9 +810,9 @@ body::after {
 
 /* 양식 검증 체크리스트 패널 (모달 내) */
 .validation-panel {
-  background: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.50);
   border: 1px solid rgba(255, 255, 255, 0.78);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: inset 0 1.5px 1px rgba(255, 255, 255, 0.92);
   border-radius: var(--radius-md);
   padding: 10px 12px;
   display: flex;
@@ -830,9 +858,9 @@ body::after {
 }
 
 .panel-card {
-  background: var(--bg-glass);
-  backdrop-filter: blur(24px) saturate(165%);
-  -webkit-backdrop-filter: blur(24px) saturate(165%);
+  background: var(--bg-glass-card);
+  backdrop-filter: blur(20px) saturate(170%);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-rim), var(--glass-shadow);
   border-radius: var(--radius-lg);
@@ -882,7 +910,7 @@ body::after {
 .field-input[readonly] {
   opacity: 0.78;
   cursor: not-allowed;
-  background: rgba(241, 245, 249, 0.55);
+  background: rgba(241, 245, 249, 0.50);
 }
 
 .field-input.editable {
@@ -902,14 +930,14 @@ body::after {
 }
 .bar-track {
   height: 8px;
-  background: rgba(255, 255, 255, 0.50);
+  background: rgba(255, 255, 255, 0.44);
   border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 99px;
   overflow: hidden;
 }
 .bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #0ea5e9, #2563eb, #4f46e5);
+  background: linear-gradient(90deg, #2dd4bf, #0ea5e9, #2563eb);
   border-radius: 99px;
 }
 
@@ -917,7 +945,7 @@ body::after {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 28, 46, 0.42);
+  background: rgba(10, 22, 40, 0.44);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   display: none;
@@ -933,13 +961,14 @@ body::after {
 
 .modal-content {
   background: var(--bg-glass-modal);
-  backdrop-filter: blur(28px) saturate(175%);
-  -webkit-backdrop-filter: blur(28px) saturate(175%);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.82);
   box-shadow:
-    inset 0 1.5px 1px rgba(255, 255, 255, 0.95),
-    0 24px 60px rgba(15, 28, 46, 0.34);
-  border-radius: var(--radius-lg);
+    inset 0 2px 3px rgba(255, 255, 255, 0.96),
+    inset 0 -3px 8px rgba(15, 28, 46, 0.12),
+    0 28px 70px rgba(10, 22, 40, 0.38);
+  border-radius: 22px;
   max-width: 760px;
   width: 100%;
   max-height: 90vh;
@@ -1003,21 +1032,21 @@ body::after {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.92), rgba(37, 99, 235, 0.95));
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.90), rgba(37, 99, 235, 0.94));
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.62);
   color: #fff;
   padding: 10px 16px;
-  border-radius: var(--radius-md);
+  border-radius: 12px;
   font-weight: 700;
   font-size: 13px;
   z-index: 2000;
   display: none;
   max-width: calc(100vw - 32px);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    0 12px 30px rgba(15, 28, 46, 0.28);
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.82),
+    0 12px 30px -4px rgba(37, 99, 235, 0.48);
 }
 .toast.show {
   display: block;
@@ -1025,9 +1054,9 @@ body::after {
 
 /* 관심공고 카테고리 분류 드롭다운 & 섹션 헤더 */
 .cat-select {
-  background: rgba(255, 255, 255, 0.56);
+  background: var(--bg-glass-crystal);
   border: 1px solid rgba(255, 255, 255, 0.78);
-  color: #3730a3;
+  color: #312e81;
   padding: 2px 6px;
   border-radius: 6px;
   font-size: 11px;
@@ -1050,11 +1079,11 @@ body::after {
 }
 
 .cat-pill {
-  background: rgba(255, 255, 255, 0.46);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: var(--bg-glass-crystal);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.68);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  box-shadow: inset 0 1.5px 1px rgba(255, 255, 255, 0.88);
   color: var(--text-sub);
   padding: 6px 11px;
   border-radius: 999px;
@@ -1070,17 +1099,17 @@ body::after {
 }
 
 .cat-pill:hover {
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.56);
   color: var(--text-main);
 }
 
 .cat-pill.active {
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.88), rgba(37, 99, 235, 0.92));
-  border-color: rgba(255, 255, 255, 0.52);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.84), rgba(37, 99, 235, 0.90));
+  border-color: rgba(255, 255, 255, 0.62);
   color: #ffffff;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.65),
-    0 6px 16px rgba(37, 99, 235, 0.28);
+    inset 0 2px 2px rgba(255, 255, 255, 0.88),
+    0 8px 20px -4px rgba(56, 189, 248, 0.48);
 }
 
 .cat-group-box {
@@ -1095,12 +1124,12 @@ body::after {
   gap: 8px;
   padding: 9px 13px;
   margin-bottom: 10px;
-  background: rgba(255, 255, 255, 0.44);
+  background: rgba(255, 255, 255, 0.32);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.68);
-  border-left: 3.5px solid rgba(37, 99, 235, 0.85);
-  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.66);
+  border-left: 3.5px solid rgba(14, 165, 233, 0.88);
+  border-radius: 12px;
 }
 
 /* 마감/기간만료 관심공고 카드 스타일 & 장단점 비교 미니박스 */
@@ -1124,10 +1153,11 @@ body::after {
 .fit-mini-box {
   margin-top: 6px;
   padding: 7px 10px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.40);
-  border: 1px solid rgba(255, 255, 255, 0.62);
-  border-left: 3px solid rgba(37, 99, 235, 0.82);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-left: 3px solid rgba(14, 165, 233, 0.85);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.80);
   font-size: 11.5px;
   line-height: 1.48;
   color: var(--text-sub);
@@ -1141,12 +1171,24 @@ body::after {
    반응형 모바일 / 태블릿 최적화
    ============================================================================ */
 @media (max-width: 900px) {
+  .app-shell {
+    width: calc(100% - 16px);
+    margin: 10px auto 24px;
+    border-radius: 22px;
+  }
   .kpi-grid {
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   }
 }
 
 @media (max-width: 640px) {
+  .app-shell {
+    width: 100%;
+    margin: 0;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
   .top-header {
     padding: 10px 12px;
   }
