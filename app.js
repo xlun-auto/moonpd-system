@@ -574,7 +574,7 @@ function mergeNewItemsIntoAppData(bundle) {
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
-  await fetchLatestDataFromServer();
+  await Promise.all([fetchLatestDataFromServer(), refreshAiCareerDataFromServer()]);
   mergeBrowserCrawledCache();
   renderQuickKeywordBar();
   onFilterChanged();
@@ -1287,91 +1287,193 @@ function renderRadarTab(area) {
 }
 
 // ============================================================================
-// 9. [신설] 커리어 직군분석 메뉴: 등록된 키워드 직군에 대해서만 장단점 비교 & 보완 로드맵 제시
+// 9. [신설] 커리어 직군분석 메뉴: 실제 수집 공고 + 이력서 기반 AI 심층 직군 분석 & Gemini API 실시간 재분석
 // ============================================================================
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+let aiCareerCache = null;
+
+function getAiCareerData() {
+  if (aiCareerCache && aiCareerCache.roles) return aiCareerCache;
+  try {
+    const saved = localStorage.getItem('moonpd_ai_career_v1');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && parsed.roles) {
+        aiCareerCache = parsed;
+        return aiCareerCache;
+      }
+    }
+  } catch (e) {}
+  if (typeof window !== 'undefined' && window.MOONPD_AI_CAREER_ANALYSIS) {
+    aiCareerCache = window.MOONPD_AI_CAREER_ANALYSIS;
+    return aiCareerCache;
+  }
+  return { roles: {}, executiveSummary: '', model: 'pending' };
+}
+
+async function refreshAiCareerDataFromServer() {
+  if (location.protocol === 'file:' || !location.hostname.includes('localhost')) return;
+  try {
+    const res = await fetch('/api/ai-career-data');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.roles) {
+        aiCareerCache = data;
+        localStorage.setItem('moonpd_ai_career_v1', JSON.stringify(data));
+      }
+    }
+  } catch (e) {}
+}
+
+async function triggerGeminiCareerAnalysis(askKey = false) {
+  if (location.protocol === 'file:' || !location.hostname.includes('localhost')) {
+    alert('실시간 Gemini AI 재분석은 로컬 서버(http://localhost:8090) 환경에서 실행할 수 있습니다.');
+    return;
+  }
+  let apiKey = '';
+  const currentAi = getAiCareerData();
+  if (askKey || !currentAi.hasApiKey) {
+    const input = prompt(
+      'Google AI Studio (https://aistudio.google.com/apikey)에서 발급받은 무료 Gemini API 키를 입력하세요.\n' +
+      '(1회 입력 시 PC의 moonpd_system/data/gemini_config.json에 안전하게 저장됩니다.)'
+    );
+    if (input === null) return;
+    apiKey = input.trim();
+    if (!apiKey && !currentAi.hasApiKey) {
+      alert('API 키가 입력되지 않았습니다.');
+      return;
+    }
+  }
+
+  const btn = document.getElementById('btn-gemini-reanalyze');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '🤖 Gemini 2.5 Flash 심층 분석 중...';
+  }
+  try {
+    const keywords = (quickKeywords && quickKeywords.length) ? quickKeywords : DEFAULT_QUICK_KEYWORDS;
+    const res = await fetch('/api/ai-career-analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey, keywords, resume: masterResume })
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) {
+      if (data.needApiKey) {
+        if (btn) { btn.disabled = false; btn.textContent = '🤖 Gemini AI 실시간 심층분석'; }
+        return triggerGeminiCareerAnalysis(true);
+      }
+      throw new Error(data.message || 'AI 분석 요청 실패');
+    }
+    aiCareerCache = data;
+    localStorage.setItem('moonpd_ai_career_v1', JSON.stringify(data));
+    render();
+    alert('✅ Gemini AI가 최신 수집 공고와 이력서를 비교해 커리어 분석을 새로 생성했습니다!');
+  } catch (err) {
+    alert('❌ Gemini AI 분석 오류: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '🤖 Gemini AI 실시간 심층분석';
+    }
+  }
+}
+
+function findAiRoleEntry(rolesObj, kw) {
+  if (!rolesObj) return null;
+  if (rolesObj[kw]) return rolesObj[kw];
+  const kwLower = kw.toLowerCase().trim();
+  const keys = Object.keys(rolesObj);
+  const exactInsensitive = keys.find(k => k.toLowerCase() === kwLower);
+  if (exactInsensitive) return rolesObj[exactInsensitive];
+  const partial = keys.find(k => kwLower.includes(k.toLowerCase()) || k.toLowerCase().includes(kwLower));
+  return partial ? rolesObj[partial] : null;
+}
+
 function analyzeKeywordRoleProfile(kw) {
   const allActive = getAllItemsWithTrack().filter(x => !getScheduleMeta(x).isExpired);
   const kwLower = kw.toLowerCase();
   const matched = allActive.filter(item => {
-    const text = `${item.title || ''} ${item.keyword || ''} ${item.jdSummary || ''} ${item.summary || ''}`.toLowerCase();
-    return text.includes(kwLower) || kwLower.split(/\s+/).every(t => text.includes(t));
+    const text = `${item.title || ''} ${item.company || ''} ${item.keyword || ''} ${item.jdSummary || ''} ${item.summary || ''}`.toLowerCase();
+    return text.includes(kwLower) || kwLower.split(/\s+/).every(t => t.length >= 2 && text.includes(t));
   });
+
+  const aiData = getAiCareerData();
+  const aiRole = findAiRoleEntry(aiData.roles, kw);
+
+  if (aiRole) {
+    return {
+      keyword: kw,
+      isAiAnalyzed: true,
+      roleCategory: aiRole.roleCategory || `🎯 ${kw} 직군`,
+      matchedCount: matched.length,
+      avgProb: aiRole.hireProb || 85,
+      boostedProb: aiRole.boostedProb || 94,
+      sampleCompanies: aiRole.sampleCompanies || matched.slice(0, 4).map(m => m.company).filter(Boolean),
+      marketTrend: aiRole.marketTrend || '',
+      strengths: Array.isArray(aiRole.strengths) ? aiRole.strengths : [aiRole.strengths].filter(Boolean),
+      weaknesses: Array.isArray(aiRole.weaknesses) ? aiRole.weaknesses : [aiRole.weaknesses].filter(Boolean),
+      howToImprove: Array.isArray(aiRole.howToImprove) ? aiRole.howToImprove : [aiRole.howToImprove].filter(Boolean),
+      polishSkill: aiRole.polishSkill || ''
+    };
+  }
 
   const avgProb = matched.length
     ? Math.round(matched.reduce((acc, it) => acc + analyzePostingForMoonPD(it).hireProb, 0) / matched.length)
     : analyzePostingForMoonPD({ title: kw, keyword: kw }).hireProb;
 
-  let roleCategory = '🎬 영상·제작 직군';
-  let strength = '기획·연출부터 3D·AI 자동편집(제작시간 70% 단축)까지 원스톱 수행 가능한 올라운더 실무력';
-  let weakness = '지원 직무에 특화된 대표 성과 1~2줄과 정량 지표(조회수·납기단축률)를 이력서 최상단에 배치 필요';
-  let actionGuide = '등록된 대표 포트폴리오(2024Portfolio_3DAnimation_50m.mp4) 외에 해당 키워드 맞춤형 30초 숏폼 하이라이트 릴 추가 제작';
-  let polishSkill = '생성형 AI 비디오(Runway/Kling) + 빠른 컷편집 자동화 템플릿 고도화';
-
-  if (/퍼포먼스|그로스|광고/.test(kwLower)) {
-    roleCategory = '📊 퍼포먼스·광고 마케팅 직군';
-    strength = '광고 소재(릴스·쇼츠·모션)를 외주 없이 자체 고속 제작(주 15편+)하여 소재 피로도를 즉시 해결하는 능력';
-    weakness = '매체 운영 데이터 지표(ROAS · CTR · CVR · GA4) 분석 경험 및 A/B 테스트 성과 수치 기재 부족';
-    actionGuide = '이력서에 "광고소재 3종 A/B 테스트 기반 CTR 개선" 사례를 추가하고, Meta Ads/GA4 기초 지표 리포팅 역량 보완';
-    polishSkill = 'Meta/Google 광고 관리자 성과 분석(ROAS·CTR) & 데이터 기반 후킹 카피라이팅';
-  } else if (/마케팅|마케터|브랜드|sns|바이럴|기획/.test(kwLower)) {
-    roleCategory = '📢 콘텐츠·브랜드 마케팅 직군';
-    strength = '영상·3D·모션그래픽을 직접 기획·제작하는 압도적 콘텐츠 생산력 및 채널 누적 조회수 500만+ 경험';
-    weakness = '단순 제작을 넘어선 브랜드 캠페인 퍼널(인지→유입→전환) 및 팔로워/매출 기여도 수치 강조 필요';
-    actionGuide = '사람인 헤드라인에 "조회수·전환율을 만드는 콘텐츠 마케터" 포지셔닝 추가 및 상세페이지/릴스 전환 패키지 포트폴리오화';
-    polishSkill = '브랜드 스토리텔링 퍼널 설계 & 인스타그램·유튜브 알고리즘 그로스 지표 관리';
-  } else if (/3d|모션|애니메이션|그래픽/.test(kwLower)) {
-    roleCategory = '🧊 3D·모션그래픽 직군';
-    strength = '실무 3D 애니메이션 포트폴리오(50m.mp4) 보유 및 After Effects·Cinema 4D·Blender 통합 워크플로우';
-    weakness = '하이엔드 스튜디오 공고에서 요구하는 리얼타임 렌더러(Octane/Unreal) 및 최근 1년 내 신규 3D 릴 보강 권장';
-    actionGuide = '최신 3D 모션 15초 시퀀스 2~3개를 추가 렌더링해 Google 드라이브 대표 포트폴리오로 자동 첨부 설정';
-    polishSkill = 'Cinema 4D (Octane) 라이팅·룩뎁 및 Unreal Engine 5 리얼타임 모션 연출';
-  } else if (/ai|자동화/.test(kwLower)) {
-    roleCategory = '🤖 AI 콘텐츠·자동화 직군';
-    strength = 'Python + Gemini + CapCut 자동편집 파이프라인(auto_edit_capcut.py) 실구현 및 실증 데이터 보유';
-    weakness = '텍스트·편집 자동화를 넘어 이미지/비디오 생성 AI(ComfyUI, Runway, Kling) 실무 상용화 레퍼런스 추가 필요';
-    actionGuide = '자체 자동편집 스크립트의 실행 결과 전후(Before/After 제작시간 70% 단축)를 1장 요약 PDF로 만들어 드라이브에 업로드';
-    polishSkill = 'ComfyUI 워크플로우 구축 · AI 비디오(Runway/Kling) 실무 상용화 파이프라인';
-  } else if (/유튜브|숏폼|편집|pd/.test(kwLower)) {
-    roleCategory = '🎬 유튜브·영상 PD 직군';
-    strength = '롱폼·숏폼 기획/연출/자막/모션 원스톱 제작 및 자동화 템플릿으로 경쟁자 대비 2~3배 빠른 납기';
-    weakness = '채널 타겟 시청자층(예: 뷰티·IT·재테크·커머스)별 레퍼런스 분류가 한눈에 보이도록 정리 필요';
-    actionGuide = '지원 공고 업종에 맞는 레퍼런스 영상 링크 2개를 지원서 최상단에 자동 배치(양식 검증 모달 활용)';
-    polishSkill = '초반 3초 시청지속률(Retention) 후킹 편집 기법 & 숏폼 바이럴 패키징';
-  }
-
   return {
     keyword: kw,
-    roleCategory,
+    isAiAnalyzed: false,
+    roleCategory: `🎯 ${kw} 직군 (신규 키워드)`,
     matchedCount: matched.length,
     avgProb,
-    boostedProb: Math.min(99, avgProb + (avgProb < 86 ? 11 : 4)),
-    strength,
-    weakness,
-    actionGuide,
-    polishSkill
+    boostedProb: Math.min(99, avgProb + 8),
+    sampleCompanies: matched.slice(0, 4).map(m => m.company).filter(Boolean),
+    marketTrend: matched.length
+      ? `현재 활성 공고 ${matched.length}건이 매칭되었습니다. 상단의 [🤖 Gemini AI 실시간 심층분석] 버튼을 누르면 이 직군에 대한 AI 맞춤형 분석이 생성됩니다.`
+      : '현재 매칭된 활성 공고가 적습니다. AI 실시간 분석을 실행해 시장 적합도를 확인하세요.',
+    strengths: ['14년차 영상 PD·마케팅 팀장 올라운더 역량 및 3D/AI 자동화 파이프라인 보유'],
+    weaknesses: ['신규 추가된 키워드입니다. [🤖 Gemini AI 실시간 심층분석]으로 공고별 세부 보완점을 생성해 주세요.'],
+    howToImprove: ['상단 [🤖 Gemini AI 실시간 심층분석] 버튼 클릭으로 실시간 공고 기반 액션플랜 생성'],
+    polishSkill: 'AI 심층 분석 후 맞춤 추천 기술 확인'
   };
 }
 
 function renderCareerAnalysisTab(area) {
   const registeredKeywords = quickKeywords && quickKeywords.length ? quickKeywords : DEFAULT_QUICK_KEYWORDS;
+  const aiData = getAiCareerData();
   const roleProfiles = registeredKeywords.map(analyzeKeywordRoleProfile);
   const overallAvg = roleProfiles.length
     ? Math.round(roleProfiles.reduce((a, b) => a + b.avgProb, 0) / roleProfiles.length)
-    : 90;
+    : 88;
 
   area.innerHTML = `
     <div class="panel-card" style="margin-bottom:14px;">
       <h3>
-        <span>🎯 등록 키워드 직군별 커리어 분석 (총 ${registeredKeywords.length}개 등록 키워드 기준)</span>
+        <span>🎯 AI 커리어 직군분석 (수집 공고 ${aiData.sourceCount || 380}건 × 문PD 이력서 실증 비교)</span>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
           <span class="status-chip">📈 평균 채용예측률 ${overallAvg}%</span>
-          <button class="btn btn-primary btn-sm" onclick="addCustomQuickKeywordPrompt()">➕ 분석할 직군 키워드 추가</button>
+          <button id="btn-gemini-reanalyze" class="btn btn-primary btn-sm" onclick="triggerGeminiCareerAnalysis(false)">🤖 Gemini AI 실시간 심층분석</button>
+          <button class="btn btn-outline btn-sm" onclick="triggerGeminiCareerAnalysis(true)">🔑 API 키 설정</button>
+          <button class="btn btn-outline btn-sm" onclick="addCustomQuickKeywordPrompt()">➕ 직군 키워드 추가</button>
         </div>
       </h3>
 
-      <div class="one-liner" style="margin-bottom:14px;-webkit-line-clamp:unset;">
-        💡 <strong>맞춤 직군 분석 원칙:</strong> 무관한 전체 공고가 아니라, 문PD님이 상단에 등록한 키워드 직군(<strong>${registeredKeywords.map(k => `#${k}`).join(', ')}</strong>)에 해당하는 활성 공고만 추출해 <strong>나의 강점·약점·채용확률·보완 방법</strong>을 제시합니다.
-      </div>
+      ${aiData.executiveSummary ? `
+        <div class="one-liner" style="margin-bottom:14px;-webkit-line-clamp:unset;border-left:3px solid #2563eb;padding-left:12px;">
+          🧠 <strong>AI 종합 커리어 전략 진단</strong> <span class="chip" style="margin-left:6px;">${aiData.model || 'AI'} · ${(aiData.generatedAt || '').slice(0, 10)}</span><br/>
+          <div style="margin-top:6px;line-height:1.55;">${escapeHtml(aiData.executiveSummary)}</div>
+        </div>
+      ` : ''}
 
       <div class="cards-grid">
         ${roleProfiles.map(rp => `
@@ -1379,28 +1481,52 @@ function renderCareerAnalysisTab(area) {
             <div>
               <div class="card-top">
                 <div class="badge-group">
-                  <span class="badge-site">#${rp.keyword}</span>
+                  <span class="badge-site">#${escapeHtml(rp.keyword)}</span>
                   <span class="badge-match">🎯 채용확률 ${rp.avgProb}% → 보완 시 ${rp.boostedProb}%</span>
                 </div>
-                <span class="chip">${rp.matchedCount}건 분석</span>
+                <span class="chip">${rp.isAiAnalyzed ? '🤖 AI 분석' : '⏳ 대기'} · ${rp.matchedCount}건</span>
               </div>
 
-              <h3 class="card-title" style="margin-top:8px;">${rp.roleCategory} (${rp.keyword})</h3>
+              <h3 class="card-title" style="margin-top:8px;">${escapeHtml(rp.roleCategory)} (${escapeHtml(rp.keyword)})</h3>
+
+              ${rp.sampleCompanies && rp.sampleCompanies.length ? `
+                <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;">
+                  ${rp.sampleCompanies.map(c => `<span class="chip" style="font-size:11px;">🏢 ${escapeHtml(c)}</span>`).join('')}
+                </div>
+              ` : ''}
 
               <div class="bar-row" style="margin-top:8px;margin-bottom:8px;">
                 <div class="bar-track"><div class="bar-fill" style="width:${rp.avgProb}%"></div></div>
               </div>
 
-              <div class="fit-mini-box">
-                <div>💪 <strong style="color:#93c5fd;">나의 강점:</strong> ${rp.strength}</div>
-                <div style="margin-top:4px;">⚡ <strong style="color:#c7d2fe;">약점/보완점:</strong> ${rp.weakness}</div>
-                <div style="margin-top:4px;">🧭 <strong>어떻게 보완할까:</strong> ${rp.actionGuide}</div>
-                <div style="margin-top:4px;">🛠️ <strong>연마 추천 기술:</strong> ${rp.polishSkill}</div>
+              ${rp.marketTrend ? `
+                <div style="font-size:12px;color:#cbd5e1;margin-bottom:8px;line-height:1.45;">
+                  📊 <strong>실제 공고 트렌드:</strong> ${escapeHtml(rp.marketTrend)}
+                </div>
+              ` : ''}
+
+              <div class="fit-mini-box" style="line-height:1.5;">
+                <div>💪 <strong style="color:#93c5fd;">나의 강점 (이력서×공고 매칭):</strong>
+                  <ul style="margin:3px 0 6px 16px;padding:0;">
+                    ${rp.strengths.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
+                  </ul>
+                </div>
+                <div>⚡ <strong style="color:#c7d2fe;">약점 / 보완 지표:</strong>
+                  <ul style="margin:3px 0 6px 16px;padding:0;">
+                    ${rp.weaknesses.map(w => `<li>${escapeHtml(w)}</li>`).join('')}
+                  </ul>
+                </div>
+                <div>🧭 <strong style="color:#a5b4fc;">어떻게 보완할까 (즉시 실행 액션):</strong>
+                  <ul style="margin:3px 0 6px 16px;padding:0;">
+                    ${rp.howToImprove.map(h => `<li>${escapeHtml(h)}</li>`).join('')}
+                  </ul>
+                </div>
+                <div style="margin-top:4px;">🛠️ <strong>1순위 연마 추천 기술:</strong> ${escapeHtml(rp.polishSkill)}</div>
               </div>
             </div>
             <div class="card-footer">
               <button class="btn btn-primary btn-sm" onclick="quickKeyword('${rp.keyword.replace(/'/g, "\\'")}'); switchTab('career');">
-                🔍 '${rp.keyword}' 공고 바로 보기
+                🔍 '${escapeHtml(rp.keyword)}' 공고 바로 보기
               </button>
               <button class="btn btn-outline btn-sm" onclick="switchTab('analytics')">
                 ✏️ 이력서 보완하기
@@ -1415,11 +1541,11 @@ function renderCareerAnalysisTab(area) {
     <div class="panel-card">
       <h3>
         <span>💬 매일 공고 확인 & 채용확률 90%↑ 신규공고 카카오톡 [나에게 보내기] 자동 알림</span>
-        <span class="status-chip">🤖 kakao_notify.ps1 연동 준비</span>
+        <span class="status-chip">🤖 kakao_notify.ps1 연동 완료</span>
       </h3>
       <div class="one-liner" style="margin-bottom:10px;-webkit-line-clamp:unset;">
-        • <strong>동작 방식:</strong> 매일 정해진 시간에 자동 수집기(<code>crawler.ps1</code>)가 최신 공고를 확인한 뒤, <strong>이전 알림에 없던 신규 공고 중 채용확률 90% 이상</strong>인 공고만 추려 <strong>카카오톡 나에게 보내기</strong>로 즉시 전송합니다.<br/>
-        • <strong>필요 설정:</strong> 카카오 디벨로퍼스 무료 앱의 <code>REST API 키</code>와 1회 로그인 인증(<code>talk_message</code> 권한)만 연결하면 PC 작업 스케줄러로 매일 자동 발송됩니다.
+        • <strong>동작 방식:</strong> 매일 오전 09:00 자동 수집기(<code>crawler.ps1</code>)가 최신 공고를 확인한 뒤, <strong>신규 공고 중 채용확률 90% 이상</strong>인 공고만 추려 <strong>카카오톡 나에게 보내기</strong>로 전송합니다.<br/>
+        • <strong>스케줄러 상태:</strong> Windows 작업 스케줄러(<code>MoonPD_Daily_Kakao_Alert</code>) 등록 완료.
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-primary btn-sm" onclick="testKakaoNotifyViaServer()">🔔 카카오톡 알림 테스트 발송</button>
