@@ -24,7 +24,8 @@ window.MOONPD_AI_CAREER_ANALYSIS = {
                                                    "기존 제작 영상 중 반응이 좋았던 2~3개를 골라 \u0027타겟 페르소나 → 초반 3초 후킹 포인트 → 조회수/클릭/문의 전환 결과\u0027 순으로 3줄 성과 요약 추가",
                                                    "AI 자동편집 파이프라인(auto_edit_capcut.py)을 \u00271개 원본으로 광고 소재 10종을 1시간 내 파생 제작하는 마케팅 그로스 툴\u0027로 재포지셔닝"
                                                ],
-                              "polishSkill":  "Meta Ads Manager 소재별 CTR/CPA 해석 + 15초 Direct-Response(구매전환) 스크립트 구조"
+                              "polishSkill":  "Meta Ads Manager 소재별 CTR/CPA 해석 + 15초 Direct-Response(구매전환) 스크립트 구조",
+                              "roleCategory":  "📢 브랜드·콘텐츠 마케팅 직군"
                           },
                   "콘텐츠 마케터":  {
                                   "roleTitle":  "✍️ B2B·커머스 콘텐츠 마케터 직군",
@@ -49,7 +50,8 @@ window.MOONPD_AI_CAREER_ANALYSIS = {
                                                        "기존 Python+Gemini 자동편집 스크립트에 \u0027다국어 자동 자막/더빙 및 블로그·카드뉴스 요약 텍스트 동시 추출\u0027 기능을 1개 추가해 포트폴리오화",
                                                        "지원서 첫 문단에 \u0027영상+썸네일+카피라이팅 1인 완결형 콘텐츠 마케터\u0027로 포지션 명칭 명시"
                                                    ],
-                                  "polishSkill":  "유입 퍼널별 카피라이팅(후킹-공감-CTA) + AI 기반 글로벌 다국어 로컬라이징"
+                                  "polishSkill":  "유입 퍼널별 카피라이팅(후킹-공감-CTA) + AI 기반 글로벌 다국어 로컬라이징",
+                                  "roleCategory":  "✍️ B2B·커머스 콘텐츠 마케터 직군"
                               },
                   "퍼포먼스 마케팅":  {
                                    "roleTitle":  "📊 퍼포먼스·그로스 마케팅 직군",
@@ -74,7 +76,8 @@ window.MOONPD_AI_CAREER_ANALYSIS = {
                                                         "순수 매체 운영 포지션보다는 \u0027드리븐(퍼포먼스 광고 콘텐츠 디자이너)\u0027 또는 \u0027부스트랩(구매전환형 영상PD)\u0027 같은 크리에이티브 중심 퍼포먼스 공고에 집중 지원",
                                                         "Google Analytics 4(GA4) 무료 자격증(GAIQ) 취득 및 개인 프로젝트 1건에 소액(3~5만 원) 메타 광고 집행 후 CTR/CPC 리포트 포트폴리오 1장 첨부"
                                                     ],
-                                   "polishSkill":  "GA4·Meta Ads 성과 지표(CTR·CVR·ROAS·CPA) 실전 리포팅 및 A/B 테스트 가설 검증"
+                                   "polishSkill":  "GA4·Meta Ads 성과 지표(CTR·CVR·ROAS·CPA) 실전 리포팅 및 A/B 테스트 가설 검증",
+                                   "roleCategory":  "📊 퍼포먼스·그로스 마케팅 직군"
                                },
                   "영상 PD":  {
                                 "roleTitle":  "🎬 커머스·브랜드·구매전환형 영상 PD 직군",
@@ -100,7 +103,8 @@ window.MOONPD_AI_CAREER_ANALYSIS = {
                                                      "기존 작업물 중 제품/서비스 홍보·릴스 컷만 추려 \u002715초 구매전환형 광고 PD 릴(가로+세로)\u0027을 별도 1편 만들어 Google 드라이브에 추가",
                                                      "지원서에서 \u0027기획안 3종 → 촬영 → 48시간 내 A/B 테스트 편집본 5개 납품\u0027 프로세스를 구체적 숫자로 제시"
                                                  ],
-                                "polishSkill":  "D2C 커머스 숏폼 후킹 공식(Problem-Agitation-Solution-Review) \u0026 세로형 UI 자막 디자인"
+                                "polishSkill":  "D2C 커머스 숏폼 후킹 공식(Problem-Agitation-Solution-Review) \u0026 세로형 UI 자막 디자인",
+                                "roleCategory":  "🎬 커머스·브랜드·구매전환형 영상 PD 직군"
                             },
                   "모션그래픽":  {
                                 "roleTitle":  "✨ 3D·AI 융합 모션그래픽 디자이너·PD 직군",
@@ -126,7 +130,8 @@ window.MOONPD_AI_CAREER_ANALYSIS = {
                                                      "기존 3D 포폴에서 가장 임팩트 있는 10컷 + 최신 AI 생성 영상 합성 5컷을 묶어 \u002745초 3D×AI 모션 쇼릴\u0027을 1번 대표 포트폴리오로 업로드",
                                                      "사용 툴란에 렌더러/플러그인(Octane/Redshift/Blender Cycles/Element 3D 등 실제 사용 기술)을 구체적으로 명시"
                                                  ],
-                                "polishSkill":  "3D 에셋(C4D/Blender) + 생성형 AI 비디오(Runway/Kling/ComfyUI) 하이브리드 합성 룩뎁"
+                                "polishSkill":  "3D 에셋(C4D/Blender) + 생성형 AI 비디오(Runway/Kling/ComfyUI) 하이브리드 합성 룩뎁",
+                                "roleCategory":  "✨ 3D·AI 융합 모션그래픽 디자이너·PD 직군"
                             },
                   "유튜브":  {
                               "roleTitle":  "📺 대형채널·재테크·브랜드 유튜브 PD·편집자 직군",
@@ -150,7 +155,8 @@ window.MOONPD_AI_CAREER_ANALYSIS = {
                                                    "포트폴리오에 내가 편집한 영상의 \u0027썸네일 3종 + 초반 30초 이탈 방지 모션 구성 예시\u0027를 이미지 1장으로 첨부",
                                                    "이도바이크·팬딩 등 지원 시 \u0027롱폼 1편 편집 시 쇼츠 3편 자동 파생 납품\u0027 조건을 제안해 경쟁자 대비 압도적 가성비 어필"
                                                ],
-                              "polishSkill":  "유튜브 스튜디오 시청지속률(Retention) 기반 텐션 편집 \u0026 고클릭률 썸네일 카피·레이아웃"
+                              "polishSkill":  "유튜브 스튜디오 시청지속률(Retention) 기반 텐션 편집 \u0026 고클릭률 썸네일 카피·레이아웃",
+                              "roleCategory":  "📺 대형채널·재테크·브랜드 유튜브 PD·편집자 직군"
                           },
                   "3D":  {
                              "roleTitle":  "🧊 3D 제너럴리스트 · 3D AI 영상 전문가 직군",
@@ -173,7 +179,8 @@ window.MOONPD_AI_CAREER_ANALYSIS = {
                                                   "뷰티·전자제품 1개를 임의 선정해 \u00273D 제품 시네마틱 15초 광고 시안\u0027 1편을 제작해 3D 포트폴리오 라인업에 추가",
                                                   "Blender/C4D 외에 AI 텍스처링·AI 업스케일링(Topaz/ComfyUI) 활용 시간 단축 사례 명시"
                                               ],
-                             "polishSkill":  "제품 시네마틱 3D 라이팅/물성(PBR) 표현 + AI 업스케일링·프레임 보간 실무 파이프라인"
+                             "polishSkill":  "제품 시네마틱 3D 라이팅/물성(PBR) 표현 + AI 업스케일링·프레임 보간 실무 파이프라인",
+                             "roleCategory":  "🧊 3D 제너럴리스트 · 3D AI 영상 전문가 직군"
                          },
                   "AI":  {
                              "roleTitle":  "🤖 생성형 AI 콘텐츠·자동화 크리에이터 직군",
@@ -196,7 +203,8 @@ window.MOONPD_AI_CAREER_ANALYSIS = {
                                                   "GitHub 또는 Google 드라이브에 `auto_edit_capcut.py` 실행 전후 비교 영상(30초 데모)을 올려 링크로 바로 볼 수 있게 구성",
                                                   "K-Startup/콘진원 지원사업(PSST) 지원 시 이 파이프라인을 \u0027중소 커머스용 AI 숏폼 대량생성 SaaS\u0027로 사업화 모델 제시"
                                               ],
-                             "polishSkill":  "일관성 유지형 AI 비디오 생성(Kling·Runway·ComfyUI LoRA/ControlNet) + API 자동화 연결"
+                             "polishSkill":  "일관성 유지형 AI 비디오 생성(Kling·Runway·ComfyUI LoRA/ControlNet) + API 자동화 연결",
+                             "roleCategory":  "🤖 생성형 AI 콘텐츠·자동화 크리에이터 직군"
                          },
                   "편집":  {
                              "roleTitle":  "✂️ 고속 숏폼·롱폼 영상 편집 \u0026 캐시카우 외주 직군",
@@ -219,7 +227,8 @@ window.MOONPD_AI_CAREER_ANALYSIS = {
                                                   "알바/외주 제안 시 \u0027건당 편집\u0027이 아닌 \u0027월 8~12편 숏폼+썸네일+자막 자동화 패키지\u0027 단가표를 제시해 안정적 캐시카우 확보",
                                                   "이력서 지원 시 희망 급여란에 \u0027단순 편집 이상(3D·AI 자동화 포함)의 멀티 역량 보유\u0027 명시"
                                               ],
-                             "polishSkill":  "모션 템플릿(MOGRT) 자산화 + 업종별 고단가 B2B 리테이너(월정액) 계약 패키징"
+                             "polishSkill":  "모션 템플릿(MOGRT) 자산화 + 업종별 고단가 B2B 리테이너(월정액) 계약 패키징",
+                             "roleCategory":  "✂️ 고속 숏폼·롱폼 영상 편집 \u0026 캐시카우 외주 직군"
                          },
                   "AI 영상 제작 PD":  {
                                       "roleCategory":  "AI 콘텐츠 및 자동화 제작",
@@ -244,7 +253,8 @@ window.MOONPD_AI_CAREER_ANALYSIS = {
                                                            "ComfyUI를 활용한 브랜드 맞춤형 일관된 캐릭터/배경 생성 워크플로우 포트폴리오 추가",
                                                            "월 100만원 수익형 모델로 \u0027중소 쇼핑몰 전용 AI 숏폼 자동 생성 패키지\u0027 런칭"
                                                        ],
-                                      "polishSkill":  "ComfyUI 기반의 브랜드 전용 LoRA 학습 및 일관성 유지 기술"
+                                      "polishSkill":  "ComfyUI 기반의 브랜드 전용 LoRA 학습 및 일관성 유지 기술",
+                                      "roleTitle":  "AI 콘텐츠 및 자동화 제작"
                                   },
                   "3D 모션그래픽 디자이너":  {
                                         "roleCategory":  "프리미엄 브랜드 영상",
@@ -269,7 +279,8 @@ window.MOONPD_AI_CAREER_ANALYSIS = {
                                                              "크몽/숨고 등에서 \u0027고단가 3D 오프닝\u0027 전문 서비스 등록 (건당 50~80만원 책정 가능)",
                                                              "Blender와 AI(Stable Diffusion)를 결합한 하이브리드 3D 제작 방식 제안"
                                                          ],
-                                        "polishSkill":  "Blender Geometry Nodes를 활용한 절차적 애니메이션 자동화"
+                                        "polishSkill":  "Blender Geometry Nodes를 활용한 절차적 애니메이션 자동화",
+                                        "roleTitle":  "프리미엄 브랜드 영상"
                                     },
                   "퍼포먼스 콘텐츠 마케터":  {
                                        "roleCategory":  "데이터 기반 광고 제작",
@@ -294,7 +305,8 @@ window.MOONPD_AI_CAREER_ANALYSIS = {
                                                             "과거 제작 영상의 단순 조회수가 아닌 \u0027구매 전환율\u0027 또는 \u0027ROAS\u0027 개선 사례 수치화",
                                                             "월 100만원 캐시카우로 \u0027전환율 보장형 숏폼 광고 제작\u0027 대행 서비스 운영"
                                                         ],
-                                       "polishSkill":  "데이터 분석 기반의 광고 소재 성과 측정 및 반복 개선(Iteration) 프로세스"
+                                       "polishSkill":  "데이터 분석 기반의 광고 소재 성과 측정 및 반복 개선(Iteration) 프로세스",
+                                       "roleTitle":  "데이터 기반 광고 제작"
                                    }
               },
     "generatedAt":  "2026-11-14T20:59:28+09:00",
