@@ -1531,15 +1531,15 @@ async function triggerGeminiCareerAnalysis(askKey = false) {
     const savedKey = localStorage.getItem('moonpd_gemini_api_key') || '';
     if (askKey || !savedKey) {
       openInputDialog({
-        title: '🔑 Gemini API 키 설정 (웹 버전)',
-        message: 'Google AI Studio(https://aistudio.google.com/apikey)에서 발급받은 Gemini API 키를 입력하세요.',
-        placeholder: 'AIza...',
+        title: '🤖 실시간 AI 재분석 안내 (웹 버전)',
+        message: '현재 화면에는 이미 최신 Gemini AI 분석 결과가 반영되어 있습니다. 웹(GitHub Pages)은 공개 사이트라 보안상 API 키를 코드에 저장할 수 없으며, PC의 http://localhost:8090/ 에서 누르시면 키 입력 없이 즉시 재분석됩니다.',
+        placeholder: '웹에서 직접 재분석할 경우에만 Gemini API 키(AIza...) 입력',
         defaultValue: savedKey,
-        subText: '• 입력한 키는 이 브라우저의 localStorage에만 저장됩니다.',
+        subText: '• 입력한 키는 이 브라우저의 localStorage에만 안전하게 저장됩니다.',
         onSubmit: async (input) => {
           const clean = input.trim();
           if (!clean) {
-            showToast('⚠️ API 키가 입력되지 않았습니다.');
+            showToast('ℹ️ PC 로컬 서버(http://localhost:8090)에서는 키 입력 없이 바로 재분석됩니다.');
             return;
           }
           localStorage.setItem('moonpd_gemini_api_key', clean);
@@ -1649,8 +1649,8 @@ function renderCareerAnalysisTab(area) {
         <span>🎯 AI 커리어 직군분석 (수집 공고 ${aiData.sourceCount || getAllItemsWithTrack().length}건 × 문PD 이력서 실증 비교)</span>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
           <span class="status-chip">📈 평균 채용예측률 ${overallAvg}%</span>
+          <span class="status-chip">✅ 최신 AI 분석 반영됨 (${escapeHtml(modelLabel)})</span>
           <button type="button" id="btn-gemini-reanalyze" class="btn btn-primary btn-sm" onclick="triggerGeminiCareerAnalysis(false)">🤖 Gemini AI 실시간 심층분석</button>
-          <button type="button" class="btn btn-outline btn-sm" onclick="triggerGeminiCareerAnalysis(true)">🔑 API 키 설정</button>
           <button type="button" class="btn btn-outline btn-sm" onclick="addCustomQuickKeywordPrompt()">➕ 직군 키워드 추가</button>
         </div>
       </h3>
