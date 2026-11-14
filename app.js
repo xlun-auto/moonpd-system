@@ -663,13 +663,13 @@ function initCosmosBackground() {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const prefersReducedMotion = false;
   let width = 0;
   let height = 0;
   let dpr = 1;
   let rafId = null;
   let lastTs = 0;
-  let nextMeteorAt = 600;
+  let nextMeteorAt = 300;
 
   let targetMouseX = 0;
   let targetMouseY = 0;
@@ -678,9 +678,9 @@ function initCosmosBackground() {
 
   const starColors = ['#ffffff', '#bae6fd', '#e0e7ff', '#fef3c7'];
   const layerConfigs = [
-    { count: 140, rMin: 0.9, rMax: 1.6, speed: 0.010, parallax: 12, alphaMin: 0.55, alphaMax: 0.90 },
-    { count: 85, rMin: 1.5, rMax: 2.5, speed: 0.020, parallax: 26, alphaMin: 0.72, alphaMax: 1.00 },
-    { count: 45, rMin: 2.2, rMax: 3.6, speed: 0.034, parallax: 42, alphaMin: 0.85, alphaMax: 1.00 }
+    { count: 140, rMin: 1.0, rMax: 1.7, speed: 0.024, parallax: 14, alphaMin: 0.55, alphaMax: 0.92 },
+    { count: 85, rMin: 1.6, rMax: 2.6, speed: 0.048, parallax: 28, alphaMin: 0.72, alphaMax: 1.00 },
+    { count: 45, rMin: 2.3, rMax: 3.8, speed: 0.082, parallax: 46, alphaMin: 0.85, alphaMax: 1.00 }
   ];
 
   const stars = [];
@@ -795,7 +795,7 @@ function initCosmosBackground() {
     if (!prefersReducedMotion) {
       if (now >= nextMeteorAt) {
         spawnMeteor();
-        nextMeteorAt = now + 3500 + Math.random() * 3500;
+        nextMeteorAt = now + 1200 + Math.random() * 1400;
       }
       for (let i = meteors.length - 1; i >= 0; i--) {
         const m = meteors[i];
@@ -819,16 +819,16 @@ function initCosmosBackground() {
         grad.addColorStop(1, `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})`);
 
         ctx.strokeStyle = grad;
-        ctx.lineWidth = 1.6;
+        ctx.lineWidth = 2.4;
         ctx.lineCap = 'round';
         ctx.beginPath();
         ctx.moveTo(tailX, tailY);
         ctx.lineTo(m.x, m.y);
         ctx.stroke();
 
-        ctx.fillStyle = `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})`;
+        ctx.fillStyle = `rgba(255, 255, 255, ${(0.98 * alpha).toFixed(3)})`;
         ctx.beginPath();
-        ctx.arc(m.x, m.y, 1.5, 0, Math.PI * 2);
+        ctx.arc(m.x, m.y, 2.4, 0, Math.PI * 2);
         ctx.fill();
       }
     }
