@@ -209,6 +209,18 @@
     </div>
   </div>
 
+  <!-- 3) 사람인 등록 이력서 선택 모달 -->
+  <div class="modal-backdrop" id="saraminResumeModal" onclick="if(event.target===this) closeSaraminResumeModal()">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="saraminModalTitle">
+      <div class="modal-header">
+        <h3 id="saraminModalTitle" style="font-size:15px;font-weight:800;">📥 사람인 등록 이력서 불러오기</h3>
+        <button class="btn btn-outline btn-sm" onclick="closeSaraminResumeModal()">✕ 닫기</button>
+      </div>
+      <div class="modal-body" id="saraminModalBody"></div>
+      <div class="modal-footer" id="saraminModalFooter"></div>
+    </div>
+  </div>
+
   <div id="toastNotification" class="toast" role="status" aria-live="polite"></div>
 
   <script src="data/db_seed.js"></script>
