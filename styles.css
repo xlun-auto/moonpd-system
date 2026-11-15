@@ -1405,10 +1405,51 @@ body::after {
   border: 1px solid rgba(245, 158, 11, 0.35);
 }
 
+.cover-notice.is-error {
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(248, 113, 113, 0.42);
+}
+
+.cover-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cover-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cover-field-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-sub);
+}
+
+.cover-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 13.5px;
+  background: rgba(15, 23, 48, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  color: var(--text-main);
+}
+
+.cover-input:focus {
+  outline: none;
+  border-color: rgba(56, 189, 248, 0.65);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.16);
+}
+
 .cover-actions {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  margin-top: 4px;
 }
 
 .cover-login-btn {
