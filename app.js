@@ -883,10 +883,9 @@ function initCosmosBackground() {
   rafId = requestAnimationFrame(loop);
 }
 
-const ALLOWED_GOOGLE_EMAIL = 'sgstarceo@gmail.com';
+const ALLOWED_RESEARCH_IDS = ['sgstarceo', 'sgstarceo@gmail.com'];
+const RESEARCH_PASSWORD_HASH = '6986ab3185fe122aac75a972c19de377aadd696befd970f55945325e022b8fc3';
 const INACTIVITY_LIMIT_MS = 5 * 60 * 1000;
-const GOOGLE_CLIENT_ID_STORAGE_KEY = 'marketlens_google_client_id';
-const DEFAULT_GOOGLE_OAUTH_CLIENT_ID = '';
 const SESSION_AUTH_KEY = 'marketlens_auth_session_v1';
 const COVER_DISGUISE_TITLE = 'MarketLens — 미디어·콘텐츠 시장조사 리서치';
 const APP_REAL_TITLE = '문PD 커리어 · 캐시카우';
@@ -896,9 +895,12 @@ let authHeartbeatInterval = null;
 let authListenersBound = false;
 let authDataBootstrapped = false;
 
-function getConfiguredGoogleClientId() {
-  const stored = (localStorage.getItem(GOOGLE_CLIENT_ID_STORAGE_KEY) || '').trim();
-  return (DEFAULT_GOOGLE_OAUTH_CLIENT_ID || stored).trim();
+async function sha256Hex(text) {
+  const data = new TextEncoder().encode(text);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 function setCoverLockReason(message, isError = false) {
@@ -915,35 +917,22 @@ function setCoverLockReason(message, isError = false) {
   el.classList.toggle('is-error', Boolean(isError));
 }
 
-function showOAuthSetupBox(show) {
-  const box = document.getElementById('coverOAuthSetupBox');
-  if (!box) return;
-  box.style.display = show ? 'flex' : 'none';
-  if (show) {
-    const input = document.getElementById('googleClientIdInput');
-    if (input) {
-      input.value = getConfiguredGoogleClientId();
-      input.focus();
-    }
-  }
-}
-
 function readAuthSession() {
   try {
     const raw = sessionStorage.getItem(SESSION_AUTH_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!parsed || parsed.email !== ALLOWED_GOOGLE_EMAIL) return null;
+    if (!parsed || !ALLOWED_RESEARCH_IDS.includes(String(parsed.userId || '').toLowerCase())) return null;
     return parsed;
   } catch {
     return null;
   }
 }
 
-function writeAuthSession(email) {
+function writeAuthSession(userId) {
   const now = Date.now();
   const payload = {
-    email,
+    userId,
     unlockedAt: now,
     lastActiveAt: now,
   };
@@ -1027,14 +1016,14 @@ async function bootstrapAuthenticatedAppData() {
   onFilterChanged();
 }
 
-async function unlockAppSession(email) {
-  if (String(email || '').toLowerCase() !== ALLOWED_GOOGLE_EMAIL) {
-    setCoverLockReason(`허용되지 않은 계정(${email || '알 수 없음'})입니다. ${ALLOWED_GOOGLE_EMAIL} 계정으로만 접근할 수 있습니다.`, true);
+async function unlockAppSession(userId) {
+  const normalizedId = String(userId || '').trim().toLowerCase();
+  if (!ALLOWED_RESEARCH_IDS.includes(normalizedId)) {
+    setCoverLockReason('허용되지 않은 리서처 ID입니다. 아이디를 다시 확인해 주세요.', true);
     return;
   }
-  writeAuthSession(ALLOWED_GOOGLE_EMAIL);
+  writeAuthSession(normalizedId);
   setCoverLockReason('');
-  showOAuthSetupBox(false);
   const cover = document.getElementById('authCoverScreen');
   const shell = document.getElementById('mainAppShell');
   if (cover) cover.style.display = 'none';
@@ -1047,84 +1036,57 @@ async function unlockAppSession(email) {
 function lockSessionNow(reason = 'manual') {
   clearAuthTimers();
   sessionStorage.removeItem(SESSION_AUTH_KEY);
+  const pwInput = document.getElementById('loginPassword');
+  if (pwInput) pwInput.value = '';
   const cover = document.getElementById('authCoverScreen');
   const shell = document.getElementById('mainAppShell');
   if (shell) shell.style.display = 'none';
   if (cover) cover.style.display = 'flex';
   document.title = COVER_DISGUISE_TITLE;
   if (reason === 'timeout') {
-    setCoverLockReason('보안을 위해 5분간 활동이 없어 자동 잠금되었습니다. 다시 Google 계정으로 인증해 주세요.');
+    setCoverLockReason('보안을 위해 5분간 활동이 없어 자동 잠금되었습니다. 다시 로그인해 주세요.');
   } else if (reason === 'manual') {
-    setCoverLockReason('화면이 잠금되었습니다. 계속하려면 Google 계정으로 다시 인증해 주세요.');
+    setCoverLockReason('화면이 잠금되었습니다. 계속하려면 다시 로그인해 주세요.');
   } else {
     setCoverLockReason('');
   }
 }
 
-function saveGoogleClientIdFromCover() {
-  const input = document.getElementById('googleClientIdInput');
-  const val = (input?.value || '').trim();
-  if (!val || !val.includes('.apps.googleusercontent.com')) {
-    setCoverLockReason('유효한 Google OAuth Web Client ID(...apps.googleusercontent.com)를 입력해 주세요.', true);
-    return;
-  }
-  localStorage.setItem(GOOGLE_CLIENT_ID_STORAGE_KEY, val);
-  showOAuthSetupBox(false);
-  setCoverLockReason('Google Client ID가 저장되었습니다. 인증 창을 엽니다...');
-  startGoogleAuthSignIn();
-}
+async function handleResearchLoginSubmit(event) {
+  if (event) event.preventDefault();
+  const idInput = document.getElementById('loginUserId');
+  const pwInput = document.getElementById('loginPassword');
+  const btn = document.getElementById('researchLoginBtn');
+  const userId = (idInput?.value || '').trim().toLowerCase();
+  const password = pwInput?.value || '';
 
-function startGoogleAuthSignIn() {
-  const clientId = getConfiguredGoogleClientId();
-  if (!clientId) {
-    showOAuthSetupBox(true);
-    setCoverLockReason('Google 로그인을 사용하려면 Google Cloud Console에서 발급한 Web OAuth Client ID(...apps.googleusercontent.com)를 1회 등록해 주세요. (2단계 인증 완료 후 발급 가능)');
+  if (!userId || !password) {
+    setCoverLockReason('리서처 ID와 비밀번호를 모두 입력해 주세요.', true);
     return;
   }
-  if (!window.google || !google.accounts || !google.accounts.oauth2) {
-    setCoverLockReason('Google 인증 스크립트를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.', true);
-    return;
-  }
-  const btn = document.getElementById('googleAuthBtn');
+
   if (btn) btn.disabled = true;
-  setCoverLockReason('Google 계정 인증 창을 확인해 주세요...');
-
   try {
-    const tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
-      scope: 'openid email profile',
-      hint: ALLOWED_GOOGLE_EMAIL,
-      callback: async (tokenResponse) => {
-        if (btn) btn.disabled = false;
-        if (!tokenResponse || tokenResponse.error || !tokenResponse.access_token) {
-          setCoverLockReason(`Google 인증에 실패했습니다 (${tokenResponse?.error || '취소됨'}).`, true);
-          return;
-        }
-        try {
-          const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-            headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-          });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const profile = await res.json();
-          const email = String(profile?.email || '').toLowerCase();
-          if (email !== ALLOWED_GOOGLE_EMAIL) {
-            setCoverLockReason(`접근 거부: ${email || '알 수 없는 계정'} — ${ALLOWED_GOOGLE_EMAIL} 계정만 허용됩니다.`, true);
-            return;
-          }
-          await unlockAppSession(email);
-        } catch (err) {
-          setCoverLockReason(`사용자 정보 확인 중 오류가 발생했습니다: ${err.message}`, true);
-        }
-      },
-      error_callback: (err) => {
-        if (btn) btn.disabled = false;
-        setCoverLockReason(`Google 인증 팝업 오류: ${err?.type || '창이 차단되었거나 닫혔습니다.'}`, true);
-      },
-    });
-    tokenClient.requestAccessToken({ prompt: 'select_account' });
-  } catch (err) {
+    if (!ALLOWED_RESEARCH_IDS.includes(userId)) {
+      setCoverLockReason('리서처 ID 또는 비밀번호가 올바르지 않습니다.', true);
+      if (pwInput) {
+        pwInput.value = '';
+        pwInput.focus();
+      }
+      return;
+    }
+    const digest = await sha256Hex(password);
+    if (digest !== RESEARCH_PASSWORD_HASH) {
+      setCoverLockReason('리서처 ID 또는 비밀번호가 올바르지 않습니다.', true);
+      if (pwInput) {
+        pwInput.value = '';
+        pwInput.focus();
+      }
+      return;
+    }
+    await unlockAppSession(userId);
+  } finally {
     if (btn) btn.disabled = false;
-    setCoverLockReason(`Google OAuth 초기화 오류: ${err.message}`, true);
   }
 }
 
@@ -1133,7 +1095,7 @@ async function initAuthGateAndAutoLock() {
   document.title = COVER_DISGUISE_TITLE;
   const existing = readAuthSession();
   if (existing && Date.now() - (existing.lastActiveAt || 0) < INACTIVITY_LIMIT_MS) {
-    await unlockAppSession(existing.email);
+    await unlockAppSession(existing.userId);
   } else {
     if (existing) {
       lockSessionNow('timeout');
