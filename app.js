@@ -883,13 +883,269 @@ function initCosmosBackground() {
   rafId = requestAnimationFrame(loop);
 }
 
-window.addEventListener('DOMContentLoaded', async () => {
-  initCosmosBackground();
+const ALLOWED_GOOGLE_EMAIL = 'sgstarceo@gmail.com';
+const INACTIVITY_LIMIT_MS = 5 * 60 * 1000;
+const GOOGLE_CLIENT_ID_STORAGE_KEY = 'marketlens_google_client_id';
+const DEFAULT_GOOGLE_OAUTH_CLIENT_ID = '';
+const SESSION_AUTH_KEY = 'marketlens_auth_session_v1';
+const COVER_DISGUISE_TITLE = 'MarketLens — 미디어·콘텐츠 시장조사 리서치';
+const APP_REAL_TITLE = '문PD 커리어 · 캐시카우';
+
+let authInactivityTimer = null;
+let authHeartbeatInterval = null;
+let authListenersBound = false;
+let authDataBootstrapped = false;
+
+function getConfiguredGoogleClientId() {
+  const stored = (localStorage.getItem(GOOGLE_CLIENT_ID_STORAGE_KEY) || '').trim();
+  return (DEFAULT_GOOGLE_OAUTH_CLIENT_ID || stored).trim();
+}
+
+function setCoverLockReason(message, isError = false) {
+  const el = document.getElementById('coverLockReason');
+  if (!el) return;
+  if (!message) {
+    el.style.display = 'none';
+    el.textContent = '';
+    el.classList.remove('is-error');
+    return;
+  }
+  el.textContent = message;
+  el.style.display = 'block';
+  el.classList.toggle('is-error', Boolean(isError));
+}
+
+function showOAuthSetupBox(show) {
+  const box = document.getElementById('coverOAuthSetupBox');
+  if (!box) return;
+  box.style.display = show ? 'flex' : 'none';
+  if (show) {
+    const input = document.getElementById('googleClientIdInput');
+    if (input) {
+      input.value = getConfiguredGoogleClientId();
+      input.focus();
+    }
+  }
+}
+
+function readAuthSession() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_AUTH_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.email !== ALLOWED_GOOGLE_EMAIL) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeAuthSession(email) {
+  const now = Date.now();
+  const payload = {
+    email,
+    unlockedAt: now,
+    lastActiveAt: now,
+  };
+  sessionStorage.setItem(SESSION_AUTH_KEY, JSON.stringify(payload));
+}
+
+function touchAuthActivity() {
+  const session = readAuthSession();
+  if (!session) return;
+  session.lastActiveAt = Date.now();
+  sessionStorage.setItem(SESSION_AUTH_KEY, JSON.stringify(session));
+}
+
+function clearAuthTimers() {
+  if (authInactivityTimer) {
+    clearTimeout(authInactivityTimer);
+    authInactivityTimer = null;
+  }
+  if (authHeartbeatInterval) {
+    clearInterval(authHeartbeatInterval);
+    authHeartbeatInterval = null;
+  }
+}
+
+function resetInactivityTimer() {
+  if (!readAuthSession()) return;
+  touchAuthActivity();
+  if (authInactivityTimer) clearTimeout(authInactivityTimer);
+  authInactivityTimer = setTimeout(() => {
+    lockSessionNow('timeout');
+  }, INACTIVITY_LIMIT_MS);
+}
+
+function bindInactivityListeners() {
+  if (authListenersBound) return;
+  authListenersBound = true;
+  const activityEvents = ['mousemove', 'mousedown', 'keydown', 'click', 'scroll', 'touchstart'];
+  let lastTouch = 0;
+  activityEvents.forEach((evt) => {
+    window.addEventListener(evt, () => {
+      const now = Date.now();
+      if (now - lastTouch < 1000) return;
+      lastTouch = now;
+      if (readAuthSession()) {
+        resetInactivityTimer();
+      }
+    }, { passive: true });
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      const session = readAuthSession();
+      if (session && Date.now() - (session.lastActiveAt || 0) >= INACTIVITY_LIMIT_MS) {
+        lockSessionNow('timeout');
+      }
+    }
+  });
+}
+
+function startInactivityWatchdog() {
+  clearAuthTimers();
+  resetInactivityTimer();
+  authHeartbeatInterval = setInterval(() => {
+    const session = readAuthSession();
+    if (!session) {
+      clearAuthTimers();
+      return;
+    }
+    if (Date.now() - (session.lastActiveAt || 0) >= INACTIVITY_LIMIT_MS) {
+      lockSessionNow('timeout');
+    }
+  }, 15000);
+}
+
+async function bootstrapAuthenticatedAppData() {
+  if (authDataBootstrapped) return;
+  authDataBootstrapped = true;
   await Promise.all([fetchLatestDataFromServer(), refreshAiCareerDataFromServer()]);
   mergeBrowserCrawledCache();
   populateSiteFilterOptions();
   renderQuickKeywordBar();
   onFilterChanged();
+}
+
+async function unlockAppSession(email) {
+  if (String(email || '').toLowerCase() !== ALLOWED_GOOGLE_EMAIL) {
+    setCoverLockReason(`허용되지 않은 계정(${email || '알 수 없음'})입니다. ${ALLOWED_GOOGLE_EMAIL} 계정으로만 접근할 수 있습니다.`, true);
+    return;
+  }
+  writeAuthSession(ALLOWED_GOOGLE_EMAIL);
+  setCoverLockReason('');
+  showOAuthSetupBox(false);
+  const cover = document.getElementById('authCoverScreen');
+  const shell = document.getElementById('mainAppShell');
+  if (cover) cover.style.display = 'none';
+  if (shell) shell.style.display = 'block';
+  document.title = APP_REAL_TITLE;
+  startInactivityWatchdog();
+  await bootstrapAuthenticatedAppData();
+}
+
+function lockSessionNow(reason = 'manual') {
+  clearAuthTimers();
+  sessionStorage.removeItem(SESSION_AUTH_KEY);
+  const cover = document.getElementById('authCoverScreen');
+  const shell = document.getElementById('mainAppShell');
+  if (shell) shell.style.display = 'none';
+  if (cover) cover.style.display = 'flex';
+  document.title = COVER_DISGUISE_TITLE;
+  if (reason === 'timeout') {
+    setCoverLockReason('보안을 위해 5분간 활동이 없어 자동 잠금되었습니다. 다시 Google 계정으로 인증해 주세요.');
+  } else if (reason === 'manual') {
+    setCoverLockReason('화면이 잠금되었습니다. 계속하려면 Google 계정으로 다시 인증해 주세요.');
+  } else {
+    setCoverLockReason('');
+  }
+}
+
+function saveGoogleClientIdFromCover() {
+  const input = document.getElementById('googleClientIdInput');
+  const val = (input?.value || '').trim();
+  if (!val || !val.includes('.apps.googleusercontent.com')) {
+    setCoverLockReason('유효한 Google OAuth Web Client ID(...apps.googleusercontent.com)를 입력해 주세요.', true);
+    return;
+  }
+  localStorage.setItem(GOOGLE_CLIENT_ID_STORAGE_KEY, val);
+  showOAuthSetupBox(false);
+  setCoverLockReason('Google Client ID가 저장되었습니다. 인증 창을 엽니다...');
+  startGoogleAuthSignIn();
+}
+
+function startGoogleAuthSignIn() {
+  const clientId = getConfiguredGoogleClientId();
+  if (!clientId) {
+    showOAuthSetupBox(true);
+    setCoverLockReason('Google 로그인을 사용하려면 Google Cloud Console에서 발급한 Web OAuth Client ID(...apps.googleusercontent.com)를 1회 등록해 주세요. (2단계 인증 완료 후 발급 가능)');
+    return;
+  }
+  if (!window.google || !google.accounts || !google.accounts.oauth2) {
+    setCoverLockReason('Google 인증 스크립트를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.', true);
+    return;
+  }
+  const btn = document.getElementById('googleAuthBtn');
+  if (btn) btn.disabled = true;
+  setCoverLockReason('Google 계정 인증 창을 확인해 주세요...');
+
+  try {
+    const tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: 'openid email profile',
+      hint: ALLOWED_GOOGLE_EMAIL,
+      callback: async (tokenResponse) => {
+        if (btn) btn.disabled = false;
+        if (!tokenResponse || tokenResponse.error || !tokenResponse.access_token) {
+          setCoverLockReason(`Google 인증에 실패했습니다 (${tokenResponse?.error || '취소됨'}).`, true);
+          return;
+        }
+        try {
+          const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const profile = await res.json();
+          const email = String(profile?.email || '').toLowerCase();
+          if (email !== ALLOWED_GOOGLE_EMAIL) {
+            setCoverLockReason(`접근 거부: ${email || '알 수 없는 계정'} — ${ALLOWED_GOOGLE_EMAIL} 계정만 허용됩니다.`, true);
+            return;
+          }
+          await unlockAppSession(email);
+        } catch (err) {
+          setCoverLockReason(`사용자 정보 확인 중 오류가 발생했습니다: ${err.message}`, true);
+        }
+      },
+      error_callback: (err) => {
+        if (btn) btn.disabled = false;
+        setCoverLockReason(`Google 인증 팝업 오류: ${err?.type || '창이 차단되었거나 닫혔습니다.'}`, true);
+      },
+    });
+    tokenClient.requestAccessToken({ prompt: 'select_account' });
+  } catch (err) {
+    if (btn) btn.disabled = false;
+    setCoverLockReason(`Google OAuth 초기화 오류: ${err.message}`, true);
+  }
+}
+
+async function initAuthGateAndAutoLock() {
+  bindInactivityListeners();
+  document.title = COVER_DISGUISE_TITLE;
+  const existing = readAuthSession();
+  if (existing && Date.now() - (existing.lastActiveAt || 0) < INACTIVITY_LIMIT_MS) {
+    await unlockAppSession(existing.email);
+  } else {
+    if (existing) {
+      lockSessionNow('timeout');
+    } else {
+      lockSessionNow('initial');
+    }
+  }
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+  initCosmosBackground();
+  await initAuthGateAndAutoLock();
 });
 
 window.addEventListener('keydown', (e) => {
