@@ -49,6 +49,10 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+function escapeJsSingleQuoteAttr(str) {
+  return escapeHtml(String(str ?? '').replace(/\\/g, '\\\\')).replace(/&#39;/g, "\\'");
+}
+
 function safeUrl(url) {
   const s = String(url ?? '').trim();
   if (/^https?:\/\//i.test(s)) return escapeHtml(s);
@@ -75,7 +79,10 @@ const LUCIDE_PATHS = {
   key: '<path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/>',
   bell: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
   folder: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
-  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'
+  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+  monitor: '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>'
 };
 
 function icon(name, size = 14) {
@@ -181,7 +188,7 @@ function removeExpiredFromSaved() {
 }
 
 const SHEETS_WEBAPP_URL_STORAGE_KEY = 'MOONPD_SHEETS_WEBAPP_URL';
-const DEFAULT_SHEETS_WEBAPP_URL = '';
+const DEFAULT_SHEETS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyZByXAUTKZuY3it7MesO2SOWhf1MqECAa5vO3HMmN8dQ-E-ieFy2dnb68M-r4cvGgwsw/exec';
 
 function getSheetsWebAppUrl() {
   const stored = (localStorage.getItem(SHEETS_WEBAPP_URL_STORAGE_KEY) || '').trim();
@@ -219,10 +226,22 @@ async function pullSavedJobsFromGoogleSheets(showFeedback = false) {
 
     const incomingMap = data.savedCategoryMap || {};
     const incomingCats = Array.isArray(data.savedCategories) ? data.savedCategories : [];
-    if (incomingCats.length) {
-      savedCategories = Array.from(new Set([...DEFAULT_SAVED_CATEGORIES, ...savedCategories, ...incomingCats]));
-      localStorage.setItem('MOONPD_SAVED_CATEGORIES', JSON.stringify(savedCategories));
+    const incomingKeys = Object.keys(incomingMap);
+    const localKeys = Object.keys(savedCategoryMap);
+
+    if (incomingKeys.length === 0 && localKeys.length > 0) {
+      // 원격 시트가 비어 있고 로컬에 관심공고가 있으면 로컬 데이터를 유지하고 시트로 업로드
+      schedulePushSavedJobsToSheets();
+      if (showFeedback) {
+        showToast(`로컬 관심공고 ${localKeys.length}건을 유지하고 Google Sheets로 업로드를 예약했습니다.`);
+      }
+      return true;
     }
+
+    const mapCatValues = Object.values(incomingMap).map(stripLeadingEmoji).filter(Boolean);
+    savedCategories = Array.from(new Set([...DEFAULT_SAVED_CATEGORIES, ...savedCategories, ...incomingCats, ...mapCatValues]));
+    localStorage.setItem('MOONPD_SAVED_CATEGORIES', JSON.stringify(savedCategories));
+
     savedCategoryMap = { ...incomingMap };
     localStorage.setItem('MOONPD_SAVED_CATEGORY_MAP', JSON.stringify(savedCategoryMap));
     localStorage.setItem('MOONPD_SAVED_JOBS', JSON.stringify(Object.keys(savedCategoryMap)));
@@ -664,7 +683,7 @@ function renderQuickKeywordBar() {
   bar.innerHTML = `
     <button type="button" class="btn ${curQ === '' ? 'btn-primary' : 'btn-outline'} btn-sm" onclick="quickKeyword('')">전체</button>
     ${quickKeywords.map(kw => {
-      const safeAttr = escapeHtml(kw).replace(/&#39;/g, "\\'");
+      const safeAttr = escapeJsSingleQuoteAttr(kw);
       return `<button type="button" class="btn ${curQ === kw ? 'btn-primary' : 'btn-outline'} btn-sm" onclick="quickKeyword('${safeAttr}')">${escapeHtml(kw)}</button>`;
     }).join('')}
     <button type="button" class="btn btn-outline btn-sm" onclick="addCustomQuickKeywordPrompt()" title="자주 쓰는 검색 키워드 칩 추가">${icon('plus', 13)} 키워드</button>
@@ -676,7 +695,7 @@ function addCustomQuickKeywordPrompt() {
     title: '검색 키워드 추가',
     message: '상단에 고정할 검색 키워드를 입력하세요.',
     placeholder: '예: 브랜드 마케터, SNS 기획, 광고 AE, 드론 촬영',
-    onSubmit: (kw) => {
+    onSubmit: async (kw) => {
       const clean = kw.trim();
       if (!clean) return;
       if (!quickKeywords.includes(clean)) {
@@ -685,8 +704,7 @@ function addCustomQuickKeywordPrompt() {
           localStorage.setItem('MOONPD_QUICK_KEYWORDS', JSON.stringify(quickKeywords));
         } catch (e) {}
       }
-      quickKeyword(clean);
-      triggerLiveCrawl();
+      await quickKeyword(clean);
     }
   });
 }
@@ -1033,12 +1051,63 @@ let authHeartbeatInterval = null;
 let authListenersBound = false;
 let authDataBootstrapped = false;
 
+function sha256FallbackHex(text) {
+  const bytes = new TextEncoder().encode(text);
+  const K = [
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+  ];
+  const H = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+  const bitLen = bytes.length * 8;
+  const paddedLen = Math.ceil((bytes.length + 9) / 64) * 64;
+  const padded = new Uint8Array(paddedLen);
+  padded.set(bytes);
+  padded[bytes.length] = 0x80;
+  const view = new DataView(padded.buffer);
+  view.setUint32(paddedLen - 8, Math.floor(bitLen / 0x100000000), false);
+  view.setUint32(paddedLen - 4, bitLen >>> 0, false);
+
+  const w = new Uint32Array(64);
+  const rotr = (x, n) => (x >>> n) | (x << (32 - n));
+  for (let offset = 0; offset < paddedLen; offset += 64) {
+    for (let i = 0; i < 16; i++) w[i] = view.getUint32(offset + i * 4, false);
+    for (let i = 16; i < 64; i++) {
+      const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+      const s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
+    }
+    let [a, b, c, d, e, f, g, h] = H;
+    for (let i = 0; i < 64; i++) {
+      const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+      const ch = (e & f) ^ (~e & g);
+      const temp1 = (h + S1 + ch + K[i] + w[i]) >>> 0;
+      const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const temp2 = (S0 + maj) >>> 0;
+      h = g; g = f; f = e; e = (d + temp1) >>> 0;
+      d = c; c = b; b = a; a = (temp1 + temp2) >>> 0;
+    }
+    H[0] = (H[0] + a) >>> 0; H[1] = (H[1] + b) >>> 0; H[2] = (H[2] + c) >>> 0; H[3] = (H[3] + d) >>> 0;
+    H[4] = (H[4] + e) >>> 0; H[5] = (H[5] + f) >>> 0; H[6] = (H[6] + g) >>> 0; H[7] = (H[7] + h) >>> 0;
+  }
+  return H.map(v => v.toString(16).padStart(8, '0')).join('');
+}
+
 async function sha256Hex(text) {
-  const data = new TextEncoder().encode(text);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+  if (window.crypto && window.crypto.subtle) {
+    const data = new TextEncoder().encode(text);
+    const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hashBuffer))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+  return sha256FallbackHex(text);
 }
 
 function setCoverLockReason(message, isError = false) {
@@ -1150,12 +1219,27 @@ async function bootstrapAuthenticatedAppData() {
   await Promise.all([
     fetchLatestDataFromServer(),
     refreshAiCareerDataFromServer(),
-    pullSavedJobsFromGoogleSheets(false),
   ]);
+  await pullSavedJobsFromGoogleSheets(false);
   mergeBrowserCrawledCache();
   populateSiteFilterOptions();
   renderQuickKeywordBar();
   onFilterChanged();
+}
+
+function updateModeSwitchButton() {
+  const btn = document.getElementById('modeSwitchBtn');
+  if (!btn) return;
+  if (IS_LOCAL_SERVER) {
+    btn.href = 'https://xlun-auto.github.io/moonpd-system/';
+    btn.title = 'GitHub Pages 웹 버전 열기';
+    btn.innerHTML = `${icon('globe', 14)} 웹용 보기`;
+  } else {
+    btn.href = 'http://localhost:8090/';
+    btn.title = '로컬 PC 서버(Start_MoonPD_System.bat) 실행 중일 때 접속';
+    btn.innerHTML = `${icon('monitor', 14)} PC용 보기`;
+  }
+  btn.style.display = 'inline-flex';
 }
 
 async function unlockAppSession(userId) {
@@ -1171,6 +1255,8 @@ async function unlockAppSession(userId) {
   if (cover) cover.style.display = 'none';
   if (shell) shell.style.display = 'block';
   document.title = APP_REAL_TITLE;
+  updateModeSwitchButton();
+  updateSelectionUI();
   startInactivityWatchdog();
   await bootstrapAuthenticatedAppData();
 }
@@ -1180,6 +1266,15 @@ function lockSessionNow(reason = 'manual') {
   sessionStorage.removeItem(SESSION_AUTH_KEY);
   const pwInput = document.getElementById('loginPassword');
   if (pwInput) pwInput.value = '';
+  closeDocModal();
+  const confirmModal = document.getElementById('confirmModal');
+  if (confirmModal) {
+    confirmModal.dataset.hasCancel = '';
+    confirmModal._onCancel = null;
+    confirmModal.classList.remove('open');
+  }
+  document.getElementById('batchFloatingBar')?.classList.remove('visible');
+  document.getElementById('toastNotification')?.classList.remove('show');
   const cover = document.getElementById('authCoverScreen');
   const shell = document.getElementById('mainAppShell');
   if (shell) shell.style.display = 'none';
@@ -1227,6 +1322,8 @@ async function handleResearchLoginSubmit(event) {
       return;
     }
     await unlockAppSession(userId);
+  } catch (err) {
+    setCoverLockReason('로그인 처리 중 오류가 발생했습니다. 다시 시도해 주세요.', true);
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -1615,7 +1712,10 @@ function openConfirmDialog({ title, message, subText, confirmLabel, onConfirm })
       if (typeof onConfirm === 'function') await onConfirm();
     };
   }
-  document.getElementById('confirmModal').classList.add('open');
+  const modal = document.getElementById('confirmModal');
+  modal.dataset.hasCancel = '';
+  modal._onCancel = null;
+  modal.classList.add('open');
 }
 
 function openInputDialog({ title, message, placeholder, defaultValue, subText, onSubmit, onCancel }) {
@@ -1648,6 +1748,8 @@ function openInputDialog({ title, message, placeholder, defaultValue, subText, o
     btn.textContent = '확인';
     btn.onclick = async () => {
       const val = inputEl ? inputEl.value : '';
+      modal.dataset.hasCancel = '';
+      modal._onCancel = null;
       closeConfirmModal();
       if (typeof onSubmit === 'function') await onSubmit(val);
     };
@@ -1928,7 +2030,7 @@ function renderSavedTab(area) {
           전체 <span class="num">(${allSaved.length})</span>
         </button>
         ${savedCategories.map(cat => {
-          const safeAttr = escapeHtml(cat).replace(/&#39;/g, "\\'");
+          const safeAttr = escapeJsSingleQuoteAttr(cat);
           return `
             <button type="button" class="cat-pill ${activeSavedCategoryFilter === cat ? 'active' : ''}" onclick="setSavedCategoryFilter('${safeAttr}')">
               ${escapeHtml(cat)} <span class="num">(${catCounts[cat] || 0})</span>
@@ -1950,11 +2052,12 @@ function renderSavedTab(area) {
   }
 
   if (savedGroupViewMode && activeSavedCategoryFilter === 'ALL') {
-    const activeCats = savedCategories.filter(c => (catCounts[c] || 0) > 0);
+    const allGroupCats = Array.from(new Set([...savedCategories, ...Object.keys(catCounts)]));
+    const activeCats = allGroupCats.filter(c => (catCounts[c] || 0) > 0);
     area.innerHTML = filterBarHtml + activeCats.map(cat => {
       const groupItems = filteredItems.filter(item => (savedCategoryMap[item.id] || autoDetectCategory(item)) === cat);
       if (!groupItems.length) return '';
-      const safeAttr = escapeHtml(cat).replace(/&#39;/g, "\\'");
+      const safeAttr = escapeJsSingleQuoteAttr(cat);
       return `
         <div class="cat-group-box">
           <div class="cat-group-header">
@@ -2289,7 +2392,7 @@ function renderCareerAnalysisTab(area) {
 
       <div class="cards-grid career-cards-grid">
         ${roleProfiles.map(rp => {
-          const safeKwAttr = escapeHtml(rp.keyword).replace(/&#39;/g, "\\'");
+          const safeKwAttr = escapeJsSingleQuoteAttr(rp.keyword);
           return `
             <article class="item-card">
               <div>
@@ -2464,8 +2567,11 @@ function renderAnalyticsAndResumeTab(area) {
         <label class="field-label">포트폴리오 구글 드라이브 링크
           <input id="resPortfolioUrl" class="${inputClass}" ${readonlyAttr} value="${escapeHtml(masterResume.portfolioDriveUrl || GOOGLE_DRIVE_URL)}" />
         </label>
-        <label class="field-label" style="grid-column: 1 / -1;">보유 기술 및 자동화 강점
-          <input id="resTools" class="${inputClass}" ${readonlyAttr} value="${escapeHtml(masterResume.tools || '')}${masterResume.techAutomation ? ' | ' + escapeHtml(masterResume.techAutomation) : ''}" />
+        <label class="field-label" style="grid-column: 1 / -1;">보유 기술 및 툴
+          <input id="resTools" class="${inputClass}" ${readonlyAttr} value="${escapeHtml(masterResume.tools || '')}" />
+        </label>
+        <label class="field-label" style="grid-column: 1 / -1;">핵심 기술 자동화 강점
+          <input id="resTechAutomation" class="${inputClass}" ${readonlyAttr} value="${escapeHtml(masterResume.techAutomation || '')}" />
         </label>
         <label class="field-label" style="grid-column: 1 / -1;">핵심 경력 요약 (줄바꿈 구분 · 지원서 자동 변환에 반영됨)
           <textarea id="resCareer" class="${inputClass}" ${readonlyAttr} style="min-height:90px;resize:vertical;">${escapeHtml((masterResume.coreCareer || []).join('\n'))}</textarea>
@@ -2522,10 +2628,12 @@ function downloadSaraminLatestResume() {
 ${(masterResume.coreCareer || []).map((c, i) => `${i + 1}. ${c}`).join('\n')}
 `;
   const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' });
+  const blobUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  a.href = blobUrl;
   a.download = `사람인_최신이력서_문PD_${new Date().toISOString().slice(0, 10)}.txt`;
   a.click();
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
   showToast('마스터 이력서가 PC에 다운로드되었습니다.');
 }
 
@@ -2712,6 +2820,7 @@ function requestSaveEditedResume() {
   const newPortfolio = document.getElementById('resPortfolio')?.value || masterResume.portfolioMain;
   const newPortfolioUrl = document.getElementById('resPortfolioUrl')?.value || masterResume.portfolioDriveUrl;
   const newTools = document.getElementById('resTools')?.value || masterResume.tools;
+  const newTechAutomation = document.getElementById('resTechAutomation')?.value ?? masterResume.techAutomation;
   const newCareer = (document.getElementById('resCareer')?.value || '').split('\n').map(s => s.trim()).filter(Boolean);
 
   openConfirmDialog({
@@ -2729,6 +2838,7 @@ function requestSaveEditedResume() {
         portfolioMain: newPortfolio,
         portfolioDriveUrl: newPortfolioUrl,
         tools: newTools,
+        techAutomation: newTechAutomation,
         coreCareer: newCareer
       });
       let serverSaved = false;
@@ -3131,10 +3241,12 @@ async function saveModalContentToFile() {
   }
 
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const blobUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  a.href = blobUrl;
   a.download = currentModalFilename;
   a.click();
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
   showToast(`${currentModalFilename} 다운로드 완료`);
 }
 
@@ -3180,10 +3292,15 @@ async function fetchViaCorsProxy(targetUrl) {
     `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`
   ];
   for (const pUrl of proxies) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
     try {
-      const res = await fetch(pUrl, { cache: 'no-store' });
+      const res = await fetch(pUrl, { cache: 'no-store', signal: controller.signal });
       if (res.ok) return await res.text();
-    } catch (e) {}
+    } catch (e) {
+    } finally {
+      clearTimeout(timer);
+    }
   }
   return '';
 }
@@ -3405,45 +3522,47 @@ async function triggerLiveCrawl() {
 
   showToast(kw ? `'${kw}' 키워드 실시간 수집 중...` : '전체 키워드 실시간 수집 중...');
 
-  let handledByLocalServer = false;
-  if (IS_LOCAL_SERVER) {
-    try {
-      const res = await fetch('/api/crawl', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword: kw })
-      });
-      if (res.ok) {
-        appData = await res.json();
-        invalidateCaches();
-        mergeBrowserCrawledCache();
-        populateSiteFilterOptions();
-        handledByLocalServer = true;
-        onFilterChanged();
-        const matchedNow =
-          (appData.jobs || []).filter(x => matchesSearchAndFilter(x, false)).length +
-          (appData.albas || []).filter(x => matchesSearchAndFilter(x, false)).length +
-          (appData.freelances || []).filter(x => matchesSearchAndFilter(x, false)).length +
-          (appData.contests || []).filter(x => matchesSearchAndFilter(x, false)).length;
-        showToast(`'${kw || '전체'}' 실시간 수집 완료 (활성 ${matchedNow}건)`);
-      }
-    } catch (e) {}
-  }
+  try {
+    let handledByLocalServer = false;
+    if (IS_LOCAL_SERVER) {
+      try {
+        const res = await fetch('/api/crawl', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keyword: kw })
+        });
+        if (res.ok) {
+          appData = await res.json();
+          invalidateCaches();
+          mergeBrowserCrawledCache();
+          populateSiteFilterOptions();
+          handledByLocalServer = true;
+          onFilterChanged();
+          const matchedNow =
+            (appData.jobs || []).filter(x => matchesSearchAndFilter(x, false)).length +
+            (appData.albas || []).filter(x => matchesSearchAndFilter(x, false)).length +
+            (appData.freelances || []).filter(x => matchesSearchAndFilter(x, false)).length +
+            (appData.contests || []).filter(x => matchesSearchAndFilter(x, false)).length;
+          showToast(`'${kw || '전체'}' 실시간 수집 완료 (활성 ${matchedNow}건)`);
+        }
+      } catch (e) {}
+    }
 
-  if (!handledByLocalServer) {
-    const addedCount = await crawlKeywordDirectlyInBrowser(kw || '마케팅');
-    onFilterChanged();
-    const matchedNow =
-      (appData.jobs || []).filter(x => matchesSearchAndFilter(x, false)).length +
-      (appData.albas || []).filter(x => matchesSearchAndFilter(x, false)).length +
-      (appData.freelances || []).filter(x => matchesSearchAndFilter(x, false)).length +
-      (appData.contests || []).filter(x => matchesSearchAndFilter(x, false)).length;
-    showToast(`'${kw || '전체'}' 수집 완료 (신규 ${addedCount}건 · 활성 ${matchedNow}건)`);
-  }
-
-  if (btn) {
-    btn.disabled = false;
-    btn.innerHTML = orig;
+    if (!handledByLocalServer) {
+      const addedCount = await crawlKeywordDirectlyInBrowser(kw || '마케팅');
+      onFilterChanged();
+      const matchedNow =
+        (appData.jobs || []).filter(x => matchesSearchAndFilter(x, false)).length +
+        (appData.albas || []).filter(x => matchesSearchAndFilter(x, false)).length +
+        (appData.freelances || []).filter(x => matchesSearchAndFilter(x, false)).length +
+        (appData.contests || []).filter(x => matchesSearchAndFilter(x, false)).length;
+      showToast(`'${kw || '전체'}' 수집 완료 (신규 ${addedCount}건 · 활성 ${matchedNow}건)`);
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = orig;
+    }
   }
 }
 
