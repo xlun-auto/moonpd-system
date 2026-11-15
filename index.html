@@ -3,12 +3,69 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>문PD 커리어 · 캐시카우</title>
-  <link rel="stylesheet" href="styles.css?v=cosmos6" />
+  <title>MarketLens — 미디어·콘텐츠 시장조사 리서치</title>
+  <link rel="stylesheet" href="styles.css?v=cosmos7" />
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
   <canvas id="cosmosCanvas" aria-hidden="true"></canvas>
-  <div class="app-shell">
+
+  <!-- 시장조사 앱 위장 표지 및 Google 계정 인증 게이트 (5분 미사용 시 자동 복귀) -->
+  <section id="authCoverScreen" class="cover-screen" aria-label="MarketLens 시장조사 로그인">
+    <div class="cover-card">
+      <div class="cover-top-badge">
+        <span class="cover-dot"></span>
+        <span>MARKET RESEARCH WORKSPACE · v2.4</span>
+      </div>
+      <div class="cover-brand">
+        <div class="cover-logo" aria-hidden="true">ML</div>
+        <div>
+          <h1 class="cover-title">MarketLens Intelligence</h1>
+          <p class="cover-subtitle">미디어 · 커머스 · 콘텐츠 산업 시장 동향 및 채널 트렌드 분석 플랫폼</p>
+        </div>
+      </div>
+
+      <div class="cover-metrics">
+        <div class="cover-metric-tile">
+          <div class="cover-metric-num num">27</div>
+          <div class="cover-metric-label">모니터링 채널</div>
+        </div>
+        <div class="cover-metric-tile">
+          <div class="cover-metric-num num">AI</div>
+          <div class="cover-metric-label">섹터 트렌드 진단</div>
+        </div>
+        <div class="cover-metric-tile">
+          <div class="cover-metric-num num">5m</div>
+          <div class="cover-metric-label">비활성 자동 잠금</div>
+        </div>
+      </div>
+
+      <div id="coverLockReason" class="cover-notice" style="display:none;"></div>
+
+      <div class="cover-actions">
+        <button type="button" id="googleAuthBtn" class="btn btn-primary cover-login-btn" onclick="startGoogleAuthSignIn()">
+          <svg class="ui-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Google 계정 인증 후 리서치 시작
+        </button>
+      </div>
+
+      <div id="coverOAuthSetupBox" class="cover-setup-box" style="display:none;">
+        <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px;">
+          Google OAuth 클라이언트 ID가 아직 등록되지 않았습니다. Google Cloud Console에서 2단계 인증 완료 후 발급받은 웹 클라이언트 ID(<code>...apps.googleusercontent.com</code>)를 입력하세요.
+        </div>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="googleClientIdInput" class="field-input" placeholder="123456789-xxx.apps.googleusercontent.com" />
+          <button type="button" class="btn btn-primary btn-sm" onclick="saveGoogleClientIdFromCover()">저장</button>
+        </div>
+      </div>
+
+      <p class="cover-footnote">
+        허가된 연구자 계정(<code>sgstarceo@gmail.com</code>) 전용 · 5분 미사용 시 표지 화면으로 자동 전환됩니다.
+      </p>
+    </div>
+  </section>
+
+  <div class="app-shell" id="mainAppShell" style="display:none;">
     <!-- 상단 헤더 -->
     <header class="top-header">
       <div class="header-inner">
@@ -23,6 +80,10 @@
         </div>
 
         <div class="header-actions">
+          <button type="button" class="btn btn-outline btn-sm" onclick="lockSessionNow('manual')" title="즉시 잠금 (표지로 이동)">
+            <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            잠금
+          </button>
           <a class="btn btn-outline btn-sm" href="https://docs.google.com/spreadsheets/d/1wReNF82GUdAZb4c0_bFFI2kbU6grpapVz7fZqD2EFQE/edit" target="_blank" rel="noopener" title="구글 시트 DB 열기">
             <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
             시트
@@ -235,6 +296,6 @@
 
   <script src="data/db_seed.js"></script>
   <script src="data/ai_career_seed.js"></script>
-  <script src="app.js?v=cosmos6"></script>
+  <script src="app.js?v=cosmos7"></script>
 </body>
 </html>
