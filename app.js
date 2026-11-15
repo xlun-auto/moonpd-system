@@ -180,6 +180,143 @@ function removeExpiredFromSaved() {
   showToast(`마감·기간경과된 관심공고 ${removed}건을 정리했습니다.`);
 }
 
+const SHEETS_WEBAPP_URL_STORAGE_KEY = 'MOONPD_SHEETS_WEBAPP_URL';
+const DEFAULT_SHEETS_WEBAPP_URL = '';
+
+function getSheetsWebAppUrl() {
+  const stored = (localStorage.getItem(SHEETS_WEBAPP_URL_STORAGE_KEY) || '').trim();
+  return (DEFAULT_SHEETS_WEBAPP_URL || stored).trim();
+}
+
+let sheetsPushTimer = null;
+function schedulePushSavedJobsToSheets() {
+  const url = getSheetsWebAppUrl();
+  if (!url) return;
+  if (sheetsPushTimer) clearTimeout(sheetsPushTimer);
+  sheetsPushTimer = setTimeout(() => {
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        action: 'saveSavedJobs',
+        savedIds: Object.keys(savedCategoryMap),
+        savedCategoryMap,
+        savedCategories
+      })
+    }).catch(() => {});
+  }, 400);
+}
+
+async function pullSavedJobsFromGoogleSheets(showFeedback = false) {
+  const url = getSheetsWebAppUrl();
+  if (!url) return false;
+  try {
+    const sep = url.includes('?') ? '&' : '?';
+    const res = await fetch(`${url}${sep}action=getSavedJobs&t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!data || !data.ok || !data.savedCategoryMap) throw new Error('응답 형식 오류');
+
+    const incomingMap = data.savedCategoryMap || {};
+    const incomingCats = Array.isArray(data.savedCategories) ? data.savedCategories : [];
+    if (incomingCats.length) {
+      savedCategories = Array.from(new Set([...DEFAULT_SAVED_CATEGORIES, ...savedCategories, ...incomingCats]));
+      localStorage.setItem('MOONPD_SAVED_CATEGORIES', JSON.stringify(savedCategories));
+    }
+    savedCategoryMap = { ...incomingMap };
+    localStorage.setItem('MOONPD_SAVED_CATEGORY_MAP', JSON.stringify(savedCategoryMap));
+    localStorage.setItem('MOONPD_SAVED_JOBS', JSON.stringify(Object.keys(savedCategoryMap)));
+    if (IS_LOCAL_SERVER) {
+      fetch('/api/saved-jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          savedIds: Object.keys(savedCategoryMap),
+          savedCategoryMap,
+          savedCategories,
+          updatedAt: new Date().toLocaleString()
+        })
+      }).catch(() => {});
+    }
+    if (showFeedback) {
+      showToast(`Google Sheets에서 관심공고 ${Object.keys(savedCategoryMap).length}건을 동기화했습니다.`);
+    }
+    return true;
+  } catch (err) {
+    if (showFeedback) {
+      showToast(`Google Sheets 동기화 실패: ${err.message}`);
+    }
+    return false;
+  }
+}
+
+function openSheetsSyncConfigModal() {
+  const current = getSheetsWebAppUrl();
+  openInputDialog({
+    title: 'Google Sheets 자동 동기화 설정',
+    message: 'Google_WebApp_Code.gs를 웹 앱으로 배포한 URL(https://script.google.com/macros/s/.../exec)을 입력하세요.',
+    placeholder: 'https://script.google.com/macros/s/.../exec',
+    defaultValue: current,
+    subText: '1회 등록 시 웹 버전·집 PC·회사 PC의 관심공고가 Google Sheets와 자동 동기화됩니다.',
+    onSubmit: async (input) => {
+      const clean = input.trim();
+      if (!clean) {
+        localStorage.removeItem(SHEETS_WEBAPP_URL_STORAGE_KEY);
+        showToast('Google Sheets 동기화 URL이 해제되었습니다.');
+        onFilterChanged();
+        return;
+      }
+      if (!clean.startsWith('https://script.google.com/')) {
+        showToast('올바른 Google Apps Script 웹앱 URL(https://script.google.com/...)을 입력해 주세요.');
+        return;
+      }
+      localStorage.setItem(SHEETS_WEBAPP_URL_STORAGE_KEY, clean);
+      const ok = await pullSavedJobsFromGoogleSheets(true);
+      if (!ok) {
+        schedulePushSavedJobsToSheets();
+      }
+      onFilterChanged();
+    }
+  });
+}
+
+function exportSavedJobsToClipboard() {
+  const payload = JSON.stringify({ savedCategoryMap, savedCategories });
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(payload)
+      .then(() => showToast(`관심공고 ${Object.keys(savedCategoryMap).length}건 데이터를 클립보드에 복사했습니다.`))
+      .catch(() => showToast('복사에 실패했습니다.'));
+  } else {
+    showToast('이 브라우저에서는 클립보드 복사가 지원되지 않습니다.');
+  }
+}
+
+function importSavedJobsFromJsonPrompt() {
+  openInputDialog({
+    title: '관심공고 JSON 가져오기',
+    message: '다른 PC나 웹 버전에서 복사한 관심공고 JSON을 붙여넣으세요.',
+    placeholder: '{"savedCategoryMap":{...},"savedCategories":[...]}',
+    subText: '기존 관심공고와 병합되어 즉시 저장됩니다.',
+    onSubmit: (input) => {
+      try {
+        const parsed = JSON.parse(input.trim());
+        const map = parsed.savedCategoryMap || {};
+        const cats = Array.isArray(parsed.savedCategories) ? parsed.savedCategories : [];
+        if (cats.length) {
+          savedCategories = Array.from(new Set([...DEFAULT_SAVED_CATEGORIES, ...savedCategories, ...cats]));
+          persistSavedCategories();
+        }
+        savedCategoryMap = { ...savedCategoryMap, ...map };
+        persistSavedCategoryMap();
+        onFilterChanged();
+        showToast(`관심공고 ${Object.keys(map).length}건을 병합했습니다.`);
+      } catch {
+        showToast('올바른 JSON 형식이 아닙니다.');
+      }
+    }
+  });
+}
+
 function persistSavedCategoryMap() {
   try {
     localStorage.setItem('MOONPD_SAVED_CATEGORY_MAP', JSON.stringify(savedCategoryMap));
@@ -197,6 +334,7 @@ function persistSavedCategoryMap() {
       })
     }).catch(() => {});
   }
+  schedulePushSavedJobsToSheets();
 }
 
 function getSavedCount() {
@@ -1009,7 +1147,11 @@ function startInactivityWatchdog() {
 async function bootstrapAuthenticatedAppData() {
   if (authDataBootstrapped) return;
   authDataBootstrapped = true;
-  await Promise.all([fetchLatestDataFromServer(), refreshAiCareerDataFromServer()]);
+  await Promise.all([
+    fetchLatestDataFromServer(),
+    refreshAiCareerDataFromServer(),
+    pullSavedJobsFromGoogleSheets(false),
+  ]);
   mergeBrowserCrawledCache();
   populateSiteFilterOptions();
   renderQuickKeywordBar();
@@ -1123,6 +1265,15 @@ async function fetchLatestDataFromServer() {
     const res = await fetch('/api/data', { cache: 'no-store' });
     if (res.ok) {
       appData = await res.json();
+      if (Array.isArray(appData.savedCategories) && appData.savedCategories.length) {
+        savedCategories = Array.from(new Set([...DEFAULT_SAVED_CATEGORIES, ...savedCategories, ...appData.savedCategories]));
+        localStorage.setItem('MOONPD_SAVED_CATEGORIES', JSON.stringify(savedCategories));
+      }
+      if (appData.savedCategoryMap && typeof appData.savedCategoryMap === 'object') {
+        savedCategoryMap = { ...appData.savedCategoryMap, ...savedCategoryMap };
+        localStorage.setItem('MOONPD_SAVED_CATEGORY_MAP', JSON.stringify(savedCategoryMap));
+        localStorage.setItem('MOONPD_SAVED_JOBS', JSON.stringify(Object.keys(savedCategoryMap)));
+      }
       invalidateCaches();
     }
   } catch (e) {}
@@ -1759,6 +1910,11 @@ function renderSavedTab(area) {
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
         <span style="font-weight:600;" class="num">관심공고함 (총 ${allSaved.length}건 · 활성 ${allSaved.length - expiredSavedItems.length}건 / 마감 ${expiredSavedItems.length}건)</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="openSheetsSyncConfigModal()">
+            ${icon('cloud', 13)} ${getSheetsWebAppUrl() ? 'Sheets 동기화됨' : 'Sheets 동기화 설정'}
+          </button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="exportSavedJobsToClipboard()" title="현재 관심공고 JSON 복사">복사</button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="importSavedJobsFromJsonPrompt()" title="다른 기기 관심공고 JSON 붙여넣기">가져오기</button>
           <button type="button" class="btn btn-outline btn-sm" onclick="toggleSavedGroupViewMode()">
             ${savedGroupViewMode ? '단일 그리드로 보기' : '카테고리별 묶음 보기'}
           </button>
