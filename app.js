@@ -883,8 +883,8 @@ function initCosmosBackground() {
   rafId = requestAnimationFrame(loop);
 }
 
-const ALLOWED_RESEARCH_IDS = ['sgstarceo', 'sgstarceo@gmail.com'];
-const RESEARCH_PASSWORD_HASH = '6986ab3185fe122aac75a972c19de377aadd696befd970f55945325e022b8fc3';
+const ALLOWED_RESEARCH_IDS = ['andymun'];
+const RESEARCH_PASSWORD_HASH = '438ea118a31f25c5ea6635c696899b4376c494a0d99b6b99e818fb9f6756aa2d';
 const INACTIVITY_LIMIT_MS = 5 * 60 * 1000;
 const SESSION_AUTH_KEY = 'marketlens_auth_session_v1';
 const COVER_DISGUISE_TITLE = 'MarketLens — 미디어·콘텐츠 시장조사 리서치';
