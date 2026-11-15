@@ -1213,15 +1213,61 @@ function startInactivityWatchdog() {
   }, 15000);
 }
 
+async function fetchFreshSeedJson(relPath, globalVarName) {
+  if (IS_LOCAL_SERVER || location.protocol === 'file:') return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 1200);
+  try {
+    const res = await fetch(`${relPath}?t=${Date.now()}`, {
+      cache: 'no-store',
+      signal: controller.signal
+    });
+    if (!res.ok) return null;
+    const raw = (await res.text()).trim();
+    const prefixRe = new RegExp(`^(?:window\\.)?${globalVarName}\\s*=\\s*`);
+    const jsonStr = raw.replace(prefixRe, '').replace(/;\s*$/, '').trim();
+    if (!jsonStr.startsWith('{')) return null;
+    return JSON.parse(jsonStr);
+  } catch (e) {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchFreshWebSeeds() {
+  const [freshDb, freshAi] = await Promise.all([
+    fetchFreshSeedJson('data/db_seed.js', 'MOONPD_SEED_DATA'),
+    fetchFreshSeedJson('data/ai_career_seed.js', 'MOONPD_AI_CAREER_ANALYSIS')
+  ]);
+  if (freshDb && Array.isArray(freshDb.jobs)) {
+    appData = freshDb;
+    invalidateCaches();
+  }
+  if (freshAi && freshAi.roles) {
+    aiCareerCache = freshAi;
+    try {
+      localStorage.setItem('moonpd_ai_career_v1', JSON.stringify(freshAi));
+    } catch (e) {}
+  }
+}
+
 async function bootstrapAuthenticatedAppData() {
   if (authDataBootstrapped) return;
   authDataBootstrapped = true;
-  await Promise.all([
-    fetchLatestDataFromServer(),
-    refreshAiCareerDataFromServer(),
-  ]);
-  await pullSavedJobsFromGoogleSheets(false);
-  mergeBrowserCrawledCache();
+  if (IS_LOCAL_SERVER) {
+    await Promise.all([
+      fetchLatestDataFromServer(),
+      refreshAiCareerDataFromServer(),
+    ]);
+    await pullSavedJobsFromGoogleSheets(false);
+  } else {
+    await Promise.all([
+      fetchFreshWebSeeds(),
+      pullSavedJobsFromGoogleSheets(false),
+    ]);
+    mergeBrowserCrawledCache();
+  }
   populateSiteFilterOptions();
   renderQuickKeywordBar();
   onFilterChanged();
@@ -3534,7 +3580,6 @@ async function triggerLiveCrawl() {
         if (res.ok) {
           appData = await res.json();
           invalidateCaches();
-          mergeBrowserCrawledCache();
           populateSiteFilterOptions();
           handledByLocalServer = true;
           onFilterChanged();
