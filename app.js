@@ -1218,7 +1218,7 @@ function startInactivityWatchdog() {
 async function fetchFreshSeedJson(relPath, globalVarName) {
   if (HAS_BACKEND_API || location.protocol === 'file:') return null;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 1200);
+  const timer = setTimeout(() => controller.abort(), 6000);
   try {
     const res = await fetch(`${relPath}?t=${Date.now()}`, {
       cache: 'no-store',
@@ -1268,7 +1268,6 @@ async function bootstrapAuthenticatedAppData() {
       fetchFreshWebSeeds(),
       pullSavedJobsFromGoogleSheets(false),
     ]);
-    mergeBrowserCrawledCache();
   }
   populateSiteFilterOptions();
   renderQuickKeywordBar();
