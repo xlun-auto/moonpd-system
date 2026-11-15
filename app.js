@@ -1279,8 +1279,8 @@ function updateModeSwitchButton() {
   const btn = document.getElementById('modeSwitchBtn');
   if (!btn) return;
   if (IS_LOCAL_SERVER) {
-    btn.href = 'https://xlun-auto.github.io/moonpd-system/';
-    btn.title = 'GitHub Pages 웹 버전 열기';
+    btn.href = 'https://fluffy-sunburst-d49e2e.netlify.app/';
+    btn.title = 'Netlify 클라우드 웹 버전 열기';
     btn.innerHTML = `${icon('globe', 14)} 웹용 보기`;
   } else {
     btn.href = 'http://localhost:8090/';
