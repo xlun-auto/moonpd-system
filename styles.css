@@ -1283,7 +1283,7 @@ body::after {
    ============================================================================ */
 .cover-screen {
   position: relative;
-  z-index: 2;
+  z-index: 2500;
   min-height: 100vh;
   display: flex;
   align-items: center;
