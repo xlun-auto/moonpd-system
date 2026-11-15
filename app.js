@@ -6,6 +6,8 @@ const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1wReNF82GUdAZb4
 const GOOGLE_DRIVE_URL = 'https://drive.google.com/drive/folders/1iLuXv3tbem-SzHNn-erlbLdtH2Yxyf5K';
 const SARAMIN_RESUME_MANAGE_URL = 'https://www.saramin.co.kr/zf_user/member/resume-manage/list';
 const IS_LOCAL_SERVER = location.protocol !== 'file:' && (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
+const IS_NETLIFY_SERVER = location.hostname.endsWith('.netlify.app') || location.hostname === 'xlun.kr' || (location.protocol !== 'file:' && !IS_LOCAL_SERVER && location.hostname !== 'xlun-auto.github.io');
+const HAS_BACKEND_API = IS_LOCAL_SERVER || IS_NETLIFY_SERVER;
 
 let appData = window.MOONPD_SEED_DATA || {
   lastUpdated: new Date().toLocaleString(),
@@ -1214,7 +1216,7 @@ function startInactivityWatchdog() {
 }
 
 async function fetchFreshSeedJson(relPath, globalVarName) {
-  if (IS_LOCAL_SERVER || location.protocol === 'file:') return null;
+  if (HAS_BACKEND_API || location.protocol === 'file:') return null;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 1200);
   try {
@@ -1255,7 +1257,7 @@ async function fetchFreshWebSeeds() {
 async function bootstrapAuthenticatedAppData() {
   if (authDataBootstrapped) return;
   authDataBootstrapped = true;
-  if (IS_LOCAL_SERVER) {
+  if (HAS_BACKEND_API) {
     await Promise.all([
       fetchLatestDataFromServer(),
       refreshAiCareerDataFromServer(),
@@ -1403,7 +1405,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 async function fetchLatestDataFromServer() {
-  if (!IS_LOCAL_SERVER) return;
+  if (!HAS_BACKEND_API) return;
   try {
     const res = await fetch('/api/data', { cache: 'no-store' });
     if (res.ok) {
@@ -1672,8 +1674,8 @@ function updateKpiAndCounts() {
 
   const badge = document.getElementById('syncStatusBadge');
   if (badge) {
-    badge.classList.toggle('web-mode', !IS_LOCAL_SERVER);
-    const modeLabel = IS_LOCAL_SERVER ? '로컬' : '웹';
+    badge.classList.toggle('web-mode', !HAS_BACKEND_API);
+    const modeLabel = IS_LOCAL_SERVER ? '로컬' : (IS_NETLIFY_SERVER ? '클라우드' : '웹');
     badge.textContent = `${modeLabel} · ${visibleAll.length}건 · ${avgProb}%`;
   }
 }
@@ -2179,7 +2181,7 @@ function getAiCareerData() {
 }
 
 async function refreshAiCareerDataFromServer() {
-  if (!IS_LOCAL_SERVER) return;
+  if (!HAS_BACKEND_API) return;
   try {
     const res = await fetch('/api/ai-career-data', { cache: 'no-store' });
     if (res.ok) {
@@ -2285,7 +2287,7 @@ async function executeGeminiAnalysis(apiKey) {
   }
   try {
     let data;
-    if (IS_LOCAL_SERVER) {
+    if (HAS_BACKEND_API) {
       const res = await fetch('/api/ai-career-analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2317,18 +2319,20 @@ async function executeGeminiAnalysis(apiKey) {
 }
 
 async function triggerGeminiCareerAnalysis(askKey = false) {
-  if (!IS_LOCAL_SERVER) {
-    showToast('웹 버전은 저장된 AI 분석 결과 열람 전용입니다. 실시간 Gemini AI 재분석은 PC 버전(http://localhost:8090/)에서 실행해 주세요.');
+  if (!HAS_BACKEND_API) {
+    showToast('웹 버전은 저장된 AI 분석 결과 열람 전용입니다. 실시간 Gemini AI 재분석은 PC(localhost:8090) 또는 클라우드 버전에서 실행해 주세요.');
     return;
   }
 
   const currentAi = getAiCareerData();
   if (askKey || !currentAi.hasApiKey) {
     openInputDialog({
-      title: 'Gemini API 키 설정 (로컬 서버)',
+      title: 'Gemini API 키 설정',
       message: 'Google AI Studio(https://aistudio.google.com/apikey)에서 발급받은 Gemini API 키를 입력하세요.',
       placeholder: 'AIza...',
-      subText: '1회 입력 시 PC의 moonpd_system/data/gemini_config.json에 저장됩니다.',
+      subText: IS_LOCAL_SERVER
+        ? '1회 입력 시 PC의 moonpd_system/data/gemini_config.json에 저장됩니다.'
+        : '입력한 키로 클라우드 서버에서 즉시 Gemini AI 분석을 실행합니다.',
       onSubmit: async (input) => {
         const clean = input.trim();
         if (!clean && !currentAi.hasApiKey) {
@@ -2419,11 +2423,11 @@ function renderCareerAnalysisTab(area) {
         <span class="num">AI 커리어 직군분석 (수집 공고 ${aiData.sourceCount || getAllItemsWithTrack().length}건 × 문PD 이력서 실증 비교)</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <span class="status-chip num">평균 채용예측률 ${overallAvg}%</span>
-          ${IS_LOCAL_SERVER ? `
+          ${HAS_BACKEND_API ? `
             <button type="button" id="btn-gemini-reanalyze" class="btn btn-primary btn-sm" onclick="triggerGeminiCareerAnalysis(false)">${icon('sparkles', 13)} Gemini AI 실시간 심층분석</button>
             <button type="button" class="btn btn-outline btn-sm" onclick="triggerGeminiCareerAnalysis(true)">${icon('key', 13)} ${aiData.hasApiKey ? 'API 키 변경' : 'API 키 설정'}</button>
           ` : `
-            <span class="status-chip" title="보안상 웹 버전에서는 저장된 AI 분석 결과만 열람할 수 있습니다.">웹 열람 전용 · 실시간 AI 분석은 PC 버전(localhost:8090) 이용</span>
+            <span class="status-chip" title="보안상 정적 웹 버전에서는 저장된 AI 분석 결과만 열람할 수 있습니다.">웹 열람 전용 · 실시간 AI 분석은 PC(localhost:8090) 또는 클라우드 버전 이용</span>
           `}
           <button type="button" class="btn btn-outline btn-sm" onclick="addCustomQuickKeywordPrompt()">${icon('plus', 13)} 키워드 추가</button>
         </div>
@@ -2504,14 +2508,14 @@ function renderCareerAnalysisTab(area) {
     <div class="panel-card">
       <h3>
         <span>매일 공고 확인 · 채용확률 90% 이상 신규공고 카카오톡 알림</span>
-        <span class="status-chip">${IS_LOCAL_SERVER ? '로컬 서버 연동 가능' : '로컬 PC 전용 기능'}</span>
+        <span class="status-chip">${HAS_BACKEND_API ? '서버 연동 가능' : '로컬/클라우드 전용 기능'}</span>
       </h3>
       <div class="one-liner" style="margin-bottom:12px;-webkit-line-clamp:unset;">
         • <strong>동작 방식:</strong> 매일 오전 09:00 자동 수집기(<code>crawler.ps1</code>)가 최신 공고를 확인한 뒤, <strong>신규 공고 중 채용확률 90% 이상</strong>인 공고만 추려 카카오톡 나에게 보내기로 전송합니다.<br/>
-        • <strong>실행 환경:</strong> ${IS_LOCAL_SERVER ? '현재 로컬 PC 서버(localhost:8090)에 연결되어 테스트 발송이 가능합니다.' : '현재 웹 뷰어 모드입니다. 카카오톡 발송 테스트는 로컬 PC 서버(http://localhost:8090) 실행 시 사용할 수 있습니다.'}
+        • <strong>실행 환경:</strong> ${HAS_BACKEND_API ? '현재 백엔드 서버에 연결되어 테스트 발송이 가능합니다.' : '현재 정적 웹 뷰어 모드입니다. 카카오톡 발송 테스트는 로컬 PC 서버(http://localhost:8090) 또는 클라우드 버전에서 사용할 수 있습니다.'}
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-        <button type="button" class="btn btn-primary btn-sm" onclick="testKakaoNotifyViaServer()" ${IS_LOCAL_SERVER ? '' : 'disabled title="로컬 PC 서버 실행 시 사용 가능"'}>
+        <button type="button" class="btn btn-primary btn-sm" onclick="testKakaoNotifyViaServer()" ${HAS_BACKEND_API ? '' : 'disabled title="로컬 PC 서버 또는 클라우드 버전 실행 시 사용 가능"'}>
           ${icon('bell', 13)} 카카오톡 알림 테스트 발송
         </button>
         <span class="chip">스크립트: moonpd_system/kakao_notify.ps1</span>
@@ -2521,8 +2525,8 @@ function renderCareerAnalysisTab(area) {
 }
 
 async function testKakaoNotifyViaServer() {
-  if (!IS_LOCAL_SERVER) {
-    showToast('카카오톡 발송 테스트는 로컬 PC 서버(http://localhost:8090)에서만 지원됩니다.');
+  if (!HAS_BACKEND_API) {
+    showToast('카카오톡 발송 테스트는 로컬 PC 서버(http://localhost:8090) 또는 클라우드 버전에서만 지원됩니다.');
     return;
   }
   showToast('카카오톡 알림 발송 테스트 요청 중...');
@@ -3570,7 +3574,7 @@ async function triggerLiveCrawl() {
 
   try {
     let handledByLocalServer = false;
-    if (IS_LOCAL_SERVER) {
+    if (HAS_BACKEND_API) {
       try {
         const res = await fetch('/api/crawl', {
           method: 'POST',
