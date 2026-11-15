@@ -4,13 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MarketLens — 미디어·콘텐츠 시장조사 리서치</title>
-  <link rel="stylesheet" href="styles.css?v=cosmos7" />
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <link rel="stylesheet" href="styles.css?v=cosmos8" />
 </head>
 <body>
   <canvas id="cosmosCanvas" aria-hidden="true"></canvas>
 
-  <!-- 시장조사 앱 위장 표지 및 Google 계정 인증 게이트 (5분 미사용 시 자동 복귀) -->
+  <!-- 시장조사 앱 위장 표지 및 ID/PW 인증 게이트 (5분 미사용 시 자동 복귀) -->
   <section id="authCoverScreen" class="cover-screen" aria-label="MarketLens 시장조사 로그인">
     <div class="cover-card">
       <div class="cover-top-badge">
@@ -42,25 +41,25 @@
 
       <div id="coverLockReason" class="cover-notice" style="display:none;"></div>
 
-      <div class="cover-actions">
-        <button type="button" id="googleAuthBtn" class="btn btn-primary cover-login-btn" onclick="startGoogleAuthSignIn()">
-          <svg class="ui-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          Google 계정 인증 후 리서치 시작
-        </button>
-      </div>
-
-      <div id="coverOAuthSetupBox" class="cover-setup-box" style="display:none;">
-        <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px;">
-          Google OAuth 클라이언트 ID가 아직 등록되지 않았습니다. Google Cloud Console에서 2단계 인증 완료 후 발급받은 웹 클라이언트 ID(<code>...apps.googleusercontent.com</code>)를 입력하세요.
+      <form id="coverLoginForm" class="cover-login-form" onsubmit="handleResearchLoginSubmit(event)">
+        <div class="cover-field-group">
+          <label class="cover-field-label" for="loginUserId">리서처 ID</label>
+          <input type="text" id="loginUserId" class="field-input cover-input" placeholder="리서처 ID 입력" autocomplete="username" required />
         </div>
-        <div style="display:flex;gap:6px;">
-          <input type="text" id="googleClientIdInput" class="field-input" placeholder="123456789-xxx.apps.googleusercontent.com" />
-          <button type="button" class="btn btn-primary btn-sm" onclick="saveGoogleClientIdFromCover()">저장</button>
+        <div class="cover-field-group">
+          <label class="cover-field-label" for="loginPassword">액세스 비밀번호</label>
+          <input type="password" id="loginPassword" class="field-input cover-input" placeholder="비밀번호 입력" autocomplete="current-password" required />
         </div>
-      </div>
+        <div class="cover-actions">
+          <button type="submit" id="researchLoginBtn" class="btn btn-primary cover-login-btn">
+            <svg class="ui-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            리서치 워크스페이스 입장
+          </button>
+        </div>
+      </form>
 
       <p class="cover-footnote">
-        허가된 연구자 계정(<code>sgstarceo@gmail.com</code>) 전용 · 5분 미사용 시 표지 화면으로 자동 전환됩니다.
+        승인된 리서처 계정 전용 · 5분 미사용 시 표지 화면으로 자동 전환됩니다.
       </p>
     </div>
   </section>
@@ -296,6 +295,6 @@
 
   <script src="data/db_seed.js"></script>
   <script src="data/ai_career_seed.js"></script>
-  <script src="app.js?v=cosmos7"></script>
+  <script src="app.js?v=cosmos8"></script>
 </body>
 </html>
