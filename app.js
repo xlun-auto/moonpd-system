@@ -2013,27 +2013,7 @@ async function executeGeminiAnalysis(apiKey) {
 
 async function triggerGeminiCareerAnalysis(askKey = false) {
   if (!IS_LOCAL_SERVER) {
-    const savedKey = localStorage.getItem('moonpd_gemini_api_key') || '';
-    if (askKey || !savedKey) {
-      openInputDialog({
-        title: 'Gemini API 키 설정 (웹 버전)',
-        message: 'Google AI Studio(https://aistudio.google.com/apikey)에서 발급받은 Gemini API 키를 입력하세요.',
-        placeholder: 'AIza...',
-        defaultValue: savedKey,
-        subText: '입력한 키는 이 브라우저의 localStorage에만 저장됩니다.',
-        onSubmit: async (input) => {
-          const clean = input.trim();
-          if (!clean) {
-            showToast('API 키가 입력되지 않았습니다.');
-            return;
-          }
-          localStorage.setItem('moonpd_gemini_api_key', clean);
-          await executeGeminiAnalysis(clean);
-        }
-      });
-      return;
-    }
-    await executeGeminiAnalysis(savedKey);
+    showToast('웹 버전은 저장된 AI 분석 결과 열람 전용입니다. 실시간 Gemini AI 재분석은 PC 버전(http://localhost:8090/)에서 실행해 주세요.');
     return;
   }
 
@@ -2134,8 +2114,12 @@ function renderCareerAnalysisTab(area) {
         <span class="num">AI 커리어 직군분석 (수집 공고 ${aiData.sourceCount || getAllItemsWithTrack().length}건 × 문PD 이력서 실증 비교)</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <span class="status-chip num">평균 채용예측률 ${overallAvg}%</span>
-          <button type="button" id="btn-gemini-reanalyze" class="btn btn-primary btn-sm" onclick="triggerGeminiCareerAnalysis(false)">${icon('sparkles', 13)} Gemini AI 실시간 심층분석</button>
-          <button type="button" class="btn btn-outline btn-sm" onclick="triggerGeminiCareerAnalysis(true)">${icon('key', 13)} API 키 설정</button>
+          ${IS_LOCAL_SERVER ? `
+            <button type="button" id="btn-gemini-reanalyze" class="btn btn-primary btn-sm" onclick="triggerGeminiCareerAnalysis(false)">${icon('sparkles', 13)} Gemini AI 실시간 심층분석</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="triggerGeminiCareerAnalysis(true)">${icon('key', 13)} ${aiData.hasApiKey ? 'API 키 변경' : 'API 키 설정'}</button>
+          ` : `
+            <span class="status-chip" title="보안상 웹 버전에서는 저장된 AI 분석 결과만 열람할 수 있습니다.">웹 열람 전용 · 실시간 AI 분석은 PC 버전(localhost:8090) 이용</span>
+          `}
           <button type="button" class="btn btn-outline btn-sm" onclick="addCustomQuickKeywordPrompt()">${icon('plus', 13)} 키워드 추가</button>
         </div>
       </h3>
