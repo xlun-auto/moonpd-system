@@ -1473,3 +1473,260 @@ body::after {
   text-align: center;
   line-height: 1.45;
 }
+
+/* ============================================================================
+   Dooray 일정·프로젝트 허브 (Cosmic Liquid Glass)
+   ============================================================================ */
+.hub-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.hub-filter-group,
+.hub-action-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hub-grid-2col {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 960px) {
+  .hub-grid-2col {
+    grid-template-columns: 1fr;
+  }
+}
+
+.hub-event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.hub-event-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.hub-event-date {
+  min-width: 68px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  color: var(--color-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.hub-event-date.is-today {
+  background: rgba(129, 140, 248, 0.25);
+  border-color: rgba(129, 140, 248, 0.55);
+  color: #e0e7ff;
+}
+
+.hub-event-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.hub-event-subject {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hub-event-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.gantt-wrap {
+  position: relative;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.gantt-inner {
+  min-width: 580px;
+  position: relative;
+}
+
+.gantt-header {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.gantt-ruler {
+  position: relative;
+  height: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.gantt-rows {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.gantt-row {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.gantt-label {
+  font-size: 12px;
+  color: var(--text-sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.gantt-track {
+  position: relative;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.gantt-today-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: rgba(244, 63, 94, 0.75);
+  box-shadow: 0 0 8px rgba(244, 63, 94, 0.5);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.gantt-bar {
+  position: absolute;
+  top: 3px;
+  height: 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  cursor: pointer;
+  transition: transform 0.12s ease, filter 0.12s ease;
+  z-index: 3;
+}
+
+.gantt-bar:hover {
+  transform: scaleY(1.15);
+  filter: brightness(1.15);
+}
+
+.gantt-bar.proj-xlun {
+  background: linear-gradient(90deg, rgba(14, 165, 233, 0.85), rgba(56, 189, 248, 0.92));
+}
+
+.gantt-bar.proj-sungho {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.85), rgba(168, 85, 247, 0.92));
+}
+
+.gantt-bar.proj-other {
+  background: linear-gradient(90deg, rgba(20, 184, 166, 0.85), rgba(45, 212, 191, 0.92));
+}
+
+.gantt-bar.wf-closed {
+  opacity: 0.42;
+  filter: grayscale(0.5);
+}
+
+.gantt-bar.wf-working {
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.45);
+}
+
+.hub-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hub-task-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.hub-task-row.is-closed {
+  opacity: 0.58;
+}
+
+.hub-task-main {
+  min-width: 0;
+  flex: 1 1 260px;
+}
+
+.hub-task-title {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-main);
+  margin-top: 4px;
+}
+
+.hub-task-row.is-closed .hub-task-title {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.hub-task-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hub-form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
