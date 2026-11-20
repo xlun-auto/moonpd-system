@@ -84,7 +84,8 @@ const LUCIDE_PATHS = {
   zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
   cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
   globe: '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
-  monitor: '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>'
+  monitor: '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>'
 };
 
 function icon(name, size = 14) {
@@ -1314,6 +1315,7 @@ function lockSessionNow(reason = 'manual') {
   const pwInput = document.getElementById('loginPassword');
   if (pwInput) pwInput.value = '';
   closeDocModal();
+  closeDoorayModal();
   const confirmModal = document.getElementById('confirmModal');
   if (confirmModal) {
     confirmModal.dataset.hasCancel = '';
@@ -1400,6 +1402,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     closeDocModal();
     closeConfirmModal();
+    closeDoorayModal();
   }
 });
 
@@ -1694,6 +1697,9 @@ function switchTab(tabName) {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tabName);
   });
+  if (tabName === 'life_hub' && HAS_BACKEND_API && !doorayOverview && !doorayLoading) {
+    fetchDoorayOverview(false);
+  }
   renderActiveTab();
 }
 
@@ -1886,6 +1892,7 @@ function renderActiveTab() {
   else if (currentTab === 'career_analysis') renderCareerAnalysisTab(area);
   else if (currentTab === 'radar') renderRadarTab(area);
   else if (currentTab === 'analytics') renderAnalyticsAndResumeTab(area);
+  else if (currentTab === 'life_hub') renderLifeHubTab(area);
 }
 
 function renderPostingCard(item, trackType, ctaLabel) {
@@ -1934,6 +1941,9 @@ function renderPostingCard(item, trackType, ctaLabel) {
       <div class="card-footer">
         <button type="button" class="btn btn-primary btn-sm" onclick="openConvertedDocModal('${trackType}', '${safeId}')">
           ${icon('sparkles', 13)} ${ctaLabel}
+        </button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="sendItemToDooray('${safeId}')" title="Dooray 업무·캘린더로 보내기">
+          ${icon('calendar', 12)} 두레이
         </button>
         <a class="btn btn-outline btn-sm" href="${safeUrl(item.url)}" target="_blank" rel="noopener">
           원문 ${icon('external', 12)}
@@ -2026,6 +2036,9 @@ function renderSavedCardHtml(item) {
       <div class="card-footer">
         <button type="button" class="btn btn-primary btn-sm" onclick="openConvertedDocModal('${escapeHtml(item._track)}', '${safeId}')">
           ${icon('sparkles', 13)} 진단·지원
+        </button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="sendItemToDooray('${safeId}')" title="Dooray 업무·캘린더로 보내기">
+          ${icon('calendar', 12)} 두레이
         </button>
         <a class="btn btn-outline btn-sm" href="${safeUrl(item.url)}" target="_blank" rel="noopener">
           원문 ${icon('external', 12)}
@@ -3657,4 +3670,601 @@ function showToast(msg) {
   el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 3400);
+}
+
+// ============================================================================
+// 15. Dooray 일정·프로젝트 허브 & 커리어 연동
+// ============================================================================
+let doorayOverview = null;
+let doorayLoading = false;
+let doorayError = '';
+let doorayProjectFilter = 'ALL';
+let doorayIncludeClosed = false;
+
+async function fetchDoorayOverview(showFeedback = false) {
+  if (!HAS_BACKEND_API) return null;
+  if (doorayLoading) return doorayOverview;
+  doorayLoading = true;
+  doorayError = '';
+  if (currentTab === 'life_hub') renderActiveTab();
+  try {
+    const res = await fetch(`/api/dooray/overview?t=${Date.now()}`, { cache: 'no-store' });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) {
+      throw new Error(data.message || `HTTP ${res.status}`);
+    }
+    doorayOverview = data;
+    if (showFeedback) showToast('Dooray 일정 및 프로젝트 데이터를 새로고침했습니다.');
+    return data;
+  } catch (err) {
+    doorayError = err.message || 'Dooray 연동 오류';
+    if (showFeedback) showToast(`Dooray 불러오기 실패: ${doorayError}`);
+    return null;
+  } finally {
+    doorayLoading = false;
+    if (currentTab === 'life_hub') renderActiveTab();
+  }
+}
+
+function setDoorayProjectFilter(projCode) {
+  doorayProjectFilter = projCode;
+  renderActiveTab();
+}
+
+function toggleDoorayIncludeClosed() {
+  doorayIncludeClosed = !doorayIncludeClosed;
+  renderActiveTab();
+}
+
+function closeDoorayModal() {
+  document.getElementById('doorayModal')?.classList.remove('open');
+}
+
+function formatDoorayDateBadge(isoStr) {
+  if (!isoStr) return { label: '-', isToday: false };
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return { label: String(isoStr).slice(5, 10), isToday: false };
+  const now = new Date();
+  const isToday = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return { label: isToday ? '오늘' : `${mm}.${dd} (${weekdays[d.getDay()]})`, isToday };
+}
+
+function formatDoorayEventTime(ev) {
+  if (ev.wholeDayFlag) return '종일';
+  const s = ev.startedAt ? new Date(ev.startedAt) : null;
+  const e = ev.endedAt ? new Date(ev.endedAt) : null;
+  if (!s || isNaN(s.getTime())) return '시간 미정';
+  const fmt = (dt) => `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+  return (e && !isNaN(e.getTime())) ? `${fmt(s)} ~ ${fmt(e)}` : fmt(s);
+}
+
+function getDoorayProjectClass(code) {
+  const upper = String(code || '').toUpperCase();
+  if (upper === 'XLUN') return 'proj-xlun';
+  if (upper === 'SUNGHO') return 'proj-sungho';
+  return 'proj-other';
+}
+
+function getDoorayWorkflowLabel(wf) {
+  if (wf === 'closed') return '완료';
+  if (wf === 'working') return '진행중';
+  return '등록';
+}
+
+function renderDoorayGanttHtml(tasks) {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const todayMid = new Date();
+  todayMid.setHours(0, 0, 0, 0);
+  const winStart = todayMid.getTime() - 7 * dayMs;
+  const winEnd = todayMid.getTime() + 21 * dayMs;
+  const totalSpan = winEnd - winStart;
+
+  const fmtShort = (ms) => {
+    const d = new Date(ms);
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  };
+
+  if (!tasks.length) {
+    return `<div class="one-liner" style="-webkit-line-clamp:unset;">표시할 프로젝트 업무가 없습니다.</div>`;
+  }
+
+  const rowsHtml = tasks.slice(0, 30).map(t => {
+    const createdMs = t.createdAt ? new Date(t.createdAt).getTime() : todayMid.getTime();
+    const startRaw = isNaN(createdMs) ? todayMid.getTime() : createdMs;
+    const dueMs = t.dueDate ? new Date(t.dueDate).getTime() : (startRaw + 3 * dayMs);
+    const endRaw = isNaN(dueMs) ? (startRaw + 3 * dayMs) : Math.max(dueMs, startRaw + dayMs);
+
+    const clampedStart = Math.max(winStart, Math.min(winEnd - dayMs, startRaw));
+    const clampedEnd = Math.min(winEnd, Math.max(clampedStart + dayMs, endRaw));
+    const leftPct = ((clampedStart - winStart) / totalSpan) * 100;
+    const widthPct = Math.max(3.5, ((clampedEnd - clampedStart) / totalSpan) * 100);
+
+    const projClass = getDoorayProjectClass(t.projectCode);
+    const wfClass = `wf-${t.workflowClass || 'registered'}`;
+    const safeProjId = escapeJsSingleQuoteAttr(t.projectId || '');
+    const safePostId = escapeJsSingleQuoteAttr(t.id || '');
+    const safeDue = escapeJsSingleQuoteAttr(t.dueDate ? String(t.dueDate).slice(0, 10) : '');
+    const safeSubj = escapeJsSingleQuoteAttr(t.subject || '');
+    const onBarClick = t.workflowClass !== 'closed'
+      ? `dooraySetTaskDone('${safeProjId}', '${safePostId}')`
+      : `openEditDoorayDueDateModal('${safeProjId}', '${safePostId}', '${safeDue}', '${safeSubj}')`;
+    const tooltip = `[${t.projectCode || 'PRJ'}] ${t.subject || ''} (${getDoorayWorkflowLabel(t.workflowClass)}${t.dueDate ? ' · 마감 ' + String(t.dueDate).slice(0, 10) : ''})`;
+
+    return `
+      <div class="gantt-row">
+        <div class="gantt-label" title="${escapeHtml(tooltip)}">
+          <span class="badge-site" style="flex-shrink:0;">${escapeHtml(t.projectCode || 'PRJ')}</span>
+          <span style="overflow:hidden;text-overflow:ellipsis;">${escapeHtml(t.subject || '(제목 없음)')}</span>
+        </div>
+        <div class="gantt-track">
+          <div class="gantt-today-line" style="left:25%;" title="오늘"></div>
+          <div
+            class="gantt-bar ${projClass} ${wfClass}"
+            style="left:${leftPct.toFixed(2)}%;width:${widthPct.toFixed(2)}%;"
+            title="${escapeHtml(tooltip)} — 클릭 시 ${t.workflowClass !== 'closed' ? '완료 처리' : '마감일 수정'}"
+            onclick="${onBarClick}"
+          ></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="gantt-wrap">
+      <div class="gantt-inner">
+        <div class="gantt-header">
+          <span>업무 (${tasks.length}건)</span>
+          <div class="gantt-ruler">
+            <span>${fmtShort(winStart)} (-7d)</span>
+            <span style="color:#fda4af;font-weight:600;">오늘 (${fmtShort(todayMid.getTime())})</span>
+            <span>${fmtShort(todayMid.getTime() + 7 * dayMs)} (+7d)</span>
+            <span>${fmtShort(winEnd)} (+21d)</span>
+          </div>
+        </div>
+        <div class="gantt-rows">${rowsHtml}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderLifeHubTab(area) {
+  if (!HAS_BACKEND_API) {
+    area.innerHTML = `
+      <div class="panel-card">
+        <h3>
+          <span>${icon('calendar', 15)} Dooray 일정·프로젝트 허브</span>
+          <span class="status-chip">서버 연동 필요</span>
+        </h3>
+        <div class="one-liner" style="-webkit-line-clamp:unset;margin-top:8px;">
+          Dooray 캘린더·프로젝트 조회 및 제어 기능은 보안상 <strong>Netlify 클라우드</strong> 또는 <strong>로컬 PC 서버(http://localhost:8090)</strong> 환경에서만 사용할 수 있습니다.
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const projects = doorayOverview?.projects || [];
+  const allTasks = doorayOverview?.tasks || [];
+  const calendars = doorayOverview?.calendars || [];
+  const allEvents = doorayOverview?.events || [];
+
+  const filteredTasks = allTasks.filter(t => {
+    if (!doorayIncludeClosed && t.workflowClass === 'closed') return false;
+    if (doorayProjectFilter !== 'ALL' && String(t.projectCode || t.projectId) !== doorayProjectFilter) return false;
+    return true;
+  });
+
+  const nowMid = new Date();
+  nowMid.setHours(0, 0, 0, 0);
+  const horizonMs = nowMid.getTime() + 14 * 24 * 60 * 60 * 1000;
+  const calMap = new Map(calendars.map(c => [String(c.id), c.name]));
+
+  const upcomingEvents = allEvents
+    .filter(ev => {
+      const s = ev.startedAt ? new Date(ev.startedAt).getTime() : NaN;
+      const e = ev.endedAt ? new Date(ev.endedAt).getTime() : s;
+      if (isNaN(s)) return false;
+      return e >= nowMid.getTime() && s <= horizonMs;
+    })
+    .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
+
+  const projectPillsHtml = [
+    `<button type="button" class="cat-pill ${doorayProjectFilter === 'ALL' ? 'active' : ''}" onclick="setDoorayProjectFilter('ALL')">전체</button>`,
+    ...projects.map(p => {
+      const code = p.code || p.id;
+      const safeCode = escapeJsSingleQuoteAttr(code);
+      return `<button type="button" class="cat-pill ${doorayProjectFilter === code ? 'active' : ''}" onclick="setDoorayProjectFilter('${safeCode}')">${escapeHtml(code)}</button>`;
+    })
+  ].join('');
+
+  area.innerHTML = `
+    <div class="panel-card" style="margin-bottom:16px;">
+      <div class="hub-toolbar">
+        <div class="hub-filter-group">
+          <strong style="font-size:14px;font-weight:600;margin-right:6px;">${icon('calendar', 14)} Dooray 허브</strong>
+          ${projectPillsHtml}
+        </div>
+        <div class="hub-action-group">
+          <button type="button" class="btn btn-outline btn-sm ${doorayIncludeClosed ? 'btn-toggle-active' : ''}" onclick="toggleDoorayIncludeClosed()">
+            ${doorayIncludeClosed ? '완료 포함 ON' : '완료 포함'}
+          </button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="fetchDoorayOverview(true)" ${doorayLoading ? 'disabled' : ''}>
+            ${icon('refresh', 13)} ${doorayLoading ? '동기화 중...' : '새로고침'}
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" onclick="openNewDoorayTaskModal()">
+            ${icon('plus', 13)} 업무 추가
+          </button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="openNewDoorayEventModal()">
+            ${icon('plus', 13)} 일정 추가
+          </button>
+        </div>
+      </div>
+      ${doorayError ? `<div class="val-row val-warn" style="margin-top:8px;"><span>Dooray 연동 오류: ${escapeHtml(doorayError)}</span></div>` : ''}
+      ${doorayOverview?.member?.name ? `<div class="card-meta-line">연동 계정: <strong>${escapeHtml(doorayOverview.member.name)}</strong> · 프로젝트 ${projects.length}개 · 캘린더 ${calendars.length}개</div>` : ''}
+    </div>
+
+    <div class="hub-grid-2col">
+      <div class="panel-card">
+        <h3>
+          <span>향후 14일 캘린더 일정</span>
+          <span class="status-chip num">${upcomingEvents.length}건</span>
+        </h3>
+        <div class="hub-event-list" style="margin-top:10px;">
+          ${upcomingEvents.length ? upcomingEvents.map(ev => {
+            const dbadge = formatDoorayDateBadge(ev.startedAt);
+            const calName = ev.calendarName || ev.calendar?.name || calMap.get(String(ev.calendarId || ev.calendar?.id || '')) || '캘린더';
+            return `
+              <div class="hub-event-row">
+                <div class="hub-event-date ${dbadge.isToday ? 'is-today' : ''} num">${escapeHtml(dbadge.label)}</div>
+                <div class="hub-event-info">
+                  <div class="hub-event-subject">${escapeHtml(ev.subject || '(제목 없음)')}</div>
+                  <div class="hub-event-meta">
+                    <span class="badge-site">${escapeHtml(calName)}</span>
+                    <span class="num">${escapeHtml(formatDoorayEventTime(ev))}</span>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('') : `<div class="one-liner" style="-webkit-line-clamp:unset;">향후 14일 내 예정된 일정이 없습니다.</div>`}
+        </div>
+      </div>
+
+      <div class="panel-card">
+        <h3>
+          <span>프로젝트 타임라인 (28일 간트차트)</span>
+          <span class="status-chip num">-7d ~ +21d</span>
+        </h3>
+        <div style="margin-top:10px;">
+          ${renderDoorayGanttHtml(filteredTasks)}
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <h3>
+        <span>업무 실행 보드</span>
+        <span class="status-chip num">${filteredTasks.length}건</span>
+      </h3>
+      <div class="hub-task-list" style="margin-top:10px;">
+        ${filteredTasks.length ? filteredTasks.map(t => {
+          const isClosed = t.workflowClass === 'closed';
+          const dueStr = t.dueDate ? String(t.dueDate).slice(0, 10) : '마감일 미지정';
+          const safeProjId = escapeJsSingleQuoteAttr(t.projectId || '');
+          const safePostId = escapeJsSingleQuoteAttr(t.id || '');
+          const safeDue = escapeJsSingleQuoteAttr(t.dueDate ? String(t.dueDate).slice(0, 10) : '');
+          const safeSubj = escapeJsSingleQuoteAttr(t.subject || '');
+          return `
+            <div class="hub-task-row ${isClosed ? 'is-closed' : ''}">
+              <div class="hub-task-main">
+                <div class="badge-group">
+                  <span class="badge-site">${escapeHtml(t.projectCode || 'PRJ')}</span>
+                  <span class="badge-match ${t.workflowClass === 'working' ? 'high' : ''}">${getDoorayWorkflowLabel(t.workflowClass)}</span>
+                  <span class="chip num">마감: ${escapeHtml(dueStr)}</span>
+                </div>
+                <div class="hub-task-title">${escapeHtml(t.subject || '(제목 없음)')}</div>
+              </div>
+              <div class="hub-task-actions">
+                ${!isClosed ? `<button type="button" class="btn btn-primary btn-sm" onclick="dooraySetTaskDone('${safeProjId}', '${safePostId}')">${icon('check', 13)} 완료</button>` : ''}
+                <button type="button" class="btn btn-outline btn-sm" onclick="openEditDoorayDueDateModal('${safeProjId}', '${safePostId}', '${safeDue}', '${safeSubj}')">${icon('edit', 13)} 마감일</button>
+              </div>
+            </div>
+          `;
+        }).join('') : `<div class="one-liner" style="-webkit-line-clamp:unset;">조건에 해당하는 업무가 없습니다.</div>`}
+      </div>
+    </div>
+  `;
+}
+
+async function dooraySetTaskDone(projectId, postId) {
+  if (!HAS_BACKEND_API) return;
+  try {
+    const res = await fetch('/api/dooray/task', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'set-done', projectId, postId })
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) throw new Error(data.message || '완료 처리 실패');
+    showToast('Dooray 업무를 완료 처리했습니다.');
+    await fetchDoorayOverview(false);
+  } catch (err) {
+    showToast(`Dooray 오류: ${err.message}`);
+  }
+}
+
+function openEditDoorayDueDateModal(projectId, postId, currentDueDate, subject) {
+  const modal = document.getElementById('doorayModal');
+  const titleEl = document.getElementById('doorayModalTitle');
+  const bodyEl = document.getElementById('doorayModalBody');
+  const submitBtn = document.getElementById('doorayModalSubmitBtn');
+  if (!modal || !bodyEl || !submitBtn) return;
+
+  if (titleEl) titleEl.textContent = 'Dooray 업무 마감일 수정';
+  bodyEl.innerHTML = `
+    <div class="hub-form-stack">
+      <div style="font-size:13px;color:var(--text-sub);">${escapeHtml(subject || '')}</div>
+      <label class="field-label">마감일
+        <input type="date" id="doorayEditDueInput" class="field-input" value="${escapeHtml(currentDueDate || '')}" />
+      </label>
+    </div>
+  `;
+  submitBtn.textContent = '마감일 저장';
+  submitBtn.onclick = async () => {
+    const val = document.getElementById('doorayEditDueInput')?.value || '';
+    if (!val) {
+      showToast('마감일을 선택해 주세요.');
+      return;
+    }
+    submitBtn.disabled = true;
+    try {
+      const res = await fetch('/api/dooray/task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update',
+          projectId,
+          postId,
+          dueDate: `${val}T18:00:00+09:00`
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || data.ok === false) throw new Error(data.message || '수정 실패');
+      closeDoorayModal();
+      showToast('Dooray 업무 마감일이 수정되었습니다.');
+      await fetchDoorayOverview(false);
+    } catch (err) {
+      showToast(`수정 실패: ${err.message}`);
+    } finally {
+      submitBtn.disabled = false;
+    }
+  };
+  modal.classList.add('open');
+}
+
+function openNewDoorayTaskModal() {
+  const projects = doorayOverview?.projects || [];
+  if (!projects.length) {
+    showToast('프로젝트 목록을 먼저 불러오는 중입니다.');
+    fetchDoorayOverview(false);
+    return;
+  }
+  const modal = document.getElementById('doorayModal');
+  const titleEl = document.getElementById('doorayModalTitle');
+  const bodyEl = document.getElementById('doorayModalBody');
+  const submitBtn = document.getElementById('doorayModalSubmitBtn');
+  if (!modal || !bodyEl || !submitBtn) return;
+
+  if (titleEl) titleEl.textContent = '새 Dooray 업무 등록';
+  bodyEl.innerHTML = `
+    <div class="hub-form-stack">
+      <label class="field-label">프로젝트
+        <select id="doorayNewTaskProj" class="field-input">
+          ${projects.map(p => `<option value="${escapeHtml(p.id)}" ${String(p.code).toUpperCase() === 'XLUN' ? 'selected' : ''}>${escapeHtml(p.code || p.id)}</option>`).join('')}
+        </select>
+      </label>
+      <label class="field-label">업무 제목
+        <input type="text" id="doorayNewTaskSubject" class="field-input" placeholder="예: 포트폴리오 영상 수정 및 제출" />
+      </label>
+      <label class="field-label">마감일 (선택)
+        <input type="date" id="doorayNewTaskDue" class="field-input" />
+      </label>
+      <label class="field-label">상세 메모 (선택)
+        <textarea id="doorayNewTaskBody" class="field-input" style="min-height:80px;resize:vertical;" placeholder="업무 상세 내용을 입력하세요"></textarea>
+      </label>
+    </div>
+  `;
+  submitBtn.textContent = '업무 등록';
+  submitBtn.onclick = async () => {
+    const projectId = document.getElementById('doorayNewTaskProj')?.value || '';
+    const subject = (document.getElementById('doorayNewTaskSubject')?.value || '').trim();
+    const dueVal = document.getElementById('doorayNewTaskDue')?.value || '';
+    const content = (document.getElementById('doorayNewTaskBody')?.value || '').trim();
+    if (!projectId || !subject) {
+      showToast('프로젝트와 업무 제목을 입력해 주세요.');
+      return;
+    }
+    submitBtn.disabled = true;
+    try {
+      const payload = { action: 'create', projectId, subject, content: content || subject };
+      if (dueVal) payload.dueDate = `${dueVal}T18:00:00+09:00`;
+      const res = await fetch('/api/dooray/task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok || data.ok === false) throw new Error(data.message || '업무 등록 실패');
+      closeDoorayModal();
+      showToast('새 Dooray 업무가 등록되었습니다.');
+      await fetchDoorayOverview(false);
+    } catch (err) {
+      showToast(`업무 등록 실패: ${err.message}`);
+    } finally {
+      submitBtn.disabled = false;
+    }
+  };
+  modal.classList.add('open');
+}
+
+function openNewDoorayEventModal() {
+  const calendars = doorayOverview?.calendars || [];
+  const modal = document.getElementById('doorayModal');
+  const titleEl = document.getElementById('doorayModalTitle');
+  const bodyEl = document.getElementById('doorayModalBody');
+  const submitBtn = document.getElementById('doorayModalSubmitBtn');
+  if (!modal || !bodyEl || !submitBtn) return;
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  if (titleEl) titleEl.textContent = '새 Dooray 캘린더 일정 등록';
+  bodyEl.innerHTML = `
+    <div class="hub-form-stack">
+      ${calendars.length ? `
+        <label class="field-label">캘린더
+          <select id="doorayNewEvCal" class="field-input">
+            ${calendars.map(c => `<option value="${escapeHtml(c.id)}" ${(c.name || '').toLowerCase().includes('xlun') || c.type === 'private' ? 'selected' : ''}>${escapeHtml(c.name || c.id)}</option>`).join('')}
+          </select>
+        </label>
+      ` : ''}
+      <label class="field-label">일정 제목
+        <input type="text" id="doorayNewEvSubject" class="field-input" placeholder="예: 면접 미팅 / 외주 미팅" />
+      </label>
+      <label class="field-label">날짜
+        <input type="date" id="doorayNewEvDate" class="field-input" value="${todayIso}" />
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-sub);cursor:pointer;">
+        <input type="checkbox" id="doorayNewEvWholeDay" checked onchange="document.getElementById('doorayNewEvTimeRow').style.display=this.checked?'none':'grid';" />
+        종일 일정
+      </label>
+      <div id="doorayNewEvTimeRow" style="display:none;grid-template-columns:1fr 1fr;gap:8px;">
+        <label class="field-label">시작 시간 <input type="time" id="doorayNewEvStart" class="field-input" value="10:00" /></label>
+        <label class="field-label">종료 시간 <input type="time" id="doorayNewEvEnd" class="field-input" value="11:00" /></label>
+      </div>
+      <label class="field-label">메모 (선택)
+        <textarea id="doorayNewEvBody" class="field-input" style="min-height:68px;resize:vertical;"></textarea>
+      </label>
+    </div>
+  `;
+  submitBtn.textContent = '일정 등록';
+  submitBtn.onclick = async () => {
+    const calendarId = document.getElementById('doorayNewEvCal')?.value || '';
+    const subject = (document.getElementById('doorayNewEvSubject')?.value || '').trim();
+    const dateVal = document.getElementById('doorayNewEvDate')?.value || '';
+    const wholeDayFlag = Boolean(document.getElementById('doorayNewEvWholeDay')?.checked);
+    const startT = document.getElementById('doorayNewEvStart')?.value || '10:00';
+    const endT = document.getElementById('doorayNewEvEnd')?.value || '11:00';
+    const content = (document.getElementById('doorayNewEvBody')?.value || '').trim();
+
+    if (!subject || !dateVal) {
+      showToast('일정 제목과 날짜를 입력해 주세요.');
+      return;
+    }
+    const startedAt = wholeDayFlag ? `${dateVal}T00:00:00+09:00` : `${dateVal}T${startT}:00+09:00`;
+    const endedAt = wholeDayFlag ? `${dateVal}T23:59:59+09:00` : `${dateVal}T${endT}:00+09:00`;
+
+    submitBtn.disabled = true;
+    try {
+      const payload = { subject, startedAt, endedAt, wholeDayFlag, content };
+      if (calendarId) payload.calendarId = calendarId;
+      const res = await fetch('/api/dooray/event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok || data.ok === false) throw new Error(data.message || '일정 등록 실패');
+      closeDoorayModal();
+      showToast('새 Dooray 캘린더 일정이 등록되었습니다.');
+      await fetchDoorayOverview(false);
+    } catch (err) {
+      showToast(`일정 등록 실패: ${err.message}`);
+    } finally {
+      submitBtn.disabled = false;
+    }
+  };
+  modal.classList.add('open');
+}
+
+async function sendItemToDooray(itemId) {
+  if (!HAS_BACKEND_API) {
+    showToast('Dooray 전송은 Netlify 클라우드 또는 로컬 PC 서버(http://localhost:8090)에서 지원됩니다.');
+    return;
+  }
+  const item = findItemById(itemId);
+  if (!item) return;
+
+  showToast('Dooray로 공고 전송 중...');
+  try {
+    const overview = doorayOverview || await fetchDoorayOverview(false);
+    const projects = overview?.projects || [];
+    const calendars = overview?.calendars || [];
+    const targetProj = projects.find(p => String(p.code || '').toUpperCase() === 'XLUN') || projects[0];
+    if (!targetProj) throw new Error('연동된 Dooray 프로젝트가 없습니다.');
+
+    const sched = getScheduleMeta(item);
+    let dueDateStr = '';
+    if (item.deadlineDate && item.deadlineDate !== '2099-12-31' && /^\d{4}-\d{2}-\d{2}/.test(item.deadlineDate)) {
+      dueDateStr = item.deadlineDate.slice(0, 10);
+    } else if (!sched.isExpired && sched.dDaySort >= 0 && sched.dDaySort <= 90) {
+      const d = new Date();
+      d.setDate(d.getDate() + sched.dDaySort);
+      dueDateStr = d.toISOString().slice(0, 10);
+    }
+
+    const org = item.company || item.organizer || item.client || item.site || '';
+    const subject = `[${item.site || item.category || '공고'}] ${org ? org + ' — ' : ''}${item.title}`;
+    const content = [
+      `• 출처: ${item.site || item.category || '-'}`,
+      `• 기관/기업: ${org || '-'}`,
+      `• 지원기간: ${sched.applyPeriod}`,
+      `• 원문 URL: ${item.url || '-'}`,
+      `• 요약: ${item.jdSummary || item.summary || item.requestDetail || '-'}`
+    ].join('\n');
+
+    const taskPayload = {
+      action: 'create',
+      projectId: targetProj.id,
+      subject,
+      content
+    };
+    if (dueDateStr) taskPayload.dueDate = `${dueDateStr}T18:00:00+09:00`;
+
+    const taskRes = await fetch('/api/dooray/task', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(taskPayload)
+    });
+    const taskOut = await taskRes.json();
+    if (!taskRes.ok || taskOut.ok === false) throw new Error(taskOut.message || '업무 생성 실패');
+
+    let eventCreated = false;
+    if (dueDateStr) {
+      const targetCal = calendars.find(c => (c.name || '').toLowerCase().includes('xlun'))
+        || calendars.find(c => c.type === 'private')
+        || calendars[0];
+      const evPayload = {
+        subject: `[지원마감] ${org ? org + ' — ' : ''}${item.title}`,
+        startedAt: `${dueDateStr}T00:00:00+09:00`,
+        endedAt: `${dueDateStr}T23:59:59+09:00`,
+        wholeDayFlag: true,
+        content
+      };
+      if (targetCal) evPayload.calendarId = targetCal.id;
+      const evRes = await fetch('/api/dooray/event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(evPayload)
+      });
+      if (evRes.ok) eventCreated = true;
+    }
+
+    showToast(eventCreated
+      ? `[${targetProj.code || 'XLUN'}] 업무 및 마감일 캘린더 일정이 등록되었습니다.`
+      : `[${targetProj.code || 'XLUN'}] Dooray 업무로 등록되었습니다.`);
+    fetchDoorayOverview(false);
+  } catch (err) {
+    showToast(`Dooray 전송 실패: ${err.message}`);
+  }
 }
