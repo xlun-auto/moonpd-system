@@ -1737,13 +1737,15 @@ function updateContextChromeVisibility(tabName = currentTab) {
   const toolbar = document.querySelector('.toolbar');
   const kpiGrid = document.querySelector('.kpi-grid');
   if (toolbar) toolbar.style.display = isJobListTab ? '' : 'none';
-  if (kpiGrid) kpiGrid.style.display = tabName === 'life_hub' ? 'none' : '';
+  if (kpiGrid) kpiGrid.style.display = isJobListTab ? '' : 'none';
 }
 
 function switchTab(tabName) {
   currentTab = tabName;
   document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.tab === tabName);
+    const isActive = btn.dataset.tab === tabName;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
   });
   updateContextChromeVisibility(tabName);
   if (tabName === 'life_hub') {
@@ -4773,20 +4775,20 @@ function renderMarsStructurePopup(trackId, stateObj) {
     return;
   }
   const st = (stateObj || computeMarsTrackState())[trackId];
-  const pct = Math.round((st?.rate || 0) * 100);
   const meta = MARS_TRACK_META[trackId];
+  const sectorMap = {
+    'TRK-01': 'SEC-01 · WIND TURBINE',
+    'TRK-02': 'SEC-02 · SCOUT ROVER',
+    'TRK-03': 'SEC-03 · GEODESIC DOME',
+    'TRK-04': 'SEC-04 · HABITAT MODULE',
+  };
   popup.innerHTML = `
-    <div class="mars-popup-head">
-      <div>
-        <div class="mars-popup-title">${escapeHtml(meta.structure)}</div>
-        <div class="mars-popup-sub">${escapeHtml(meta.id)} · ${escapeHtml(meta.name)} (${st.completed}/${st.total} 완료)</div>
-      </div>
-      <button type="button" class="mars-popup-close" onclick="onMarsStructureSelected(null)">닫기</button>
+    <div class="mars-popup-compact">
+      <span class="mars-popup-dot" style="background:${meta.accent};box-shadow:0 0 8px ${meta.accent};"></span>
+      <span class="mars-popup-code">${escapeHtml(sectorMap[trackId] || trackId)}</span>
+      <span class="mars-popup-metric">${escapeHtml(meta.telemetryText(st.rate, st.completed))}</span>
+      <button type="button" class="mars-popup-close" onclick="onMarsStructureSelected(null)">전체</button>
     </div>
-    <div class="mars-popup-bar-bg">
-      <div class="mars-popup-bar-fill" style="width:${pct}%;background:${meta.accent};"></div>
-    </div>
-    <div class="mars-popup-metric">${escapeHtml(meta.telemetryText(st.rate, st.completed))}</div>
   `;
   popup.style.display = 'block';
 }
@@ -4888,13 +4890,13 @@ function renderMissionsTab(area) {
       const pct = Math.round(st.rate * 100);
       const isSelected = activeMarsTrackFilter === st.id;
       return `
-        <button type="button" class="track-stat-card ${isSelected ? 'active' : ''}" style="--track-accent:${st.accent}" onclick="setMarsTrackFilter('${isSelected ? 'ALL' : st.id}')">
+        <button type="button" class="track-stat-card ${isSelected ? 'active' : ''}" style="--track-accent:${st.accent}" title="${escapeHtml(st.effectLabel)}" onclick="setMarsTrackFilter('${isSelected ? 'ALL' : st.id}')">
           <div class="track-stat-top">
             <span class="track-code-badge">${escapeHtml(st.id)}</span>
             <span class="track-stat-rate num">${pct}%</span>
           </div>
-          <div class="track-stat-name">${escapeHtml(st.name)} · ${escapeHtml(st.structure)}</div>
-          <div class="track-stat-effect">${escapeHtml(st.effectLabel)}</div>
+          <div class="track-stat-name">${escapeHtml(st.name)}</div>
+          <div class="track-stat-effect num">${st.completed}/${st.total} 완료 · ${escapeHtml(st.structure)}</div>
           <div class="track-progress-bar">
             <div class="track-progress-fill" style="width:${pct}%"></div>
           </div>
@@ -4954,10 +4956,10 @@ function renderMissionsTab(area) {
 
       <form class="mission-add-bar" onsubmit="addMarsTaskFromInput(event)">
         <select id="marsNewTaskTrack" class="filter-select" aria-label="트랙 선택">
-          <option value="TRK-01" ${activeMarsTrackFilter === 'TRK-01' ? 'selected' : ''}>TRK-01 핵심업무</option>
-          <option value="TRK-02" ${activeMarsTrackFilter === 'TRK-02' ? 'selected' : ''}>TRK-02 일상루틴</option>
-          <option value="TRK-03" ${activeMarsTrackFilter === 'TRK-03' ? 'selected' : ''}>TRK-03 미래자산·이직</option>
-          <option value="TRK-04" ${activeMarsTrackFilter === 'TRK-04' ? 'selected' : ''}>TRK-04 건강·라이프</option>
+          <option value="TRK-01" ${activeMarsTrackFilter === 'TRK-01' ? 'selected' : ''}>TRK-01 핵심</option>
+          <option value="TRK-02" ${activeMarsTrackFilter === 'TRK-02' ? 'selected' : ''}>TRK-02 루틴</option>
+          <option value="TRK-03" ${activeMarsTrackFilter === 'TRK-03' ? 'selected' : ''}>TRK-03 미래</option>
+          <option value="TRK-04" ${activeMarsTrackFilter === 'TRK-04' ? 'selected' : ''}>TRK-04 건강</option>
         </select>
         <input type="text" id="marsNewTaskTitle" class="field-input" placeholder="새 할 일 입력 후 Enter..." autocomplete="off" />
         <button type="submit" class="btn btn-primary btn-sm">추가</button>
@@ -4971,4 +4973,36 @@ function renderMissionsTab(area) {
 // 초기 상태 동기화 (3D 씬 마운트 시 바로 반영)
 window.addEventListener('DOMContentLoaded', () => {
   syncMarsDioramaState();
+});
+
+// 헤더 더보기 드롭다운 제어 & Alt+L 즉시 대기 모드(Boss Key)
+function toggleHeaderMoreMenu(event) {
+  if (event) event.stopPropagation();
+  const menu = document.getElementById('headerMoreMenu');
+  const btn = document.getElementById('headerMoreBtn');
+  if (!menu) return;
+  const nextOpen = !menu.classList.contains('open');
+  menu.classList.toggle('open', nextOpen);
+  if (btn) btn.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+}
+
+document.addEventListener('click', (e) => {
+  const wrap = document.querySelector('.header-more-wrap');
+  const menu = document.getElementById('headerMoreMenu');
+  const btn = document.getElementById('headerMoreBtn');
+  if (menu && menu.classList.contains('open') && wrap && !wrap.contains(e.target)) {
+    menu.classList.remove('open');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  }
+});
+
+window.addEventListener('keydown', (e) => {
+  // Alt+L Boss Key: 0.1초 만에 풀스크린 3D 대기 모드로 전환
+  if (e.altKey && (e.key === 'l' || e.key === 'L')) {
+    const split = document.getElementById('workspaceSplit');
+    if (split && !split.classList.contains('is-locked')) {
+      e.preventDefault();
+      lockSessionNow('timeout');
+    }
+  }
 });
