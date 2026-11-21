@@ -1730,3 +1730,95 @@ body::after {
   flex-direction: column;
   gap: 10px;
 }
+
+/* ============================================================================
+   D-30 엑싯 워룸 배너 & 재무 런웨이 관제 카드
+   ============================================================================ */
+.warroom-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.14), rgba(129, 140, 248, 0.16));
+  border: 1px solid rgba(56, 189, 248, 0.30);
+}
+
+.warroom-banner-left {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.warroom-dday-badge {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.9), rgba(99, 102, 241, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 4px 16px rgba(56, 189, 248, 0.30);
+}
+
+.finance-inputs-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.finance-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.finance-kpi-tile {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.finance-kpi-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.finance-kpi-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-top: 4px;
+}
+
+.finance-payslip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.finance-payslip-chip {
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-sub);
+}
+
+@media (max-width: 820px) {
+  .finance-inputs-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .finance-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
