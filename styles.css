@@ -3135,3 +3135,77 @@ body.mars-layout-mode .toast.show {
   line-height: 1.5;
   padding: 6px 2px;
 }
+
+
+/* ============================================================================
+   STANDBY SCREENSAVER BGM CONTROL + INVISIBLE SECRET CLOCK UNLOCK BUTTON
+   ============================================================================ */
+/* Keep BGM control alive & interactive in locked / screensaver standby mode */
+.workspace-split.is-locked .mars-hud-controls,
+.workspace-split.is-screensaver .mars-hud-controls {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: none !important;
+}
+
+.workspace-split.is-locked .mars-hud-unlocked-only,
+.workspace-split.is-screensaver .mars-hud-unlocked-only {
+  display: none !important;
+}
+
+.mars-ss-date {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: rgba(245, 245, 247, 0.72);
+  margin-bottom: 4px;
+}
+
+.mars-ss-clock-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Completely invisible secret admin unlock target anchored directly to the right of HH:MM:SS */
+.mars-secret-unlock-btn {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  margin-left: 4px;
+  background: transparent;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  cursor: default;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.mars-secret-unlock-btn:hover,
+.mars-secret-unlock-btn:focus,
+.mars-secret-unlock-btn:active {
+  background: transparent;
+  border: none;
+  outline: none;
+  box-shadow: none;
+}
+
+@media (max-width: 640px) {
+  .mars-screensaver-hud {
+    left: 18px;
+    right: 18px;
+    bottom: 20px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .mars-ss-clock {
+    font-size: 36px;
+  }
+  .mars-secret-unlock-btn {
+    width: 44px;
+    height: 44px;
+  }
+}
