@@ -2962,3 +2962,176 @@ body.mars-layout-mode .toast.show {
     width: auto;
   }
 }
+
+
+/* ============================================================================
+   ASTRONEER SOUND ENGINE & CUSTOM BGM JUKEBOX POPOVER
+   ============================================================================ */
+.astro-audio-wrap {
+  position: relative;
+}
+
+.astro-bgm-trigger {
+  gap: 7px;
+}
+
+.astro-bgm-trigger.is-playing {
+  border-color: rgba(56, 189, 248, 0.55);
+  color: #e0f2fe;
+  background: rgba(14, 165, 233, 0.16);
+}
+
+.astro-bgm-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #64748b;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.astro-bgm-trigger.is-playing .astro-bgm-dot {
+  background: #38bdf8;
+  box-shadow: 0 0 10px #38bdf8;
+  animation: marsPulse 1.6s ease-in-out infinite;
+}
+
+.astro-audio-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(350px, calc(100vw - 24px));
+  padding: 15px;
+  border-radius: 18px;
+  background: rgba(14, 18, 28, 0.92);
+  backdrop-filter: blur(26px) saturate(185%);
+  -webkit-backdrop-filter: blur(26px) saturate(185%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.65);
+  display: none;
+  flex-direction: column;
+  gap: 11px;
+  z-index: 80;
+}
+
+.astro-audio-popover.open {
+  display: flex;
+  animation: marsPopupIn 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.astro-audio-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.astro-audio-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.astro-audio-sub {
+  font-size: 11.5px;
+  color: #38bdf8;
+  margin-top: 2px;
+  max-width: 195px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.astro-seek-row,
+.astro-vol-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.astro-slider {
+  flex: 1;
+  accent-color: #38bdf8;
+  cursor: pointer;
+  height: 4px;
+}
+
+.astro-transport-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.astro-loop-btn {
+  margin-left: auto;
+  font-size: 11.5px;
+}
+
+.astro-loop-btn.mode-one {
+  border-color: rgba(255, 159, 10, 0.55);
+  color: #ffd180;
+  background: rgba(255, 159, 10, 0.14);
+}
+
+.astro-loop-btn.mode-all {
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #bae6fd;
+  background: rgba(56, 189, 248, 0.14);
+}
+
+.astro-playlist-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.astro-playlist {
+  max-height: 175px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.astro-track-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-sub);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.astro-track-row:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: #ffffff;
+}
+
+.astro-track-row.active {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #ffffff;
+}
+
+.astro-track-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.astro-track-empty {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  padding: 6px 2px;
+}
