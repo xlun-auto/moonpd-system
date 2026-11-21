@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MarketLens — 미디어·콘텐츠 시장조사 리서치</title>
-  <link rel="stylesheet" href="styles.css?v=mars3" />
+  <link rel="stylesheet" href="styles.css?v=astro1" />
   <script type="importmap">
     {
       "imports": {
@@ -83,25 +83,53 @@
     </div>
   </section>
 
-  <!-- 55% 좌측 3D 화성 기지 뷰포트 + 45% 우측 다크 글래스모피즘 패널 -->
+  <!-- 100% 풀스크린 아스트로니어 3D 기지 월드 + 플로팅 홀로그램 스테이션 드로어 -->
   <div id="workspaceSplit" class="workspace-split is-locked">
     <aside id="marsViewportPane" class="mars-viewport-pane" aria-label="3D Sector Twin Simulation">
       <div id="marsCanvasRoot" class="mars-canvas-root"></div>
-      <div id="marsLoadingBadge" class="mars-loading-badge">3D Sector Twin 초기화 중...</div>
+      <div id="marsLoadingBadge" class="mars-loading-badge">MARS-04 기지 시뮬레이션 초기화 중...</div>
 
-      <!-- 위장 HUD (좌상단) -->
+      <!-- 상단 아스트로니어 스타일 게임 HUD -->
       <div class="mars-hud-top">
-        <div class="mars-hud-badge">
-          <span class="mars-live-dot"></span>
-          <span class="mars-hud-title">3D Sector Twin Simulation</span>
-          <span class="mars-hud-sep">·</span>
-          <span class="mars-hud-sub num">MARS-04</span>
+        <div class="astro-hud-left">
+          <div class="mars-hud-badge">
+            <span class="mars-live-dot"></span>
+            <span class="mars-hud-title">3D Sector Twin</span>
+            <span class="mars-hud-sep">·</span>
+            <span class="mars-hud-sub num" id="astroLevelBadge">LV.2 개척 전초기지</span>
+          </div>
+          <div class="astro-resource-bar" id="astroResourceBar">
+            <span class="astro-res-pill res-power" title="전력망 출력 (TRK-01 핵심업무)">
+              ⚡ <strong class="num" id="astroPowerVal">45 kW</strong>
+            </span>
+            <span class="astro-res-pill res-o2" title="생명유지 산소 (TRK-04 건강·라이프)">
+              O₂ <strong class="num" id="astroO2Val">75%</strong>
+            </span>
+            <span class="astro-res-pill res-bytes" title="누적 리서치 바이트 (미션 완료 XP)">
+              ✦ <strong class="num" id="astroBytesVal">480 B</strong>
+            </span>
+          </div>
         </div>
+
         <div class="mars-hud-controls">
-          <button type="button" class="mars-hud-btn" onclick="resetMarsCamera()" title="카메라 시점 초기화">
+          <button type="button" class="mars-hud-btn" onclick="resetMarsCamera()" title="전체 행성 시점으로 복귀">
             <svg class="ui-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-            시점 초기화
+            전체 시점
           </button>
+          <div class="header-more-wrap">
+            <button type="button" class="mars-hud-btn" id="headerMoreBtn" onclick="toggleHeaderMoreMenu(event)" title="외부 연동 및 보기 전환" aria-haspopup="true" aria-expanded="false">
+              ⋯
+            </button>
+            <div class="header-more-menu" id="headerMoreMenu" role="menu">
+              <a id="modeSwitchBtn" class="header-more-item" href="#" target="_blank" rel="noopener" role="menuitem" style="display:none;"></a>
+              <a class="header-more-item" href="https://docs.google.com/spreadsheets/d/1wReNF82GUdAZb4c0_bFFI2kbU6grpapVz7fZqD2EFQE/edit" target="_blank" rel="noopener" role="menuitem">
+                구글 시트 DB 열기
+              </a>
+              <a class="header-more-item" href="https://drive.google.com/drive/folders/1iLuXv3tbem-SzHNn-erlbLdtH2Yxyf5K" target="_blank" rel="noopener" role="menuitem">
+                구글 드라이브 폴더
+              </a>
+            </div>
+          </div>
           <button type="button" class="mars-hud-btn mars-hud-btn-standby" onclick="lockSessionNow('timeout')" title="즉시 3D 대기 모드 전환 (단축키: Alt+L)">
             <svg class="ui-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             대기 모드
@@ -109,31 +137,44 @@
         </div>
       </div>
 
-      <!-- 3D 오브젝트 클릭 시 컴팩트 텔레메트리 배지 (위장 코드명 전용) -->
-      <div id="marsStructurePopup" class="mars-structure-popup" style="display:none;" role="status"></div>
-
-      <!-- 하단 실시간 섹터 텔레메트리 바 (순수 위장 코드명) -->
-      <div class="mars-hud-bottom" id="marsTelemetryBar">
-        <button type="button" class="mars-tele-pill" data-track="TRK-01" onclick="onMarsStructureSelected('TRK-01')" title="SECTOR-01 풍력 발전기">
-          <span class="mars-tele-dot dot-wind"></span>
-          <span class="mars-tele-name">SEC-01 WIND</span>
-          <span class="mars-tele-val num" id="marsTeleTrk1">0%</span>
-        </button>
-        <button type="button" class="mars-tele-pill" data-track="TRK-02" onclick="onMarsStructureSelected('TRK-02')" title="SECTOR-02 탐사 로버">
-          <span class="mars-tele-dot dot-rover"></span>
-          <span class="mars-tele-name">SEC-02 ROVER</span>
-          <span class="mars-tele-val num" id="marsTeleTrk2">0%</span>
-        </button>
-        <button type="button" class="mars-tele-pill" data-track="TRK-03" onclick="onMarsStructureSelected('TRK-03')" title="SECTOR-03 중앙 돔">
-          <span class="mars-tele-dot dot-dome"></span>
-          <span class="mars-tele-name">SEC-03 DOME</span>
-          <span class="mars-tele-val num" id="marsTeleTrk3">0%</span>
-        </button>
-        <button type="button" class="mars-tele-pill" data-track="TRK-04" onclick="onMarsStructureSelected('TRK-04')" title="SECTOR-04 거주 모듈">
-          <span class="mars-tele-dot dot-hab"></span>
-          <span class="mars-tele-name">SEC-04 HAB</span>
-          <span class="mars-tele-val num" id="marsTeleTrk4">0%</span>
-        </button>
+      <!-- 하단 중앙 아스트로니어 스테이션 퀵 독 (3D 건물 클릭과 1:1 동기화) -->
+      <div class="astro-dock-wrap" id="marsTelemetryBar">
+        <div class="astro-dock" role="navigation" aria-label="화성 기지 스테이션 이동">
+          <button type="button" class="astro-dock-btn" data-station="TRK-01" style="--dock-accent:#38bdf8" onclick="openMarsStation('TRK-01')">
+            <span class="astro-dock-dot"></span>
+            <span class="astro-dock-label">풍력 발전소</span>
+            <span class="astro-dock-val num" id="marsTeleTrk1">0%</span>
+          </button>
+          <button type="button" class="astro-dock-btn" data-station="TRK-02" style="--dock-accent:#fde047" onclick="openMarsStation('TRK-02')">
+            <span class="astro-dock-dot"></span>
+            <span class="astro-dock-label">탐사 로버</span>
+            <span class="astro-dock-val num" id="marsTeleTrk2">0%</span>
+          </button>
+          <button type="button" class="astro-dock-btn" data-station="TRK-03" style="--dock-accent:#ff9f0a" onclick="openMarsStation('TRK-03')">
+            <span class="astro-dock-dot"></span>
+            <span class="astro-dock-label">중앙 본부 돔</span>
+            <span class="astro-dock-val num" id="marsTeleTrk3">0%</span>
+          </button>
+          <button type="button" class="astro-dock-btn" data-station="TRK-04" style="--dock-accent:#10b981" onclick="openMarsStation('TRK-04')">
+            <span class="astro-dock-dot"></span>
+            <span class="astro-dock-label">생명유지 모듈</span>
+            <span class="astro-dock-val num" id="marsTeleTrk4">0%</span>
+          </button>
+          <span class="astro-dock-sep" aria-hidden="true"></span>
+          <button type="button" class="astro-dock-btn" data-station="radar_jobs" style="--dock-accent:#60a5fa" onclick="openMarsStation('radar_jobs')">
+            <span class="astro-dock-dot"></span>
+            <span class="astro-dock-label">기회 레이더</span>
+            <span class="astro-dock-val num" id="astroRadarCount">0</span>
+          </button>
+          <button type="button" class="astro-dock-btn" data-station="research_lab" style="--dock-accent:#a78bfa" onclick="openMarsStation('research_lab')">
+            <span class="astro-dock-dot"></span>
+            <span class="astro-dock-label">AI 연구실</span>
+          </button>
+          <button type="button" class="astro-dock-btn" data-station="warroom_hub" style="--dock-accent:#fb7185" onclick="openMarsStation('warroom_hub')">
+            <span class="astro-dock-dot"></span>
+            <span class="astro-dock-label">워룸 관제탑</span>
+          </button>
+        </div>
       </div>
 
       <!-- 5분 비활성 자동 잠금 시 감성 풀스크린 스크린세이버 HUD -->
@@ -150,15 +191,15 @@
       </div>
     </aside>
 
-  <div class="app-shell" id="mainAppShell" style="display:none;">
-    <!-- 상단 헤더 (1줄 컴팩트) -->
+  <!-- 플로팅 홀로그램 스테이션 제어판 (3D 건물 클릭 시 슬라이드 오픈) -->
+  <div class="app-shell astro-holo-drawer" id="mainAppShell" style="display:none;">
     <header class="top-header">
       <div class="header-inner">
         <div class="brand-area">
-          <div class="brand-logo" aria-hidden="true">M</div>
+          <div class="brand-logo" id="astroDrawerIcon" aria-hidden="true">M</div>
           <div class="brand-title">
             <h1>
-              문PD
+              <span id="astroDrawerTitle">MARS-04 기지 제어판</span>
               <span class="status-chip" id="syncStatusBadge">로딩중</span>
             </h1>
           </div>
@@ -172,23 +213,8 @@
           <button type="button" class="btn btn-outline btn-sm" id="headerBatchBtn" onclick="runBatchConvertAndApply()" title="선택 공고 일괄 지원서 변환">
             일괄 <span id="selectedCount" class="num">0</span>
           </button>
-          <div class="header-more-wrap">
-            <button type="button" class="btn btn-outline btn-sm" id="headerMoreBtn" onclick="toggleHeaderMoreMenu(event)" title="외부 링크 및 보기 전환" aria-haspopup="true" aria-expanded="false">
-              ⋯
-            </button>
-            <div class="header-more-menu" id="headerMoreMenu" role="menu">
-              <a id="modeSwitchBtn" class="header-more-item" href="#" target="_blank" rel="noopener" role="menuitem" style="display:none;"></a>
-              <a class="header-more-item" href="https://docs.google.com/spreadsheets/d/1wReNF82GUdAZb4c0_bFFI2kbU6grpapVz7fZqD2EFQE/edit" target="_blank" rel="noopener" role="menuitem">
-                구글 시트 DB 열기
-              </a>
-              <a class="header-more-item" href="https://drive.google.com/drive/folders/1iLuXv3tbem-SzHNn-erlbLdtH2Yxyf5K" target="_blank" rel="noopener" role="menuitem">
-                구글 드라이브 폴더
-              </a>
-            </div>
-          </div>
-          <button type="button" class="btn btn-lock-accent btn-sm" onclick="lockSessionNow('timeout')" title="즉시 3D 대기 잠금 (Alt+L)">
-            <svg class="ui-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            잠금
+          <button type="button" class="btn btn-outline btn-sm" onclick="closeMarsStationDrawer()" title="제어판 닫고 3D 행성 전체 보기 (ESC)">
+            ✕ 닫기
           </button>
         </div>
       </div>
@@ -410,7 +436,7 @@
 
   <script src="data/db_seed.js"></script>
   <script src="data/ai_career_seed.js"></script>
-  <script src="app.js?v=mars3"></script>
-  <script type="module" src="mars_diorama.js?v=mars3"></script>
+  <script src="app.js?v=astro1"></script>
+  <script type="module" src="mars_diorama.js?v=astro1"></script>
 </body>
 </html>
