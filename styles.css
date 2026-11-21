@@ -2704,3 +2704,261 @@ body.mars-layout-mode .tab-btn {
     transition: none !important;
   }
 }
+
+
+/* ============================================================================
+   ASTRONEER-INSPIRED 100% FULLSCREEN 3D OUTPOST & FLOATING HOLOGRAM DRAWER
+   ============================================================================ */
+body.mars-layout-mode .mars-viewport-pane {
+  width: 100vw !important;
+  height: 100vh !important;
+  transition: none;
+}
+
+/* Top-Left Resource & Level HUD */
+.astro-hud-left {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.astro-resource-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(14, 18, 28, 0.72);
+  backdrop-filter: blur(18px) saturate(165%);
+  -webkit-backdrop-filter: blur(18px) saturate(165%);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.34);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.workspace-split.is-locked .astro-resource-bar,
+.workspace-split.is-screensaver .astro-resource-bar {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+}
+
+.astro-res-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  color: rgba(245, 245, 247, 0.85);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.astro-res-pill.res-power strong { color: #38bdf8; }
+.astro-res-pill.res-o2 strong { color: #34d399; }
+.astro-res-pill.res-bytes strong { color: #ffb340; }
+
+/* Diegetic Floating 3D Station Pins (In-World Astroneer Hologram Badges) */
+.astro-pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(10, 14, 24, 0.78);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+  color: #f5f5f7;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.astro-pin:hover,
+.astro-pin.is-selected {
+  transform: translateY(-2px) scale(1.05);
+  background: rgba(20, 28, 44, 0.92);
+  border-color: var(--pin-accent, #ff9f0a);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08), 0 10px 28px rgba(0, 0, 0, 0.56);
+}
+
+.astro-pin-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--pin-accent, #ff9f0a);
+  box-shadow: 0 0 8px var(--pin-accent, #ff9f0a);
+}
+
+.astro-pin-val {
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10);
+  color: var(--pin-accent, #ffb340);
+}
+
+/* Bottom-Center Astroneer Quick-Jump Station Dock */
+.astro-dock-wrap {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 28px);
+  z-index: 26;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.workspace-split.is-locked .astro-dock-wrap,
+.workspace-split.is-screensaver .astro-dock-wrap {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(16px);
+}
+
+.astro-dock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(12, 16, 26, 0.8);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.52);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.astro-dock::-webkit-scrollbar {
+  display: none;
+}
+
+.astro-dock-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
+  color: var(--text-sub);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.18s ease;
+}
+
+.astro-dock-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.astro-dock-btn.active {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: var(--dock-accent, #ff9f0a);
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(0, 0, 0, 0.35);
+}
+
+.astro-dock-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dock-accent, #ff9f0a);
+  box-shadow: 0 0 8px var(--dock-accent, #ff9f0a);
+}
+
+.astro-dock-val {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+  opacity: 0.9;
+}
+
+.astro-dock-sep {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.14);
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+
+/* Floating Holographic Station Drawer (Replaces Permanent 45% Wall!) */
+body.mars-layout-mode .app-shell.astro-holo-drawer {
+  position: fixed;
+  top: 70px;
+  right: 20px;
+  bottom: 76px;
+  width: min(560px, calc(100vw - 40px));
+  height: auto;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(14, 18, 28, 0.78);
+  backdrop-filter: blur(28px) saturate(185%);
+  -webkit-backdrop-filter: blur(28px) saturate(185%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 24px 64px rgba(0, 0, 0, 0.62);
+  opacity: 0;
+  transform: translateX(36px) scale(0.98);
+  pointer-events: none;
+  transition: opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1), transform 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 35;
+}
+
+.workspace-split.is-drawer-open .app-shell.astro-holo-drawer {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  pointer-events: auto;
+}
+
+.workspace-split.is-locked .app-shell.astro-holo-drawer,
+.workspace-split.is-screensaver .app-shell.astro-holo-drawer {
+  opacity: 0 !important;
+  transform: translateX(48px) scale(0.96) !important;
+  pointer-events: none !important;
+}
+
+/* Toast centered above bottom dock */
+body.mars-layout-mode .toast {
+  left: 50%;
+  right: auto;
+  bottom: 80px;
+  transform: translateX(-50%) translateY(14px);
+  z-index: 90;
+}
+
+body.mars-layout-mode .toast.show {
+  transform: translateX(-50%) translateY(0);
+}
+
+@media (max-width: 1024px) {
+  body.mars-layout-mode {
+    overflow: hidden;
+    height: 100vh;
+  }
+  .workspace-split {
+    position: fixed;
+    inset: 0;
+    height: 100vh;
+  }
+  body.mars-layout-mode .app-shell.astro-holo-drawer {
+    top: 64px;
+    left: 12px;
+    right: 12px;
+    bottom: 72px;
+    width: auto;
+  }
+}
