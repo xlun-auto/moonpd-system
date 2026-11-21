@@ -18,7 +18,7 @@ let appData = window.MOONPD_SEED_DATA || {
   sites: []
 };
 
-let currentTab = 'career';
+let currentTab = 'missions';
 let selectedIds = new Set();
 let highProbOnly = false;
 let currentModalTargetUrl = '';
@@ -1305,8 +1305,16 @@ async function unlockAppSession(userId) {
   setCoverLockReason('');
   const cover = document.getElementById('authCoverScreen');
   const shell = document.getElementById('mainAppShell');
+  const split = document.getElementById('workspaceSplit');
+  const ssHud = document.getElementById('marsScreensaverHud');
   if (cover) cover.style.display = 'none';
-  if (shell) shell.style.display = 'block';
+  if (ssHud) ssHud.style.display = 'none';
+  if (shell) shell.style.display = 'flex';
+  if (split) {
+    split.classList.remove('is-locked', 'is-screensaver');
+  }
+  if (typeof setMarsScreensaverMode === 'function') setMarsScreensaverMode(false);
+  if (typeof syncMarsDioramaState === 'function') syncMarsDioramaState();
   document.title = APP_REAL_TITLE;
   updateModeSwitchButton();
   updateSelectionUI();
@@ -1321,6 +1329,7 @@ function lockSessionNow(reason = 'manual') {
   if (pwInput) pwInput.value = '';
   closeDocModal();
   closeDoorayModal();
+  if (typeof closeMarsStructurePopup === 'function') closeMarsStructurePopup();
   const confirmModal = document.getElementById('confirmModal');
   if (confirmModal) {
     confirmModal.dataset.hasCancel = '';
@@ -1331,14 +1340,40 @@ function lockSessionNow(reason = 'manual') {
   document.getElementById('toastNotification')?.classList.remove('show');
   const cover = document.getElementById('authCoverScreen');
   const shell = document.getElementById('mainAppShell');
-  if (shell) shell.style.display = 'none';
-  if (cover) cover.style.display = 'flex';
+  const split = document.getElementById('workspaceSplit');
+  const ssHud = document.getElementById('marsScreensaverHud');
+  const ssReason = document.getElementById('marsScreensaverReason');
+
+  if (split) {
+    split.classList.add('is-locked');
+    split.classList.toggle('is-screensaver', reason === 'timeout');
+  }
+  if (typeof setMarsScreensaverMode === 'function') setMarsScreensaverMode(true);
+  if (typeof updateMarsScreensaverClock === 'function') updateMarsScreensaverClock();
+
+  // Smooth fadeout before hiding panel from layout
+  if (shell) {
+    setTimeout(() => {
+      if (split?.classList.contains('is-locked')) {
+        shell.style.display = 'none';
+      }
+    }, 620);
+  }
+
   document.title = COVER_DISGUISE_TITLE;
   if (reason === 'timeout') {
+    // 5분 비활성 자동 잠금: 우측 패널 페이드아웃 후 3D 화성 기지 풀스크린 스크린세이버로 전환
+    if (cover) cover.style.display = 'none';
+    if (ssHud) ssHud.style.display = 'flex';
+    if (ssReason) ssReason.textContent = '5분간 활동이 없어 3D 섹터 트윈 대기 모드로 자동 전환되었습니다.';
     setCoverLockReason('보안을 위해 5분간 활동이 없어 자동 잠금되었습니다. 다시 로그인해 주세요.');
   } else if (reason === 'manual') {
+    if (ssHud) ssHud.style.display = 'none';
+    if (cover) cover.style.display = 'flex';
     setCoverLockReason('화면이 잠금되었습니다. 계속하려면 다시 로그인해 주세요.');
   } else {
+    if (ssHud) ssHud.style.display = 'none';
+    if (cover) cover.style.display = 'flex';
     setCoverLockReason('');
   }
 }
@@ -1904,7 +1939,8 @@ function renderActiveTab() {
   const area = document.getElementById('tabContentArea');
   if (!area) return;
 
-  if (currentTab === 'career') renderCareerTab(area);
+  if (currentTab === 'missions') renderMissionsTab(area);
+  else if (currentTab === 'career') renderCareerTab(area);
   else if (currentTab === 'alba') renderAlbaTab(area);
   else if (currentTab === 'freelance') renderFreelanceTab(area);
   else if (currentTab === 'contests') renderContestsTab(area);
@@ -4549,3 +4585,390 @@ async function sendItemToDooray(itemId) {
     showToast(`Dooray 전송 실패: ${err.message}`);
   }
 }
+
+
+// ============================================================================
+// 14. 4대 트랙(TRK-01~04) 할 일 DB & 3D 화성 기지 실시간 인터랙션 브릿지
+// ============================================================================
+const MARS_TASKS_STORAGE_KEY = 'moonpd_mars_tracks_v1';
+
+const MARS_TRACK_META = {
+  'TRK-01': {
+    id: 'TRK-01',
+    name: '핵심업무',
+    structure: '풍력 발전기 (x3)',
+    accent: '#38bdf8',
+    effectLabel: '완료율 ↑ → 풍력 발전기 회전 속도 가속',
+    telemetryText: (rate) => `로터 회전 출력 ${Math.round(18 + rate * 82)} RPM · 발전기 ${rate >= 0.66 ? '최대 가동' : '안정 가동'}`,
+  },
+  'TRK-02': {
+    id: 'TRK-02',
+    name: '일상루틴',
+    structure: '탐사 로버 (x2)',
+    accent: '#fde047',
+    effectLabel: '루틴 체크 → 로버 헤드라이트 점등 & 순찰 활성화',
+    telemetryText: (rate) =>
+      rate > 0
+        ? `헤드라이트 ON · 외곽 섹터 순찰 속도 ${Math.round(rate * 100)}%`
+        : '헤드라이트 대기 · 루틴 체크 시 탐사 로버 출동',
+  },
+  'TRK-03': {
+    id: 'TRK-03',
+    name: '미래자산·이직',
+    structure: '중앙 지오데식 돔',
+    accent: '#ff9f0a',
+    effectLabel: '완료 시 → 돔 창문 앰버 조명 점등 & XP 파티클 상승',
+    telemetryText: (rate, completed) => `앰버 코어 출력 ${Math.round(rate * 100)}% · 누적 +${completed * 120} XP`,
+  },
+  'TRK-04': {
+    id: 'TRK-04',
+    name: '건강·라이프',
+    structure: '거주 모듈 (x3)',
+    accent: '#10b981',
+    effectLabel: '완료 시 → 거주 모듈 에메랄드/시안 생명유지 조명 점등',
+    telemetryText: (rate) => `생명유지 조명 ${rate > 0 ? 'ON' : 'STANDBY'} · O₂ 바이탈 ${Math.round(62 + rate * 38)}%`,
+  },
+};
+
+const DEFAULT_MARS_TASKS = [
+  { id: 'mt-101', track: 'TRK-01', title: 'XLUN 핵심 프로젝트 주간 마일스톤 정리', done: true },
+  { id: 'mt-102', track: 'TRK-01', title: '영상/콘텐츠 기획안 및 레퍼런스 시트 업데이트', done: false },
+  { id: 'mt-103', track: 'TRK-01', title: 'Dooray 업무 마감일 동기화 및 리스크 점검', done: false },
+  { id: 'mt-201', track: 'TRK-02', title: '오전 15분 시장 트렌드·신규 공고 스캔 루틴', done: true },
+  { id: 'mt-202', track: 'TRK-02', title: '데스크 정리 & 집중 블록(90분) 완료', done: false },
+  { id: 'mt-203', track: 'TRK-02', title: '퇴근 전 내일 우선순위 Top 3 기록', done: false },
+  { id: 'mt-301', track: 'TRK-03', title: '관심 정규직/외주 공고 합격진단 및 지원서 커스텀', done: true },
+  { id: 'mt-302', track: 'TRK-03', title: '포트폴리오 숏폼/16:9 대표 릴 최신화', done: false },
+  { id: 'mt-303', track: 'TRK-03', title: '월간 재무 런웨이·캐시카우 파이프라인 점검', done: false },
+  { id: 'mt-401', track: 'TRK-04', title: '30분 유산소/스트레칭으로 컨디션 회복', done: true },
+  { id: 'mt-402', track: 'TRK-04', title: '오늘의 성찰 로그 3줄 작성', done: false },
+  { id: 'mt-403', track: 'TRK-04', title: '수분 2L 섭취 & 자정 전 수면 준비', done: false },
+];
+
+let marsTasks = loadMarsTasks();
+let activeMarsTrackFilter = 'ALL';
+let marsScreensaverClockTimer = null;
+
+function loadMarsTasks() {
+  try {
+    const raw = localStorage.getItem(MARS_TASKS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {}
+  return DEFAULT_MARS_TASKS.map((t) => ({ ...t }));
+}
+
+function saveMarsTasks() {
+  try {
+    localStorage.setItem(MARS_TASKS_STORAGE_KEY, JSON.stringify(marsTasks));
+  } catch (e) {}
+}
+
+function computeMarsTrackState() {
+  const state = {};
+  Object.keys(MARS_TRACK_META).forEach((trkId) => {
+    const list = marsTasks.filter((t) => t.track === trkId);
+    const total = list.length;
+    const completed = list.filter((t) => t.done).length;
+    const rate = total > 0 ? completed / total : 0;
+    state[trkId] = {
+      ...MARS_TRACK_META[trkId],
+      completed,
+      total,
+      rate,
+    };
+  });
+  return state;
+}
+
+function syncMarsDioramaState() {
+  const state = computeMarsTrackState();
+  window.__MARS_TRACK_STATE__ = state;
+  window.dispatchEvent(new CustomEvent('mars:tracks-updated', { detail: state }));
+
+  const mapIds = {
+    'TRK-01': 'marsTeleTrk1',
+    'TRK-02': 'marsTeleTrk2',
+    'TRK-03': 'marsTeleTrk3',
+    'TRK-04': 'marsTeleTrk4',
+  };
+  Object.entries(mapIds).forEach(([trkId, elId]) => {
+    const el = document.getElementById(elId);
+    if (el) el.textContent = `${Math.round((state[trkId]?.rate || 0) * 100)}%`;
+  });
+
+  const tabCountEl = document.getElementById('tabCountMissions');
+  if (tabCountEl) {
+    const doneCnt = marsTasks.filter((t) => t.done).length;
+    tabCountEl.textContent = `${doneCnt}/${marsTasks.length}`;
+  }
+
+  document.querySelectorAll('.mars-tele-pill').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.track === activeMarsTrackFilter);
+  });
+
+  if (activeMarsTrackFilter !== 'ALL') {
+    renderMarsStructurePopup(activeMarsTrackFilter, state);
+  }
+}
+
+function setMarsScreensaverMode(active) {
+  window.__MARS_SCREENSAVER_MODE__ = Boolean(active);
+  window.dispatchEvent(new CustomEvent('mars:screensaver', { detail: { active: Boolean(active) } }));
+  if (active) {
+    updateMarsScreensaverClock();
+    if (!marsScreensaverClockTimer) {
+      marsScreensaverClockTimer = setInterval(updateMarsScreensaverClock, 15000);
+    }
+  } else if (marsScreensaverClockTimer) {
+    clearInterval(marsScreensaverClockTimer);
+    marsScreensaverClockTimer = null;
+  }
+}
+
+function updateMarsScreensaverClock() {
+  const el = document.getElementById('marsScreensaverClock');
+  if (!el) return;
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  el.textContent = `${hh}:${mm}`;
+}
+
+function resetMarsCamera() {
+  window.dispatchEvent(new CustomEvent('mars:reset-camera'));
+}
+
+function openAuthCoverFromScreensaver() {
+  const cover = document.getElementById('authCoverScreen');
+  const ssHud = document.getElementById('marsScreensaverHud');
+  if (ssHud) ssHud.style.display = 'none';
+  if (cover) cover.style.display = 'flex';
+  const idInput = document.getElementById('loginUserId');
+  if (idInput) idInput.focus();
+}
+
+function enterMarsScreensaverFromCover() {
+  const cover = document.getElementById('authCoverScreen');
+  const ssHud = document.getElementById('marsScreensaverHud');
+  const ssReason = document.getElementById('marsScreensaverReason');
+  if (cover) cover.style.display = 'none';
+  if (ssHud) ssHud.style.display = 'flex';
+  if (ssReason) ssReason.textContent = '3D Sector Twin Simulation · 대기 모드 (인증 버튼으로 로그인)';
+  setMarsScreensaverMode(true);
+}
+
+function closeMarsStructurePopup() {
+  const popup = document.getElementById('marsStructurePopup');
+  if (popup) popup.style.display = 'none';
+}
+
+function renderMarsStructurePopup(trackId, stateObj) {
+  const popup = document.getElementById('marsStructurePopup');
+  if (!popup) return;
+  if (!trackId || !MARS_TRACK_META[trackId]) {
+    popup.style.display = 'none';
+    return;
+  }
+  const st = (stateObj || computeMarsTrackState())[trackId];
+  const pct = Math.round((st?.rate || 0) * 100);
+  const meta = MARS_TRACK_META[trackId];
+  popup.innerHTML = `
+    <div class="mars-popup-head">
+      <div>
+        <div class="mars-popup-title">${escapeHtml(meta.structure)}</div>
+        <div class="mars-popup-sub">${escapeHtml(meta.id)} · ${escapeHtml(meta.name)} (${st.completed}/${st.total} 완료)</div>
+      </div>
+      <button type="button" class="mars-popup-close" onclick="onMarsStructureSelected(null)">닫기</button>
+    </div>
+    <div class="mars-popup-bar-bg">
+      <div class="mars-popup-bar-fill" style="width:${pct}%;background:${meta.accent};"></div>
+    </div>
+    <div class="mars-popup-metric">${escapeHtml(meta.telemetryText(st.rate, st.completed))}</div>
+  `;
+  popup.style.display = 'block';
+}
+
+window.onMarsStructureSelected = function onMarsStructureSelected(trackId) {
+  if (!trackId) {
+    activeMarsTrackFilter = 'ALL';
+    closeMarsStructurePopup();
+    window.dispatchEvent(new CustomEvent('mars:select-track', { detail: { trackId: null } }));
+    syncMarsDioramaState();
+    if (currentTab === 'missions') renderActiveTab();
+    return;
+  }
+
+  activeMarsTrackFilter = trackId;
+  window.dispatchEvent(new CustomEvent('mars:select-track', { detail: { trackId } }));
+  renderMarsStructurePopup(trackId);
+  syncMarsDioramaState();
+
+  if (currentTab !== 'missions') {
+    switchTab('missions');
+  } else {
+    renderActiveTab();
+  }
+};
+
+function setMarsTrackFilter(trackId) {
+  if (trackId === 'ALL') {
+    window.onMarsStructureSelected(null);
+  } else {
+    window.onMarsStructureSelected(trackId);
+  }
+}
+
+function toggleMarsTaskDone(taskId) {
+  const target = marsTasks.find((t) => t.id === taskId);
+  if (!target) return;
+  target.done = !target.done;
+  saveMarsTasks();
+  syncMarsDioramaState();
+
+  if (target.done) {
+    if (target.track === 'TRK-03') {
+      window.dispatchEvent(new CustomEvent('mars:xp-burst'));
+      showToast('중앙 지오데식 돔 앰버 조명 점등 & +120 XP 상승!');
+    } else if (target.track === 'TRK-01') {
+      showToast('풍력 발전기 회전 속도가 증가했습니다.');
+    } else if (target.track === 'TRK-02') {
+      showToast('탐사 로버 헤드라이트 점등 & 외곽 순찰 활성화!');
+    } else if (target.track === 'TRK-04') {
+      showToast('거주 모듈 생명 유지(에메랄드/시안) 조명이 점등되었습니다.');
+    }
+  }
+  if (currentTab === 'missions') renderActiveTab();
+}
+
+function addMarsTaskFromInput(event) {
+  if (event) event.preventDefault();
+  const trackSel = document.getElementById('marsNewTaskTrack');
+  const titleInput = document.getElementById('marsNewTaskTitle');
+  const track = trackSel?.value || (activeMarsTrackFilter !== 'ALL' ? activeMarsTrackFilter : 'TRK-01');
+  const title = (titleInput?.value || '').trim();
+  if (!title) {
+    showToast('할 일 내용을 입력해 주세요.');
+    return;
+  }
+  marsTasks.unshift({
+    id: 'mt-' + Date.now(),
+    track,
+    title,
+    done: false,
+  });
+  saveMarsTasks();
+  if (titleInput) titleInput.value = '';
+  syncMarsDioramaState();
+  renderActiveTab();
+  showToast(`[${track}] 새 할 일이 추가되었습니다.`);
+}
+
+function deleteMarsTask(taskId) {
+  marsTasks = marsTasks.filter((t) => t.id !== taskId);
+  saveMarsTasks();
+  syncMarsDioramaState();
+  renderActiveTab();
+}
+
+function renderMissionsTab(area) {
+  const state = computeMarsTrackState();
+  const visibleTasks =
+    activeMarsTrackFilter === 'ALL'
+      ? marsTasks
+      : marsTasks.filter((t) => t.track === activeMarsTrackFilter);
+
+  const totalDone = marsTasks.filter((t) => t.done).length;
+  const totalPct = marsTasks.length ? Math.round((totalDone / marsTasks.length) * 100) : 0;
+
+  const cardsHtml = Object.values(state)
+    .map((st) => {
+      const pct = Math.round(st.rate * 100);
+      const isSelected = activeMarsTrackFilter === st.id;
+      return `
+        <button type="button" class="track-stat-card ${isSelected ? 'active' : ''}" style="--track-accent:${st.accent}" onclick="setMarsTrackFilter('${isSelected ? 'ALL' : st.id}')">
+          <div class="track-stat-top">
+            <span class="track-code-badge">${escapeHtml(st.id)}</span>
+            <span class="track-stat-rate num">${pct}%</span>
+          </div>
+          <div class="track-stat-name">${escapeHtml(st.name)} · ${escapeHtml(st.structure)}</div>
+          <div class="track-stat-effect">${escapeHtml(st.effectLabel)}</div>
+          <div class="track-progress-bar">
+            <div class="track-progress-fill" style="width:${pct}%"></div>
+          </div>
+        </button>
+      `;
+    })
+    .join('');
+
+  const listHtml = visibleTasks.length
+    ? visibleTasks
+        .map((t) => {
+          const meta = MARS_TRACK_META[t.track] || MARS_TRACK_META['TRK-01'];
+          const safeId = escapeJsSingleQuoteAttr(t.id);
+          return `
+            <div class="mission-item ${t.done ? 'done' : ''}">
+              <button type="button" class="mission-check ${t.done ? 'checked' : ''}" onclick="toggleMarsTaskDone('${safeId}')" aria-label="완료 토글">
+                ${t.done ? '✓' : ''}
+              </button>
+              <div class="mission-item-body">
+                <div class="mission-item-title">${escapeHtml(t.title)}</div>
+                <div class="mission-item-meta">
+                  <span style="color:${meta.accent};font-weight:600;">${escapeHtml(meta.id)} ${escapeHtml(meta.name)}</span>
+                  <span>·</span>
+                  <span>${escapeHtml(meta.structure)}</span>
+                </div>
+              </div>
+              <button type="button" class="mission-del-btn" onclick="deleteMarsTask('${safeId}')" title="삭제">✕</button>
+            </div>
+          `;
+        })
+        .join('')
+    : `<div class="one-liner" style="padding:14px 0;">해당 트랙에 등록된 할 일이 없습니다. 위 입력창에서 새 미션을 추가해 보세요.</div>`;
+
+  area.innerHTML = `
+    <div class="panel-card" style="margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;">
+        <div>
+          <h3 style="margin:0;font-size:14.5px;">4대 트랙 · 3D 화성 기지 연동 보드</h3>
+          <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;">좌측 3D 기지 건물을 클릭하거나 트랙 카드를 눌러 실시간 필터링</div>
+        </div>
+        <span class="status-chip num">전체 ${totalDone}/${marsTasks.length} (${totalPct}%)</span>
+      </div>
+      <div class="missions-overview-grid">${cardsHtml}</div>
+    </div>
+
+    <div class="panel-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;">
+        <h3 style="margin:0;font-size:14px;">
+          ${activeMarsTrackFilter === 'ALL' ? '전체 트랙 할 일 목록' : `${escapeHtml(activeMarsTrackFilter)} · ${escapeHtml(MARS_TRACK_META[activeMarsTrackFilter]?.name || '')} 할 일`}
+        </h3>
+        ${
+          activeMarsTrackFilter !== 'ALL'
+            ? `<button type="button" class="btn btn-outline btn-sm" onclick="setMarsTrackFilter('ALL')">전체 보기</button>`
+            : ''
+        }
+      </div>
+
+      <form class="mission-add-bar" onsubmit="addMarsTaskFromInput(event)">
+        <select id="marsNewTaskTrack" class="filter-select" aria-label="트랙 선택">
+          <option value="TRK-01" ${activeMarsTrackFilter === 'TRK-01' ? 'selected' : ''}>TRK-01 핵심업무</option>
+          <option value="TRK-02" ${activeMarsTrackFilter === 'TRK-02' ? 'selected' : ''}>TRK-02 일상루틴</option>
+          <option value="TRK-03" ${activeMarsTrackFilter === 'TRK-03' ? 'selected' : ''}>TRK-03 미래자산·이직</option>
+          <option value="TRK-04" ${activeMarsTrackFilter === 'TRK-04' ? 'selected' : ''}>TRK-04 건강·라이프</option>
+        </select>
+        <input type="text" id="marsNewTaskTitle" class="field-input" placeholder="새 할 일 입력 후 Enter..." autocomplete="off" />
+        <button type="submit" class="btn btn-primary btn-sm">추가</button>
+      </form>
+
+      <div class="mission-list">${listHtml}</div>
+    </div>
+  `;
+}
+
+// 초기 상태 동기화 (3D 씬 마운트 시 바로 반영)
+window.addEventListener('DOMContentLoaded', () => {
+  syncMarsDioramaState();
+});
