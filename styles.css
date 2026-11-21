@@ -1870,3 +1870,681 @@ body::after {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ============================================================================
+   3D Mars Base Diorama Split-Screen Layout (55% 3D Viewport / 45% Glass Panel)
+   & 5-Minute Auto-Lock Fullscreen Screensaver Mode
+   ============================================================================ */
+body.mars-layout-mode {
+  overflow: hidden;
+  height: 100vh;
+}
+
+body.mars-layout-mode .cover-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 2500;
+  background: rgba(6, 9, 16, 0.34);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.workspace-split {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: block;
+}
+
+/* Left 55% Interactive 3D Mars Diorama Viewport */
+.mars-viewport-pane {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 55vw;
+  height: 100vh;
+  background: radial-gradient(ellipse 75% 70% at 50% 45%, #121726 0%, #080b12 72%, #05070c 100%);
+  overflow: hidden;
+  transition: width 0.72s cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 12;
+}
+
+.workspace-split.is-locked .mars-viewport-pane,
+.workspace-split.is-screensaver .mars-viewport-pane {
+  width: 100vw;
+}
+
+.mars-canvas-root {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.mars-loading-badge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 10px 18px;
+  border-radius: var(--radius-pill);
+  background: rgba(16, 20, 30, 0.78);
+  border: 1px solid rgba(255, 159, 10, 0.32);
+  color: var(--text-sub);
+  font-size: 12.5px;
+  backdrop-filter: blur(16px);
+  pointer-events: none;
+  z-index: 20;
+}
+
+/* Top-Left Disguised HUD ("3D Sector Twin Simulation") */
+.mars-hud-top {
+  position: absolute;
+  top: 18px;
+  left: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  pointer-events: none;
+  z-index: 24;
+  transition: opacity 0.45s ease;
+}
+
+.mars-hud-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  background: rgba(14, 18, 28, 0.68);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+  pointer-events: auto;
+}
+
+.mars-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff9f0a;
+  box-shadow: 0 0 10px rgba(255, 159, 10, 0.85);
+  animation: marsPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes marsPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.82); }
+}
+
+.mars-hud-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #f5f5f7;
+}
+
+.mars-hud-sep {
+  color: rgba(255, 255, 255, 0.28);
+}
+
+.mars-hud-sub {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffb340;
+  letter-spacing: 0.06em;
+}
+
+.mars-hud-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.mars-hud-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  background: rgba(18, 22, 34, 0.68);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text-sub);
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.mars-hud-btn:hover {
+  background: rgba(34, 42, 60, 0.84);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.26);
+}
+
+/* Bottom Telemetry Strip */
+.mars-hud-bottom {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  z-index: 24;
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+
+.workspace-split.is-locked .mars-hud-bottom,
+.workspace-split.is-screensaver .mars-hud-bottom,
+.workspace-split.is-locked .mars-hud-controls,
+.workspace-split.is-screensaver .mars-hud-controls {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+}
+
+.mars-tele-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border-radius: var(--radius-pill);
+  background: rgba(14, 18, 28, 0.72);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  color: var(--text-sub);
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.mars-tele-pill:hover,
+.mars-tele-pill.active {
+  background: rgba(36, 44, 62, 0.88);
+  border-color: rgba(255, 159, 10, 0.55);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.mars-tele-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.mars-tele-dot.dot-wind { background: #38bdf8; box-shadow: 0 0 8px #38bdf8; }
+.mars-tele-dot.dot-rover { background: #fde047; box-shadow: 0 0 8px #fde047; }
+.mars-tele-dot.dot-dome { background: #ff9f0a; box-shadow: 0 0 8px #ff9f0a; }
+.mars-tele-dot.dot-hab { background: #10b981; box-shadow: 0 0 8px #10b981; }
+
+.mars-tele-val {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* 3D Hover Tooltip */
+.mars-3d-tooltip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: rgba(12, 16, 26, 0.86);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 159, 10, 0.42);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  color: #f5f5f7;
+  font-size: 11.5px;
+}
+
+.mars-3d-tooltip strong {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.mars-3d-tooltip span {
+  font-size: 10.5px;
+  color: #ffb340;
+}
+
+/* 3D Structure Click Detail Popup */
+.mars-structure-popup {
+  position: absolute;
+  left: 20px;
+  bottom: 66px;
+  width: min(330px, calc(100% - 40px));
+  padding: 15px 16px;
+  border-radius: 16px;
+  background: rgba(16, 20, 30, 0.84);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.52);
+  z-index: 26;
+  animation: marsPopupIn 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes marsPopupIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.mars-popup-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.mars-popup-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.mars-popup-sub {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.mars-popup-close {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text-sub);
+  border-radius: 8px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.mars-popup-bar-bg {
+  width: 100%;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  overflow: hidden;
+  margin: 8px 0 10px;
+}
+
+.mars-popup-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+
+.mars-popup-metric {
+  font-size: 12px;
+  color: var(--text-sub);
+  line-height: 1.45;
+}
+
+/* Fullscreen Screensaver Standby HUD */
+.mars-screensaver-hud {
+  position: absolute;
+  left: 32px;
+  right: 32px;
+  bottom: 30px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  z-index: 30;
+  pointer-events: auto;
+  animation: marsPopupIn 0.55s ease;
+}
+
+.mars-ss-clock {
+  font-size: 46px;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+}
+
+.mars-ss-title {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #ffb340;
+}
+
+.mars-ss-sub {
+  margin-top: 3px;
+  font-size: 12px;
+  color: rgba(245, 245, 247, 0.62);
+}
+
+.mars-ss-unlock-btn {
+  padding: 10px 18px;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 10px 28px rgba(10, 132, 255, 0.36);
+}
+
+/* Right 45% Translucent Dark Glassmorphism Panel */
+body.mars-layout-mode .app-shell {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 45vw;
+  max-width: none;
+  height: 100vh;
+  margin: 0;
+  border-radius: 0;
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(16, 20, 30, 0.72);
+  backdrop-filter: blur(30px) saturate(185%);
+  -webkit-backdrop-filter: blur(30px) saturate(185%);
+  box-shadow: -20px 0 60px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 20;
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 0.62s cubic-bezier(0.22, 1, 0.36, 1), transform 0.68s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.workspace-split.is-locked .app-shell,
+.workspace-split.is-screensaver .app-shell {
+  opacity: 0;
+  transform: translateX(48px);
+  pointer-events: none;
+}
+
+body.mars-layout-mode .top-header {
+  padding: 12px 18px;
+  flex-shrink: 0;
+}
+
+body.mars-layout-mode .container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 14px 18px 80px;
+  max-width: none;
+  width: 100%;
+}
+
+/* Compact Right-Panel Adaptations */
+body.mars-layout-mode .kpi-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+body.mars-layout-mode .kpi-card {
+  padding: 9px 10px;
+}
+
+body.mars-layout-mode .kpi-value {
+  font-size: 16px;
+}
+
+body.mars-layout-mode .jobs-grid {
+  grid-template-columns: 1fr;
+}
+
+body.mars-layout-mode .hub-grid-2col {
+  grid-template-columns: 1fr;
+}
+
+body.mars-layout-mode .tabs-nav {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  gap: 6px;
+}
+
+body.mars-layout-mode .tab-btn {
+  flex-shrink: 0;
+  padding: 7px 11px;
+  font-size: 12.5px;
+}
+
+/* ============================================================================
+   4-Track Mission & Task Board (TRK-01 ~ TRK-04 Real-Time 3D Sync)
+   ============================================================================ */
+.missions-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.track-stat-card {
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(34, 40, 56, 0.56);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text-main);
+  transition: all 0.2s ease;
+}
+
+.track-stat-card:hover {
+  background: rgba(46, 54, 74, 0.68);
+  border-color: rgba(255, 255, 255, 0.24);
+  transform: translateY(-1px);
+}
+
+.track-stat-card.active {
+  border-color: var(--track-accent, #ff9f0a);
+  box-shadow: 0 0 0 1px var(--track-accent, #ff9f0a), 0 10px 24px rgba(0, 0, 0, 0.3);
+  background: rgba(44, 52, 72, 0.78);
+}
+
+.track-stat-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.track-code-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--track-accent, #ffb340);
+}
+
+.track-stat-rate {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.track-stat-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+.track-stat-effect {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.track-progress-bar {
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  margin-top: 9px;
+}
+
+.track-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--track-accent, #ff9f0a);
+  transition: width 0.35s ease;
+}
+
+.mission-add-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.mission-add-bar select {
+  width: 136px;
+  flex-shrink: 0;
+}
+
+.mission-add-bar input {
+  flex: 1;
+  min-width: 150px;
+}
+
+.mission-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mission-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: rgba(34, 40, 56, 0.48);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.mission-item:hover {
+  background: rgba(46, 54, 74, 0.62);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.mission-item.done {
+  opacity: 0.66;
+}
+
+.mission-item.done .mission-item-title {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.mission-check {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1.5px solid rgba(255, 255, 255, 0.34);
+  background: rgba(15, 20, 30, 0.6);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  color: #ffffff;
+  transition: all 0.18s ease;
+}
+
+.mission-check.checked {
+  background: #30d158;
+  border-color: #30d158;
+}
+
+.mission-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.mission-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-main);
+  line-height: 1.4;
+}
+
+.mission-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.mission-del-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.mission-del-btn:hover {
+  color: #ff453a;
+  background: rgba(255, 69, 58, 0.14);
+}
+
+/* Responsive: Stack vertically on tablet/mobile */
+@media (max-width: 1024px) {
+  body.mars-layout-mode {
+    overflow: auto;
+    height: auto;
+  }
+  .workspace-split {
+    position: relative;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+  .mars-viewport-pane {
+    position: relative;
+    width: 100%;
+    height: 44vh;
+    min-height: 320px;
+  }
+  .workspace-split.is-locked .mars-viewport-pane,
+  .workspace-split.is-screensaver .mars-viewport-pane {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+  }
+  body.mars-layout-mode .app-shell {
+    position: relative;
+    width: 100%;
+    height: auto;
+    min-height: 56vh;
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+  }
+}
