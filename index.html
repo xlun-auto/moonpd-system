@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MarketLens — 미디어·콘텐츠 시장조사 리서치</title>
-  <link rel="stylesheet" href="styles.css?v=astro1" />
+  <link rel="stylesheet" href="styles.css?v=astro2" />
   <script type="importmap">
     {
       "imports": {
@@ -112,6 +112,59 @@
         </div>
 
         <div class="mars-hud-controls">
+          <div class="astro-audio-wrap">
+            <button type="button" class="mars-hud-btn astro-bgm-trigger" id="astroBgmTriggerBtn" onclick="toggleAstroAudioPopover(event)" title="배경음(BGM) & 효과음 제어">
+              <span class="astro-bgm-dot" id="astroBgmDot"></span>
+              <span id="astroBgmBtnLabel">BGM</span>
+            </button>
+            <div class="astro-audio-popover" id="astroAudioPopover" onclick="event.stopPropagation()">
+              <div class="astro-audio-head">
+                <div>
+                  <div class="astro-audio-title">MARS-04 사운드 · BGM 주크박스</div>
+                  <div class="astro-audio-sub" id="astroNowPlayingLabel">재생 중인 트랙 없음</div>
+                </div>
+                <button type="button" class="btn btn-outline btn-sm" id="astroSfxToggleBtn" onclick="toggleAstroSfx()" title="효과음·클릭음 ON/OFF">
+                  🔊 효과음 ON
+                </button>
+              </div>
+
+              <div class="astro-seek-row">
+                <span class="num" id="astroTimeCur">00:00</span>
+                <input type="range" id="astroSeekBar" class="astro-slider" min="0" max="100" value="0" oninput="seekAstroBgm(this.value)" aria-label="재생 위치" />
+                <span class="num" id="astroTimeDur">00:00</span>
+              </div>
+
+              <div class="astro-transport-row">
+                <button type="button" class="btn btn-outline btn-sm" onclick="prevAstroTrack()" title="이전 곡">⏮</button>
+                <button type="button" class="btn btn-primary btn-sm" id="astroPlayPauseBtn" onclick="toggleAstroBgmPlay()" title="재생 / 일시정지">▶ 재생</button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="nextAstroTrack()" title="다음 곡">⏭</button>
+                <button type="button" class="btn btn-outline btn-sm astro-loop-btn" id="astroLoopModeBtn" onclick="toggleAstroLoopMode()" title="반복 모드 전환">
+                  🔁 전곡 무한루프
+                </button>
+              </div>
+
+              <div class="astro-vol-row">
+                <span>볼륨</span>
+                <input type="range" id="astroVolBar" class="astro-slider" min="0" max="100" value="55" oninput="setAstroBgmVolume(this.value)" aria-label="배경음 볼륨" />
+                <button type="button" class="btn btn-outline btn-sm" id="astroAmbientBtn" onclick="toggleAstroAmbientSynth()" title="내장 우주 앰비언트 신스">
+                  🌌 우주음 OFF
+                </button>
+              </div>
+
+              <div class="astro-playlist-actions">
+                <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('astroMusicFileInput').click()">
+                  + 내 음악 추가
+                </button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="scanLocalMusicFolder(true)" title="moonpd_system/music 폴더 자동 스캔">
+                  폴더 스캔
+                </button>
+              </div>
+              <input type="file" id="astroMusicFileInput" accept="audio/*" multiple style="display:none;" onchange="handleAstroMusicFilesSelected(event)" />
+
+              <div class="astro-playlist" id="astroPlaylistBox"></div>
+            </div>
+          </div>
+
           <button type="button" class="mars-hud-btn" onclick="resetMarsCamera()" title="전체 행성 시점으로 복귀">
             <svg class="ui-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
             전체 시점
@@ -436,7 +489,7 @@
 
   <script src="data/db_seed.js"></script>
   <script src="data/ai_career_seed.js"></script>
-  <script src="app.js?v=astro1"></script>
-  <script type="module" src="mars_diorama.js?v=astro1"></script>
+  <script src="app.js?v=astro2"></script>
+  <script type="module" src="mars_diorama.js?v=astro2"></script>
 </body>
 </html>
