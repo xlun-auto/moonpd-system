@@ -3209,3 +3209,89 @@ body.mars-layout-mode .toast.show {
     height: 44px;
   }
 }
+
+
+/* 2-Tab BGM Jukebox (내 음악·드라이브 + Spotify) */
+.astro-audio-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  padding: 3px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.astro-audio-tab {
+  padding: 6px 10px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  color: var(--text-sub);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.astro-audio-tab.active {
+  background: rgba(56, 189, 248, 0.2);
+  color: #ffffff;
+}
+
+.astro-audio-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.astro-spotify-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.astro-spotify-form input {
+  flex: 1;
+  height: 34px;
+  font-size: 12px;
+  padding: 0 10px;
+}
+
+.astro-spotify-form button {
+  height: 34px;
+  flex-shrink: 0;
+}
+
+.astro-spotify-embed-wrap {
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.28);
+  min-height: 152px;
+}
+
+.astro-spotify-embed-wrap iframe {
+  display: block;
+  width: 100%;
+  height: 152px;
+  border: none;
+}
+
+.astro-spotify-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.astro-vibe-link {
+  color: #a78bfa;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.astro-vibe-link:hover {
+  text-decoration: underline;
+}
