@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MarketLens — 미디어·콘텐츠 시장조사 리서치</title>
-  <link rel="stylesheet" href="styles.css?v=astro3" />
+  <link rel="stylesheet" href="styles.css?v=astro4" />
   <script type="importmap">
     {
       "imports": {
@@ -128,40 +128,70 @@
                 </button>
               </div>
 
-              <div class="astro-seek-row">
-                <span class="num" id="astroTimeCur">00:00</span>
-                <input type="range" id="astroSeekBar" class="astro-slider" min="0" max="100" value="0" oninput="seekAstroBgm(this.value)" aria-label="재생 위치" />
-                <span class="num" id="astroTimeDur">00:00</span>
-              </div>
-
-              <div class="astro-transport-row">
-                <button type="button" class="btn btn-outline btn-sm" onclick="prevAstroTrack()" title="이전 곡">⏮</button>
-                <button type="button" class="btn btn-primary btn-sm" id="astroPlayPauseBtn" onclick="toggleAstroBgmPlay()" title="재생 / 일시정지">▶ 재생</button>
-                <button type="button" class="btn btn-outline btn-sm" onclick="nextAstroTrack()" title="다음 곡">⏭</button>
-                <button type="button" class="btn btn-outline btn-sm astro-loop-btn" id="astroLoopModeBtn" onclick="toggleAstroLoopMode()" title="반복 모드 전환">
-                  🔁 전곡 무한루프
+              <!-- 2-Tab Switch: 내 음악(드라이브/로컬) vs Spotify -->
+              <div class="astro-audio-tabs" role="tablist">
+                <button type="button" class="astro-audio-tab active" data-audio-tab="local" onclick="switchAstroAudioTab('local')">
+                  🎵 내 음악 · 드라이브
+                </button>
+                <button type="button" class="astro-audio-tab" data-audio-tab="spotify" onclick="switchAstroAudioTab('spotify')">
+                  🎧 Spotify
                 </button>
               </div>
 
-              <div class="astro-vol-row">
-                <span>볼륨</span>
-                <input type="range" id="astroVolBar" class="astro-slider" min="0" max="100" value="55" oninput="setAstroBgmVolume(this.value)" aria-label="배경음 볼륨" />
-                <button type="button" class="btn btn-outline btn-sm" id="astroAmbientBtn" onclick="toggleAstroAmbientSynth()" title="내장 우주 앰비언트 신스">
-                  🌌 우주음 OFF
-                </button>
+              <!-- Tab 1: 내 음악 (Google Drive MoonPD_BGM + 로컬 music + 파일 추가) -->
+              <div id="astroAudioPaneLocal" class="astro-audio-pane">
+                <div class="astro-seek-row">
+                  <span class="num" id="astroTimeCur">00:00</span>
+                  <input type="range" id="astroSeekBar" class="astro-slider" min="0" max="100" value="0" oninput="seekAstroBgm(this.value)" aria-label="재생 위치" />
+                  <span class="num" id="astroTimeDur">00:00</span>
+                </div>
+
+                <div class="astro-transport-row">
+                  <button type="button" class="btn btn-outline btn-sm" onclick="prevAstroTrack()" title="이전 곡">⏮</button>
+                  <button type="button" class="btn btn-primary btn-sm" id="astroPlayPauseBtn" onclick="toggleAstroBgmPlay()" title="재생 / 일시정지">▶ 재생</button>
+                  <button type="button" class="btn btn-outline btn-sm" onclick="nextAstroTrack()" title="다음 곡">⏭</button>
+                  <button type="button" class="btn btn-outline btn-sm astro-loop-btn" id="astroLoopModeBtn" onclick="toggleAstroLoopMode()" title="반복 모드 전환">
+                    🔁 전곡 무한루프
+                  </button>
+                </div>
+
+                <div class="astro-vol-row">
+                  <span>볼륨</span>
+                  <input type="range" id="astroVolBar" class="astro-slider" min="0" max="100" value="55" oninput="setAstroBgmVolume(this.value)" aria-label="배경음 볼륨" />
+                  <button type="button" class="btn btn-outline btn-sm" id="astroAmbientBtn" onclick="toggleAstroAmbientSynth()" title="내장 우주 앰비언트 신스">
+                    🌌 우주음 OFF
+                  </button>
+                </div>
+
+                <div class="astro-playlist-actions">
+                  <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('astroMusicFileInput').click()">
+                    + 파일 추가
+                  </button>
+                  <button type="button" class="btn btn-outline btn-sm" onclick="loadDriveMusicTracks(true)" title="구글 드라이브 MoonPD_BGM 폴더 음악 불러오기">
+                    ☁️ 드라이브
+                  </button>
+                  <button type="button" class="btn btn-outline btn-sm" onclick="scanLocalMusicFolder(true)" title="PC moonpd_system/music 폴더 스캔">
+                    PC폴더
+                  </button>
+                </div>
+                <input type="file" id="astroMusicFileInput" accept="audio/*" multiple style="display:none;" onchange="handleAstroMusicFilesSelected(event)" />
+
+                <div class="astro-playlist" id="astroPlaylistBox"></div>
               </div>
 
-              <div class="astro-playlist-actions">
-                <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('astroMusicFileInput').click()">
-                  + 내 음악 추가
-                </button>
-                <button type="button" class="btn btn-outline btn-sm" onclick="scanLocalMusicFolder(true)" title="moonpd_system/music 폴더 자동 스캔">
-                  폴더 스캔
-                </button>
+              <!-- Tab 2: Spotify 공식 임베드 플레이어 -->
+              <div id="astroAudioPaneSpotify" class="astro-audio-pane" style="display:none;">
+                <form class="astro-spotify-form" onsubmit="addSpotifyUrlFromInput(event)">
+                  <input type="text" id="astroSpotifyUrlInput" class="field-input" placeholder="Spotify 플레이리스트/곡 링크 붙여넣기..." autocomplete="off" />
+                  <button type="submit" class="btn btn-primary btn-sm">추가</button>
+                </form>
+                <div class="astro-spotify-embed-wrap" id="astroSpotifyEmbedWrap"></div>
+                <div class="astro-playlist" id="astroSpotifyListBox"></div>
+                <div class="astro-spotify-foot">
+                  <span>브라우저 Spotify 유료 로그인 시 전곡 풀재생</span>
+                  <a href="https://vibe.naver.com/" target="_blank" rel="noopener" class="astro-vibe-link">VIBE 열기 ↗</a>
+                </div>
               </div>
-              <input type="file" id="astroMusicFileInput" accept="audio/*" multiple style="display:none;" onchange="handleAstroMusicFilesSelected(event)" />
-
-              <div class="astro-playlist" id="astroPlaylistBox"></div>
             </div>
           </div>
 
@@ -500,7 +530,7 @@
 
   <script src="data/db_seed.js"></script>
   <script src="data/ai_career_seed.js"></script>
-  <script src="app.js?v=astro3"></script>
-  <script type="module" src="mars_diorama.js?v=astro3"></script>
+  <script src="app.js?v=astro4"></script>
+  <script type="module" src="mars_diorama.js?v=astro4"></script>
 </body>
 </html>
