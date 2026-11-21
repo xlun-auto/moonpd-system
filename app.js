@@ -1311,7 +1311,7 @@ async function unlockAppSession(userId) {
   if (ssHud) ssHud.style.display = 'none';
   if (shell) shell.style.display = 'flex';
   if (split) {
-    split.classList.remove('is-locked', 'is-screensaver');
+    split.classList.remove('is-locked', 'is-screensaver', 'is-drawer-open');
   }
   if (typeof setMarsScreensaverMode === 'function') setMarsScreensaverMode(false);
   if (typeof syncMarsDioramaState === 'function') syncMarsDioramaState();
@@ -1320,6 +1320,7 @@ async function unlockAppSession(userId) {
   updateSelectionUI();
   startInactivityWatchdog();
   await bootstrapAuthenticatedAppData();
+  if (typeof syncMarsDioramaState === 'function') syncMarsDioramaState();
 }
 
 function lockSessionNow(reason = 'manual') {
@@ -1345,6 +1346,7 @@ function lockSessionNow(reason = 'manual') {
   const ssReason = document.getElementById('marsScreensaverReason');
 
   if (split) {
+    split.classList.remove('is-drawer-open');
     split.classList.add('is-locked');
     split.classList.toggle('is-screensaver', reason === 'timeout');
   }
@@ -1440,9 +1442,13 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    const anyModalOpen = Boolean(document.querySelector('.modal-backdrop.open'));
     closeDocModal();
     closeConfirmModal();
     closeDoorayModal();
+    if (!anyModalOpen && typeof closeMarsStationDrawer === 'function') {
+      closeMarsStationDrawer();
+    }
   }
 });
 
@@ -4685,10 +4691,53 @@ function computeMarsTrackState() {
   return state;
 }
 
+const ASTRO_STATIONS = {
+  'TRK-01': { title: '풍력 발전소 · 핵심업무', icon: '⚡', accent: '#38bdf8', tab: 'missions', track: 'TRK-01' },
+  'TRK-02': { title: '탐사 로버 · 일상루틴', icon: '🚙', accent: '#fde047', tab: 'missions', track: 'TRK-02' },
+  'TRK-03': { title: '중앙 본부 돔 · 미래자산·이직', icon: '🏛️', accent: '#ff9f0a', tab: 'missions', track: 'TRK-03' },
+  'TRK-04': { title: '생명유지 모듈 · 건강·라이프', icon: '💚', accent: '#10b981', tab: 'missions', track: 'TRK-04' },
+  radar_jobs: { title: '기회 레이더 · 채용·외주·공모', icon: '📡', accent: '#60a5fa', tab: 'career', track: null },
+  research_lab: { title: 'AI 연구실 · 직군분석·이력서', icon: '🧪', accent: '#a78bfa', tab: 'career_analysis', track: null },
+  warroom_hub: { title: '워룸 관제탑 · 일정·재무 런웨이', icon: '🗓️', accent: '#fb7185', tab: 'life_hub', track: null },
+};
+
+let activeAstroStation = null;
+
+function computeAstroneerStats(tracks) {
+  const doneCnt = marsTasks.filter((t) => t.done).length;
+  const savedCnt = Object.keys(savedCategoryMap || {}).length;
+  const bytes = doneCnt * 120 + savedCnt * 40;
+  const powerKw = Math.round(18 + (tracks['TRK-01']?.rate || 0) * 82);
+  const oxygenPct = Math.round(62 + (tracks['TRK-04']?.rate || 0) * 38);
+  const totalJobs =
+    (appData?.jobs?.length || 0) +
+    (appData?.albas?.length || 0) +
+    (appData?.freelances?.length || 0) +
+    (appData?.contests?.length || 0);
+
+  let level = 1;
+  let levelTitle = '착륙 전초기지';
+  if (bytes >= 1080) {
+    level = 4;
+    levelTitle = '문대표 2막 사령부';
+  } else if (bytes >= 720) {
+    level = 3;
+    levelTitle = '자립 콜로니';
+  } else if (bytes >= 360) {
+    level = 2;
+    levelTitle = '개척 전초기지';
+  }
+
+  return { level, levelTitle, bytes, powerKw, oxygenPct, totalJobs, savedJobs: savedCnt };
+}
+
 function syncMarsDioramaState() {
-  const state = computeMarsTrackState();
-  window.__MARS_TRACK_STATE__ = state;
-  window.dispatchEvent(new CustomEvent('mars:tracks-updated', { detail: state }));
+  const tracks = computeMarsTrackState();
+  const stats = computeAstroneerStats(tracks);
+  const gameState = { tracks, stats };
+  window.__MARS_TRACK_STATE__ = tracks;
+  window.__MARS_GAME_STATE__ = gameState;
+  window.dispatchEvent(new CustomEvent('mars:game-updated', { detail: gameState }));
 
   const mapIds = {
     'TRK-01': 'marsTeleTrk1',
@@ -4698,8 +4747,19 @@ function syncMarsDioramaState() {
   };
   Object.entries(mapIds).forEach(([trkId, elId]) => {
     const el = document.getElementById(elId);
-    if (el) el.textContent = `${Math.round((state[trkId]?.rate || 0) * 100)}%`;
+    if (el) el.textContent = `${Math.round((tracks[trkId]?.rate || 0) * 100)}%`;
   });
+
+  const levelEl = document.getElementById('astroLevelBadge');
+  if (levelEl) levelEl.textContent = `LV.${stats.level} ${stats.levelTitle}`;
+  const powerEl = document.getElementById('astroPowerVal');
+  if (powerEl) powerEl.textContent = `${stats.powerKw} kW`;
+  const o2El = document.getElementById('astroO2Val');
+  if (o2El) o2El.textContent = `${stats.oxygenPct}%`;
+  const bytesEl = document.getElementById('astroBytesVal');
+  if (bytesEl) bytesEl.textContent = `${stats.bytes} B`;
+  const radarEl = document.getElementById('astroRadarCount');
+  if (radarEl) radarEl.textContent = stats.totalJobs > 0 ? `${stats.totalJobs}` : '0';
 
   const tabCountEl = document.getElementById('tabCountMissions');
   if (tabCountEl) {
@@ -4707,13 +4767,9 @@ function syncMarsDioramaState() {
     tabCountEl.textContent = `${doneCnt}/${marsTasks.length}`;
   }
 
-  document.querySelectorAll('.mars-tele-pill').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.track === activeMarsTrackFilter);
+  document.querySelectorAll('.astro-dock-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.station === activeAstroStation);
   });
-
-  if (activeMarsTrackFilter !== 'ALL') {
-    renderMarsStructurePopup(activeMarsTrackFilter, state);
-  }
 }
 
 function setMarsScreensaverMode(active) {
@@ -4740,6 +4796,7 @@ function updateMarsScreensaverClock() {
 }
 
 function resetMarsCamera() {
+  closeMarsStationDrawer(true);
   window.dispatchEvent(new CustomEvent('mars:reset-camera'));
 }
 
@@ -4763,64 +4820,77 @@ function enterMarsScreensaverFromCover() {
 }
 
 function closeMarsStructurePopup() {
-  const popup = document.getElementById('marsStructurePopup');
-  if (popup) popup.style.display = 'none';
+  // Legacy no-op kept for backward compatibility
 }
 
-function renderMarsStructurePopup(trackId, stateObj) {
-  const popup = document.getElementById('marsStructurePopup');
-  if (!popup) return;
-  if (!trackId || !MARS_TRACK_META[trackId]) {
-    popup.style.display = 'none';
-    return;
+window.openMarsStation = function openMarsStation(stationId, from3D = false) {
+  const cfg = ASTRO_STATIONS[stationId];
+  if (!cfg) return;
+  activeAstroStation = stationId;
+
+  const split = document.getElementById('workspaceSplit');
+  const shell = document.getElementById('mainAppShell');
+  const titleEl = document.getElementById('astroDrawerTitle');
+  const iconEl = document.getElementById('astroDrawerIcon');
+
+  if (shell) shell.style.display = 'flex';
+  if (split) split.classList.add('is-drawer-open');
+  if (titleEl) titleEl.textContent = cfg.title;
+  if (iconEl) {
+    iconEl.textContent = cfg.icon;
+    iconEl.style.background = `linear-gradient(145deg, ${cfg.accent}, #1e293b)`;
   }
-  const st = (stateObj || computeMarsTrackState())[trackId];
-  const meta = MARS_TRACK_META[trackId];
-  const sectorMap = {
-    'TRK-01': 'SEC-01 · WIND TURBINE',
-    'TRK-02': 'SEC-02 · SCOUT ROVER',
-    'TRK-03': 'SEC-03 · GEODESIC DOME',
-    'TRK-04': 'SEC-04 · HABITAT MODULE',
-  };
-  popup.innerHTML = `
-    <div class="mars-popup-compact">
-      <span class="mars-popup-dot" style="background:${meta.accent};box-shadow:0 0 8px ${meta.accent};"></span>
-      <span class="mars-popup-code">${escapeHtml(sectorMap[trackId] || trackId)}</span>
-      <span class="mars-popup-metric">${escapeHtml(meta.telemetryText(st.rate, st.completed))}</span>
-      <button type="button" class="mars-popup-close" onclick="onMarsStructureSelected(null)">전체</button>
-    </div>
-  `;
-  popup.style.display = 'block';
-}
+
+  if (cfg.track) {
+    activeMarsTrackFilter = cfg.track;
+  }
+
+  if (currentTab !== cfg.tab) {
+    switchTab(cfg.tab);
+  } else {
+    renderActiveTab();
+  }
+
+  syncMarsDioramaState();
+  if (!from3D) {
+    window.dispatchEvent(new CustomEvent('mars:station-changed', { detail: { stationId, drawerOpen: true } }));
+  }
+};
+
+window.closeMarsStationDrawer = function closeMarsStationDrawer(from3D = false) {
+  activeAstroStation = null;
+  const split = document.getElementById('workspaceSplit');
+  if (split) split.classList.remove('is-drawer-open');
+  syncMarsDioramaState();
+  if (!from3D) {
+    window.dispatchEvent(new CustomEvent('mars:station-changed', { detail: { stationId: null, drawerOpen: false } }));
+  }
+};
 
 window.onMarsStructureSelected = function onMarsStructureSelected(trackId) {
   if (!trackId) {
-    activeMarsTrackFilter = 'ALL';
-    closeMarsStructurePopup();
-    window.dispatchEvent(new CustomEvent('mars:select-track', { detail: { trackId: null } }));
-    syncMarsDioramaState();
-    if (currentTab === 'missions') renderActiveTab();
-    return;
-  }
-
-  activeMarsTrackFilter = trackId;
-  window.dispatchEvent(new CustomEvent('mars:select-track', { detail: { trackId } }));
-  renderMarsStructurePopup(trackId);
-  syncMarsDioramaState();
-
-  if (currentTab !== 'missions') {
-    switchTab('missions');
+    closeMarsStationDrawer();
   } else {
-    renderActiveTab();
+    openMarsStation(trackId);
   }
 };
 
 function setMarsTrackFilter(trackId) {
-  if (trackId === 'ALL') {
-    window.onMarsStructureSelected(null);
-  } else {
-    window.onMarsStructureSelected(trackId);
+  activeMarsTrackFilter = trackId || 'ALL';
+  if (trackId && trackId !== 'ALL') {
+    activeAstroStation = trackId;
+    const cfg = ASTRO_STATIONS[trackId];
+    const titleEl = document.getElementById('astroDrawerTitle');
+    const iconEl = document.getElementById('astroDrawerIcon');
+    if (cfg && titleEl) titleEl.textContent = cfg.title;
+    if (cfg && iconEl) {
+      iconEl.textContent = cfg.icon;
+      iconEl.style.background = `linear-gradient(145deg, ${cfg.accent}, #1e293b)`;
+    }
+    window.dispatchEvent(new CustomEvent('mars:station-changed', { detail: { stationId: trackId, drawerOpen: true } }));
   }
+  syncMarsDioramaState();
+  if (currentTab === 'missions') renderActiveTab();
 }
 
 function toggleMarsTaskDone(taskId) {
