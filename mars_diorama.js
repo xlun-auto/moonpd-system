@@ -1,6 +1,6 @@
 /**
- * MarketLens Intelligence — 3D Sector Twin Simulation (Low-Poly Mars Base Diorama)
- * Powered by Three.js + @react-three/fiber + @react-three/drei (Zero-build ESM)
+ * MarketLens Intelligence — Astroneer-Inspired 3D Outpost Simulation (MARS-04)
+ * Diegetic 3D World + Tether Power Grid + Interactive Stations + Smooth Camera Focus
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -15,38 +15,182 @@ const PREFERS_REDUCED_MOTION =
   window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const DEFAULT_TRACK_STATE = {
-  'TRK-01': { id: 'TRK-01', name: '핵심업무', structure: 'WIND TURBINE ×3', completed: 1, total: 3, rate: 0.33 },
-  'TRK-02': { id: 'TRK-02', name: '일상루틴', structure: 'SCOUT ROVER ×2', completed: 1, total: 3, rate: 0.33 },
-  'TRK-03': { id: 'TRK-03', name: '미래자산·이직', structure: 'GEODESIC DOME', completed: 1, total: 3, rate: 0.33 },
-  'TRK-04': { id: 'TRK-04', name: '건강·라이프', structure: 'HABITAT MODULE ×3', completed: 1, total: 3, rate: 0.33 },
+const DEFAULT_GAME_STATE = {
+  tracks: {
+    'TRK-01': { id: 'TRK-01', name: '핵심업무', completed: 1, total: 3, rate: 0.33 },
+    'TRK-02': { id: 'TRK-02', name: '일상루틴', completed: 1, total: 3, rate: 0.33 },
+    'TRK-03': { id: 'TRK-03', name: '미래자산·이직', completed: 1, total: 3, rate: 0.33 },
+    'TRK-04': { id: 'TRK-04', name: '건강·라이프', completed: 1, total: 3, rate: 0.33 },
+  },
+  stats: {
+    level: 2,
+    levelTitle: '개척 전초기지',
+    bytes: 480,
+    powerKw: 45,
+    oxygenPct: 75,
+    totalJobs: 0,
+    savedJobs: 0,
+  },
+};
+
+// Station 3D anchor coordinates on the 7.4 x 7.4 plateau
+const STATION_ANCHORS = {
+  'TRK-01': { pos: [-2.45, 0.02, -2.05], focus: [-1.8, 0.5, -1.5], pinPos: [-2.25, 2.35, -1.95], color: '#38bdf8' },
+  'TRK-02': { pos: [0.3, 0.02, 2.65], focus: [0.2, 0.25, 1.8], pinPos: [0.2, 1.25, 2.65], color: '#fde047' },
+  'TRK-03': { pos: [0, 0.02, 0], focus: [0, 0.45, 0], pinPos: [0, 2.25, 0], color: '#ff9f0a' },
+  'TRK-04': { pos: [1.85, 0.02, 1.05], focus: [1.2, 0.35, 0.7], pinPos: [1.85, 1.45, 1.05], color: '#10b981' },
+  radar_jobs: { pos: [2.55, 0.02, -1.95], focus: [1.8, 0.55, -1.3], pinPos: [2.55, 2.15, -1.95], color: '#60a5fa' },
+  research_lab: { pos: [-2.55, 0.02, 1.75], focus: [-1.8, 0.45, 1.2], pinPos: [-2.55, 1.75, 1.75], color: '#a78bfa' },
+  warroom_hub: { pos: [-0.2, 0.02, -2.65], focus: [-0.1, 0.45, -1.8], pinPos: [-0.2, 1.95, -2.65], color: '#fb7185' },
 };
 
 /* ============================================================================
-   0. Responsive Isometric Camera Zoom Rig (Fills 55-65% of Viewport Cleanly)
+   0. Smooth Astroneer Camera Rig (Responsive Zoom + Focus Lerp on Station Click)
    ============================================================================ */
-function ResponsiveCameraRig({ screensaverMode }) {
+function AstroneerCameraRig({ controlsRef, selectedStation, drawerOpen, screensaverMode }) {
   const { camera, size } = useThree();
+  const desiredTarget = useRef(new THREE.Vector3(0, -0.1, 0));
+  const desiredZoom = useRef(68);
 
   useEffect(() => {
-    if (!camera || !camera.isOrthographicCamera) return;
     const minDim = Math.min(size.width, size.height);
-    // Larger confident framing on desktop split view, slightly wider breathing room in fullscreen screensaver
-    const baseFactor = screensaverMode ? 0.088 : 0.098;
-    const nextZoom = THREE.MathUtils.clamp(minDim * baseFactor, 42, 92);
-    camera.zoom = nextZoom;
+    const baseZoom = THREE.MathUtils.clamp(minDim * (screensaverMode ? 0.082 : 0.088), 40, 88);
+
+    if (selectedStation && STATION_ANCHORS[selectedStation] && !screensaverMode) {
+      const f = STATION_ANCHORS[selectedStation].focus;
+      // Offset slightly left when holographic drawer is open on the right so focused building stays centered-left
+      const xShift = drawerOpen && size.width > 960 ? 0.65 : 0;
+      desiredTarget.current.set(f[0] + xShift, f[1], f[2] - xShift * 0.45);
+      desiredZoom.current = Math.min(104, baseZoom * 1.18);
+    } else {
+      desiredTarget.current.set(0, -0.1, 0);
+      desiredZoom.current = baseZoom;
+    }
+  }, [size.width, size.height, selectedStation, drawerOpen, screensaverMode]);
+
+  useFrame((_, delta) => {
+    if (!camera || !camera.isOrthographicCamera) return;
+    const lerpAmt = PREFERS_REDUCED_MOTION ? 1 : Math.min(1, delta * 4.2);
+    camera.zoom = THREE.MathUtils.lerp(camera.zoom, desiredZoom.current, lerpAmt);
     camera.updateProjectionMatrix();
-  }, [camera, size.width, size.height, screensaverMode]);
+    if (controlsRef.current) {
+      controlsRef.current.target.lerp(desiredTarget.current, lerpAmt);
+      controlsRef.current.update();
+    }
+  });
 
   return null;
 }
 
 /* ============================================================================
-   1. Mars Terrain Cross-Section Cube (Floating Miniature Diorama Plinth)
+   1. Astroneer-Style Tether Cables + Animated Energy Pulses
+   ============================================================================ */
+function TetherLine({ from, to, color, powerRate }) {
+  const pulseRef = useRef();
+  const phaseRef = useRef(Math.random());
+
+  const { curve, tubeGeo, midPole } = useMemo(() => {
+    const p0 = new THREE.Vector3(from[0], from[1] + 0.24, from[2]);
+    const p2 = new THREE.Vector3(to[0], to[1] + 0.24, to[2]);
+    const mid = p0.clone().lerp(p2, 0.5);
+    mid.y = Math.max(p0.y, p2.y) + 0.16;
+    const c = new THREE.QuadraticBezierCurve3(p0, mid, p2);
+    const geo = new THREE.TubeGeometry(c, 16, 0.022, 6, false);
+    return { curve: c, tubeGeo: geo, midPole: [mid.x, 0.02, mid.z] };
+  }, [from, to]);
+
+  useFrame((_, delta) => {
+    if (!pulseRef.current) return;
+    const speed = PREFERS_REDUCED_MOTION ? 0.1 : 0.35 + powerRate * 0.9;
+    phaseRef.current = (phaseRef.current + delta * speed) % 1;
+    const pt = curve.getPoint(phaseRef.current);
+    pulseRef.current.position.copy(pt);
+  });
+
+  return h(
+    'group',
+    null,
+    // Tether cable
+    h(
+      'mesh',
+      { geometry: tubeGeo },
+      h('meshStandardMaterial', {
+        color,
+        emissive: color,
+        emissiveIntensity: 0.55 + powerRate * 1.1,
+        roughness: 0.3,
+        toneMapped: false,
+      })
+    ),
+    // Astroneer mini tether pole at midpoint
+    h(
+      'group',
+      { position: midPole },
+      h(
+        'mesh',
+        { position: [0, 0.14, 0], castShadow: true },
+        h('cylinderGeometry', { args: [0.022, 0.032, 0.28, 6] }),
+        h('meshStandardMaterial', { color: '#cbd5e1', roughness: 0.5 })
+      ),
+      h(
+        'mesh',
+        { position: [0, 0.3, 0] },
+        h('sphereGeometry', { args: [0.042, 8, 8] }),
+        h('meshStandardMaterial', {
+          color,
+          emissive: color,
+          emissiveIntensity: 1.4,
+          toneMapped: false,
+        })
+      )
+    ),
+    // Traveling glowing energy packet
+    h(
+      'mesh',
+      { ref: pulseRef },
+      h('sphereGeometry', { args: [0.055, 8, 8] }),
+      h('meshStandardMaterial', {
+        color: '#ffffff',
+        emissive: color,
+        emissiveIntensity: 2.6,
+        toneMapped: false,
+      })
+    )
+  );
+}
+
+function TetherNetwork({ tracks }) {
+  const trk1 = tracks['TRK-01']?.rate ?? 0.33;
+  const trk3 = tracks['TRK-03']?.rate ?? 0.33;
+  const trk4 = tracks['TRK-04']?.rate ?? 0.33;
+  const avg = (trk1 + trk3 + trk4) / 3;
+
+  const links = useMemo(
+    () => [
+      { from: [0, 0.02, 0], to: [-2.15, 0.02, -1.85], color: '#38bdf8', rate: trk1 },
+      { from: [0, 0.02, 0], to: [2.45, 0.02, -1.85], color: '#60a5fa', rate: Math.max(0.35, avg) },
+      { from: [0, 0.02, 0], to: [-2.45, 0.02, 1.65], color: '#a78bfa', rate: Math.max(0.35, trk3) },
+      { from: [0, 0.02, 0], to: [-0.2, 0.02, -2.55], color: '#fb7185', rate: Math.max(0.35, avg) },
+      { from: [0, 0.02, 0], to: [1.85, 0.02, 1.05], color: '#10b981', rate: trk4 },
+    ],
+    [trk1, trk3, trk4, avg]
+  );
+
+  return h(
+    'group',
+    { name: 'TetherNetwork' },
+    ...links.map((l, i) =>
+      h(TetherLine, { key: `tether-${i}`, from: l.from, to: l.to, color: l.color, powerRate: l.rate })
+    )
+  );
+}
+
+/* ============================================================================
+   2. Expanded Mars Terrain Cross-Section Cube (7.4 x 7.4 Outpost Plateau)
    ============================================================================ */
 function MarsTerrainBlock() {
   const topGeo = useMemo(() => {
-    const geo = new THREE.PlaneGeometry(6.24, 6.24, 22, 22);
+    const geo = new THREE.PlaneGeometry(7.44, 7.44, 24, 24);
     geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position;
     for (let i = 0; i < pos.count; i++) {
@@ -55,14 +199,14 @@ function MarsTerrainBlock() {
       const dist = Math.hypot(x, z);
       const edgeDist = Math.max(Math.abs(x), Math.abs(z));
       let y = 0.02;
-      if (dist > 1.7 && edgeDist < 2.95) {
+      if (dist > 2.2 && edgeDist < 3.55) {
         const wave =
-          Math.sin(x * 1.15) * Math.cos(z * 1.1) * 0.14 +
-          Math.sin(x * 2.4 + z * 1.7) * 0.06;
-        const craterDist = Math.hypot(x - 1.95, z - 1.95);
-        const crater = craterDist < 0.72 ? -0.16 * Math.cos((craterDist / 0.72) * (Math.PI / 2)) : 0;
-        const blend = THREE.MathUtils.clamp((dist - 1.7) / 0.85, 0, 1);
-        const edgeFade = THREE.MathUtils.clamp((3.08 - edgeDist) / 0.35, 0, 1);
+          Math.sin(x * 0.95) * Math.cos(z * 0.95) * 0.13 +
+          Math.sin(x * 2.1 + z * 1.5) * 0.05;
+        const craterDist = Math.hypot(x - 2.35, z - 2.35);
+        const crater = craterDist < 0.78 ? -0.17 * Math.cos((craterDist / 0.78) * (Math.PI / 2)) : 0;
+        const blend = THREE.MathUtils.clamp((dist - 2.2) / 0.9, 0, 1);
+        const edgeFade = THREE.MathUtils.clamp((3.68 - edgeDist) / 0.38, 0, 1);
         y += (wave + crater) * blend * edgeFade;
       }
       pos.setY(i, y);
@@ -73,13 +217,12 @@ function MarsTerrainBlock() {
 
   const rocks = useMemo(
     () => [
-      { pos: [2.45, 0.12, -2.35], scale: [0.28, 0.2, 0.24], rot: [0.2, 0.7, 0.1], color: '#8f3920' },
-      { pos: [2.15, 0.08, -2.55], scale: [0.16, 0.12, 0.15], rot: [0.5, 1.2, 0.3], color: '#a84729' },
-      { pos: [-2.52, 0.11, 2.15], scale: [0.24, 0.18, 0.22], rot: [0.1, 2.1, 0.4], color: '#84341e' },
-      { pos: [-2.18, 0.07, 2.48], scale: [0.15, 0.11, 0.14], rot: [0.3, 0.4, 0.2], color: '#b04e2e' },
-      { pos: [2.58, 0.09, 0.35], scale: [0.2, 0.14, 0.19], rot: [0.6, 1.8, 0.1], color: '#943c22' },
-      { pos: [-0.85, 0.08, 2.62], scale: [0.22, 0.15, 0.18], rot: [0.2, 1.1, 0.5], color: '#9d4126' },
-      { pos: [0.95, 0.08, -2.65], scale: [0.21, 0.16, 0.17], rot: [0.4, 2.5, 0.2], color: '#89361f' },
+      { pos: [3.15, 0.12, -2.95], scale: [0.3, 0.22, 0.26], rot: [0.2, 0.7, 0.1], color: '#8f3920' },
+      { pos: [-3.15, 0.11, 2.85], scale: [0.26, 0.19, 0.23], rot: [0.1, 2.1, 0.4], color: '#84341e' },
+      { pos: [3.22, 0.09, 0.55], scale: [0.22, 0.15, 0.2], rot: [0.6, 1.8, 0.1], color: '#943c22' },
+      { pos: [-1.15, 0.08, 3.22], scale: [0.23, 0.16, 0.19], rot: [0.2, 1.1, 0.5], color: '#9d4126' },
+      { pos: [1.35, 0.08, -3.22], scale: [0.22, 0.17, 0.18], rot: [0.4, 2.5, 0.2], color: '#89361f' },
+      { pos: [-3.25, 0.1, -0.35], scale: [0.24, 0.16, 0.21], rot: [0.3, 0.9, 0.2], color: '#a84729' },
     ],
     []
   );
@@ -90,48 +233,36 @@ function MarsTerrainBlock() {
     h(
       'mesh',
       { geometry: topGeo, receiveShadow: true, castShadow: true },
-      h('meshStandardMaterial', {
-        color: '#c95c36',
-        roughness: 0.86,
-        metalness: 0.05,
-        flatShading: true,
-      })
+      h('meshStandardMaterial', { color: '#cb5f38', roughness: 0.85, metalness: 0.05, flatShading: true })
     ),
     h(
       'mesh',
       { position: [0, -0.18, 0], receiveShadow: true, castShadow: true },
-      h('boxGeometry', { args: [6.24, 0.38, 6.24] }),
+      h('boxGeometry', { args: [7.44, 0.38, 7.44] }),
       h('meshStandardMaterial', { color: '#a34022', roughness: 0.88, metalness: 0.05 })
     ),
     h(
       'mesh',
       { position: [0, -0.6, 0], receiveShadow: true, castShadow: true },
-      h('boxGeometry', { args: [6.2, 0.48, 6.2] }),
+      h('boxGeometry', { args: [7.4, 0.48, 7.4] }),
       h('meshStandardMaterial', { color: '#6b2919', roughness: 0.9, metalness: 0.06 })
     ),
     h(
       'mesh',
       { position: [0, -1.04, 0], receiveShadow: true, castShadow: true },
-      h('boxGeometry', { args: [6.14, 0.42, 6.14] }),
+      h('boxGeometry', { args: [7.34, 0.42, 7.34] }),
       h('meshStandardMaterial', { color: '#2b1817', roughness: 0.84, metalness: 0.14 })
     ),
     h(
       'mesh',
       { position: [0, -1.27, 0] },
-      h('boxGeometry', { args: [6.2, 0.05, 6.2] }),
+      h('boxGeometry', { args: [7.4, 0.05, 7.4] }),
       h('meshStandardMaterial', { color: '#243044', roughness: 0.35, metalness: 0.72 })
     ),
     ...rocks.map((r, idx) =>
       h(
         'mesh',
-        {
-          key: `rock-${idx}`,
-          position: r.pos,
-          scale: r.scale,
-          rotation: r.rot,
-          castShadow: true,
-          receiveShadow: true,
-        },
+        { key: `rock-${idx}`, position: r.pos, scale: r.scale, rotation: r.rot, castShadow: true, receiveShadow: true },
         h('dodecahedronGeometry', { args: [1, 0] }),
         h('meshStandardMaterial', { color: r.color, roughness: 0.9, flatShading: true })
       )
@@ -140,21 +271,23 @@ function MarsTerrainBlock() {
 }
 
 /* ============================================================================
-   2. Central Geodesic Dome (TRK-03) + Amber Glow & XP Particles
+   3. Central Geodesic Dome (TRK-03) + Rising Golden Bytes XP
    ============================================================================ */
 function XpParticles({ rate, burstSignal }) {
   const count = 26;
   const groupRef = useRef();
   const burstRef = useRef(0);
-  const particles = useMemo(() => {
-    return Array.from({ length: count }, (_, i) => ({
-      angle: (i / count) * Math.PI * 2 + (i % 3) * 0.4,
-      radius: 0.35 + (i % 5) * 0.17,
-      speed: 0.45 + (i % 4) * 0.22,
-      phase: (i / count) * 2.6,
-      scale: 0.045 + (i % 3) * 0.02,
-    }));
-  }, []);
+  const particles = useMemo(
+    () =>
+      Array.from({ length: count }, (_, i) => ({
+        angle: (i / count) * Math.PI * 2 + (i % 3) * 0.4,
+        radius: 0.35 + (i % 5) * 0.17,
+        speed: 0.45 + (i % 4) * 0.22,
+        phase: (i / count) * 2.6,
+        scale: 0.045 + (i % 3) * 0.02,
+      })),
+    []
+  );
 
   useEffect(() => {
     if (burstSignal > 0) burstRef.current = 1.6;
@@ -162,9 +295,7 @@ function XpParticles({ rate, burstSignal }) {
 
   useFrame((_, delta) => {
     if (!groupRef.current) return;
-    if (burstRef.current > 0) {
-      burstRef.current = Math.max(0, burstRef.current - delta * 0.9);
-    }
+    if (burstRef.current > 0) burstRef.current = Math.max(0, burstRef.current - delta * 0.9);
     const motionScale = PREFERS_REDUCED_MOTION ? 0.2 : 1;
     const activeIntensity = Math.min(1, rate * 1.15 + burstRef.current);
     const children = groupRef.current.children;
@@ -185,8 +316,7 @@ function XpParticles({ rate, burstSignal }) {
         mesh.rotation.y += delta * 2.2 * motionScale;
         mesh.rotation.x += delta * 1.5 * motionScale;
         const fade = Math.sin(t * Math.PI);
-        const s = p.scale * fade * (1 + burstRef.current * 0.45);
-        mesh.scale.setScalar(Math.max(0.001, s));
+        mesh.scale.setScalar(Math.max(0.001, p.scale * fade * (1 + burstRef.current * 0.45)));
       }
     }
   });
@@ -214,16 +344,12 @@ function XpParticles({ rate, burstSignal }) {
 function GeodesicDome({ rate, selected, hovered, onHover, onSelect, burstSignal }) {
   const beaconRef = useRef();
   const windowLightRef = useRef();
-  const amberIntensity = 0.22 + rate * 2.1 + (selected ? 0.45 : 0) + (hovered ? 0.25 : 0);
+  const amberIntensity = 0.24 + rate * 2.1 + (selected ? 0.5 : 0) + (hovered ? 0.25 : 0);
 
   useFrame((state) => {
     const t = state.clock.elapsedTime;
-    if (beaconRef.current) {
-      beaconRef.current.material.emissiveIntensity = 1.2 + Math.sin(t * 3.2) * 0.65;
-    }
-    if (windowLightRef.current) {
-      windowLightRef.current.intensity = (0.35 + rate * 2.4) * (0.94 + Math.sin(t * 2.1) * 0.06);
-    }
+    if (beaconRef.current) beaconRef.current.material.emissiveIntensity = 1.2 + Math.sin(t * 3.2) * 0.65;
+    if (windowLightRef.current) windowLightRef.current.intensity = (0.35 + rate * 2.4) * (0.94 + Math.sin(t * 2.1) * 0.06);
   });
 
   const windowAngles = [0, 1, 2, 3, 4, 5].map((i) => (i * Math.PI) / 3 + Math.PI / 6);
@@ -255,35 +381,20 @@ function GeodesicDome({ rate, selected, hovered, onHover, onSelect, burstSignal 
       h(
         'mesh',
         { position: [0, 0.04, 0], rotation: [-Math.PI / 2, 0, 0] },
-        h('ringGeometry', { args: [1.34, 1.46, 24] }),
-        h('meshBasicMaterial', {
-          color: '#ff9f0a',
-          transparent: true,
-          opacity: selected ? 0.88 : 0.48,
-          side: THREE.DoubleSide,
-        })
+        h('ringGeometry', { args: [1.34, 1.48, 28] }),
+        h('meshBasicMaterial', { color: '#ff9f0a', transparent: true, opacity: selected ? 0.9 : 0.48, side: THREE.DoubleSide })
       ),
     h(
       'mesh',
       { position: [0, 0.16, 0], castShadow: true, receiveShadow: true },
       h('sphereGeometry', { args: [1.02, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.52] }),
-      h('meshStandardMaterial', {
-        color: '#e8e2d8',
-        roughness: 0.62,
-        metalness: 0.12,
-        flatShading: true,
-      })
+      h('meshStandardMaterial', { color: '#e8e2d8', roughness: 0.62, metalness: 0.12, flatShading: true })
     ),
     h(
       'mesh',
       { position: [0, 0.16, 0] },
       h('sphereGeometry', { args: [1.032, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.52] }),
-      h('meshStandardMaterial', {
-        color: '#2b3442',
-        wireframe: true,
-        roughness: 0.45,
-        metalness: 0.65,
-      })
+      h('meshStandardMaterial', { color: '#2b3442', wireframe: true, roughness: 0.45, metalness: 0.65 })
     ),
     ...windowAngles.map((ang, i) =>
       h(
@@ -324,12 +435,7 @@ function GeodesicDome({ rate, selected, hovered, onHover, onSelect, burstSignal 
       'mesh',
       { ref: beaconRef, position: [0, 1.7, 0] },
       h('octahedronGeometry', { args: [0.065, 0] }),
-      h('meshStandardMaterial', {
-        color: '#ffb340',
-        emissive: '#ff9f0a',
-        emissiveIntensity: 1.6,
-        toneMapped: false,
-      })
+      h('meshStandardMaterial', { color: '#ffb340', emissive: '#ff9f0a', emissiveIntensity: 1.6, toneMapped: false })
     ),
     h('pointLight', {
       ref: windowLightRef,
@@ -344,19 +450,18 @@ function GeodesicDome({ rate, selected, hovered, onHover, onSelect, burstSignal 
 }
 
 /* ============================================================================
-   3. Connecting Tunnels + 3 Cylindrical Habitat Modules (TRK-04)
+   4. Habitat Modules x3 (TRK-04) + Pressurized Tunnels
    ============================================================================ */
 function HabitatModules({ rate, selected, hovered, onHover, onSelect }) {
   const modules = useMemo(
     () => [
-      { angle: (210 * Math.PI) / 180, dist: 1.88 },
-      { angle: (330 * Math.PI) / 180, dist: 1.88 },
-      { angle: (90 * Math.PI) / 180, dist: 1.88 },
+      { angle: (30 * Math.PI) / 180, dist: 2.05 },
+      { angle: (145 * Math.PI) / 180, dist: 1.85 },
+      { angle: (90 * Math.PI) / 180, dist: 1.85 },
     ],
     []
   );
-
-  const lifeIntensity = 0.25 + rate * 2.3 + (selected ? 0.45 : 0) + (hovered ? 0.25 : 0);
+  const lifeIntensity = 0.25 + rate * 2.3 + (selected ? 0.5 : 0) + (hovered ? 0.25 : 0);
 
   return h(
     'group',
@@ -474,12 +579,7 @@ function HabitatModules({ rate, selected, hovered, onHover, onSelect }) {
               'mesh',
               { position: [0, -0.38, 0], rotation: [-Math.PI / 2, 0, 0] },
               h('ringGeometry', { args: [0.62, 0.72, 20] }),
-              h('meshBasicMaterial', {
-                color: '#10b981',
-                transparent: true,
-                opacity: selected ? 0.85 : 0.45,
-                side: THREE.DoubleSide,
-              })
+              h('meshBasicMaterial', { color: '#10b981', transparent: true, opacity: selected ? 0.88 : 0.45, side: THREE.DoubleSide })
             ),
           rate > 0 &&
             h('pointLight', {
@@ -496,32 +596,241 @@ function HabitatModules({ rate, selected, hovered, onHover, onSelect }) {
 }
 
 /* ============================================================================
-   4. Solar Panel Arrays (Interactive Global Power Grid -> Show All Tracks)
+   5. NEW Astroneer Station A: Deep-Space Radar Dish (radar_jobs — 채용·외주·공모)
    ============================================================================ */
-function SolarArrays({ avgRate, hovered, onHover, onSelectAll }) {
-  const arrays = [
-    { pos: [1.55, 0.04, -1.55], rotY: -0.55 },
-    { pos: [2.15, 0.04, -1.05], rotY: -0.55 },
-    { pos: [-1.52, 0.04, 2.02], rotY: 0.45 },
-  ];
+function DeepSpaceRadarStation({ selected, hovered, onHover, onSelect }) {
+  const dishRef = useRef();
+
+  useFrame((state) => {
+    if (!dishRef.current || PREFERS_REDUCED_MOTION) return;
+    dishRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.55) * 0.7 - 0.6;
+  });
 
   return h(
     'group',
     {
-      name: 'SolarArrays',
+      position: STATION_ANCHORS.radar_jobs.pos,
       onClick: (e) => {
         e.stopPropagation();
-        onSelectAll();
+        onSelect('radar_jobs');
       },
       onPointerOver: (e) => {
         e.stopPropagation();
-        onHover('ALL');
+        onHover('radar_jobs');
       },
       onPointerOut: (e) => {
         e.stopPropagation();
         onHover(null);
       },
     },
+    // Base pad
+    h(
+      'mesh',
+      { position: [0, 0.1, 0], castShadow: true, receiveShadow: true },
+      h('cylinderGeometry', { args: [0.58, 0.68, 0.2, 8] }),
+      h('meshStandardMaterial', { color: '#334155', roughness: 0.6, metalness: 0.4, flatShading: true })
+    ),
+    (selected || hovered) &&
+      h(
+        'mesh',
+        { position: [0, 0.04, 0], rotation: [-Math.PI / 2, 0, 0] },
+        h('ringGeometry', { args: [0.74, 0.86, 24] }),
+        h('meshBasicMaterial', { color: '#60a5fa', transparent: true, opacity: selected ? 0.9 : 0.5, side: THREE.DoubleSide })
+      ),
+    // Pedestal mast
+    h(
+      'mesh',
+      { position: [0, 0.52, 0], castShadow: true },
+      h('cylinderGeometry', { args: [0.16, 0.24, 0.7, 8] }),
+      h('meshStandardMaterial', { color: '#cbd5e1', roughness: 0.5, metalness: 0.28, flatShading: true })
+    ),
+    // Rotating parabolic dish assembly
+    h(
+      'group',
+      { ref: dishRef, position: [0, 0.95, 0] },
+      h(
+        'mesh',
+        { rotation: [0.65, 0, 0], castShadow: true },
+        h('cylinderGeometry', { args: [0.68, 0.14, 0.26, 12, 1, true] }),
+        h('meshStandardMaterial', { color: '#e2e8f0', roughness: 0.45, metalness: 0.35, side: THREE.DoubleSide, flatShading: true })
+      ),
+      h(
+        'mesh',
+        { position: [0, 0.26, 0.18], rotation: [0.65, 0, 0] },
+        h('cylinderGeometry', { args: [0.025, 0.04, 0.45, 6] }),
+        h('meshStandardMaterial', { color: '#475569', metalness: 0.6, roughness: 0.35 })
+      ),
+      h(
+        'mesh',
+        { position: [0, 0.42, 0.3] },
+        h('octahedronGeometry', { args: [0.09, 0] }),
+        h('meshStandardMaterial', {
+          color: '#93c5fd',
+          emissive: '#3b82f6',
+          emissiveIntensity: selected ? 2.8 : 1.7,
+          toneMapped: false,
+        })
+      ),
+      h('pointLight', { position: [0, 0.45, 0.35], color: '#60a5fa', intensity: 1.1, distance: 3, decay: 2 })
+    )
+  );
+}
+
+/* ============================================================================
+   6. NEW Astroneer Station B: Research & Printer Lab (research_lab — 직군분석·이력서)
+   ============================================================================ */
+function ResearchLabStation({ selected, hovered, onHover, onSelect }) {
+  const crystalRef = useRef();
+
+  useFrame((state, delta) => {
+    if (!crystalRef.current || PREFERS_REDUCED_MOTION) return;
+    crystalRef.current.rotation.y += delta * 1.4;
+    crystalRef.current.position.y = 0.66 + Math.sin(state.clock.elapsedTime * 2.2) * 0.06;
+  });
+
+  return h(
+    'group',
+    {
+      position: STATION_ANCHORS.research_lab.pos,
+      onClick: (e) => {
+        e.stopPropagation();
+        onSelect('research_lab');
+      },
+      onPointerOver: (e) => {
+        e.stopPropagation();
+        onHover('research_lab');
+      },
+      onPointerOut: (e) => {
+        e.stopPropagation();
+        onHover(null);
+      },
+    },
+    h(
+      'mesh',
+      { position: [0, 0.14, 0], castShadow: true, receiveShadow: true },
+      h('cylinderGeometry', { args: [0.64, 0.72, 0.28, 6] }),
+      h('meshStandardMaterial', { color: '#3b3754', roughness: 0.6, metalness: 0.35, flatShading: true })
+    ),
+    (selected || hovered) &&
+      h(
+        'mesh',
+        { position: [0, 0.04, 0], rotation: [-Math.PI / 2, 0, 0] },
+        h('ringGeometry', { args: [0.8, 0.92, 24] }),
+        h('meshBasicMaterial', { color: '#a78bfa', transparent: true, opacity: selected ? 0.9 : 0.5, side: THREE.DoubleSide })
+      ),
+    // Translucent glass research pod
+    h(
+      'mesh',
+      { position: [0, 0.62, 0], castShadow: true },
+      h('cylinderGeometry', { args: [0.46, 0.52, 0.68, 6] }),
+      h('meshStandardMaterial', { color: '#c4b5fd', transparent: true, opacity: 0.32, roughness: 0.15, metalness: 0.2 })
+    ),
+    // Top cap
+    h(
+      'mesh',
+      { position: [0, 0.98, 0], castShadow: true },
+      h('cylinderGeometry', { args: [0.34, 0.48, 0.14, 6] }),
+      h('meshStandardMaterial', { color: '#e2e8f0', roughness: 0.5, flatShading: true })
+    ),
+    // Floating holographic AI research crystal
+    h(
+      'mesh',
+      { ref: crystalRef, position: [0, 0.66, 0] },
+      h('octahedronGeometry', { args: [0.22, 0] }),
+      h('meshStandardMaterial', {
+        color: '#ddd6fe',
+        emissive: '#8b5cf6',
+        emissiveIntensity: selected ? 2.6 : 1.8,
+        toneMapped: false,
+      })
+    ),
+    h('pointLight', { position: [0, 0.7, 0], color: '#a78bfa', intensity: 1.25, distance: 3, decay: 2 })
+  );
+}
+
+/* ============================================================================
+   7. NEW Astroneer Station C: Mission Control Tower (warroom_hub — 일정·워룸·재무)
+   ============================================================================ */
+function WarRoomControlStation({ selected, hovered, onHover, onSelect }) {
+  const ringRef = useRef();
+
+  useFrame((state) => {
+    if (!ringRef.current) return;
+    ringRef.current.material.emissiveIntensity = 1.2 + Math.sin(state.clock.elapsedTime * 2.8) * 0.6;
+  });
+
+  return h(
+    'group',
+    {
+      position: STATION_ANCHORS.warroom_hub.pos,
+      onClick: (e) => {
+        e.stopPropagation();
+        onSelect('warroom_hub');
+      },
+      onPointerOver: (e) => {
+        e.stopPropagation();
+        onHover('warroom_hub');
+      },
+      onPointerOut: (e) => {
+        e.stopPropagation();
+        onHover(null);
+      },
+    },
+    // Octagonal landing pad
+    h(
+      'mesh',
+      { position: [0, 0.06, 0], castShadow: true, receiveShadow: true },
+      h('cylinderGeometry', { args: [0.76, 0.84, 0.12, 8] }),
+      h('meshStandardMaterial', { color: '#2e3748', roughness: 0.7, metalness: 0.32, flatShading: true })
+    ),
+    (selected || hovered) &&
+      h(
+        'mesh',
+        { position: [0, 0.03, 0], rotation: [-Math.PI / 2, 0, 0] },
+        h('ringGeometry', { args: [0.9, 1.02, 24] }),
+        h('meshBasicMaterial', { color: '#fb7185', transparent: true, opacity: selected ? 0.9 : 0.5, side: THREE.DoubleSide })
+      ),
+    // Control tower shaft
+    h(
+      'mesh',
+      { position: [0, 0.55, 0], castShadow: true },
+      h('boxGeometry', { args: [0.36, 0.9, 0.36] }),
+      h('meshStandardMaterial', { color: '#e2e8f0', roughness: 0.55, flatShading: true })
+    ),
+    // Control deck cabin
+    h(
+      'mesh',
+      { position: [0, 1.05, 0], castShadow: true },
+      h('cylinderGeometry', { args: [0.46, 0.34, 0.28, 6] }),
+      h('meshStandardMaterial', { color: '#334155', roughness: 0.45, metalness: 0.45, flatShading: true })
+    ),
+    // Glowing War-Room ring
+    h(
+      'mesh',
+      { ref: ringRef, position: [0, 1.05, 0] },
+      h('cylinderGeometry', { args: [0.48, 0.48, 0.08, 6] }),
+      h('meshStandardMaterial', {
+        color: '#fda4af',
+        emissive: '#f43f5e',
+        emissiveIntensity: 1.5,
+        toneMapped: false,
+      })
+    ),
+    h('pointLight', { position: [0, 1.15, 0], color: '#fb7185', intensity: 1.05, distance: 3, decay: 2 })
+  );
+}
+
+/* ============================================================================
+   8. Solar Panel Arrays + Wind Turbines (TRK-01) + Rovers (TRK-02)
+   ============================================================================ */
+function SolarArrays({ avgRate }) {
+  const arrays = [
+    { pos: [1.55, 0.04, -1.25], rotY: -0.55 },
+    { pos: [-1.45, 0.04, 2.38], rotY: 0.45 },
+  ];
+  return h(
+    'group',
+    { name: 'SolarArrays' },
     ...arrays.map((a, idx) =>
       h(
         'group',
@@ -532,35 +841,23 @@ function SolarArrays({ avgRate, hovered, onHover, onSelectAll }) {
           h('cylinderGeometry', { args: [0.045, 0.07, 0.32, 6] }),
           h('meshStandardMaterial', { color: '#475569', roughness: 0.5, metalness: 0.55 })
         ),
-        hovered &&
-          h(
-            'mesh',
-            { position: [0, 0.02, 0], rotation: [-Math.PI / 2, 0, 0] },
-            h('ringGeometry', { args: [0.46, 0.54, 16] }),
-            h('meshBasicMaterial', {
-              color: '#60a5fa',
-              transparent: true,
-              opacity: 0.65,
-              side: THREE.DoubleSide,
-            })
-          ),
         h(
           'group',
           { position: [0, 0.34, 0], rotation: [0.46, 0, 0] },
           h(
             'mesh',
             { castShadow: true, receiveShadow: true },
-            h('boxGeometry', { args: [0.92, 0.04, 0.56] }),
+            h('boxGeometry', { args: [0.88, 0.04, 0.52] }),
             h('meshStandardMaterial', { color: '#cbd5e1', roughness: 0.35, metalness: 0.68 })
           ),
           h(
             'mesh',
             { position: [0, 0.025, 0] },
-            h('boxGeometry', { args: [0.84, 0.015, 0.48] }),
+            h('boxGeometry', { args: [0.8, 0.015, 0.44] }),
             h('meshStandardMaterial', {
               color: '#1b4a8f',
               emissive: '#0ea5e9',
-              emissiveIntensity: 0.28 + avgRate * 0.65 + (hovered ? 0.35 : 0),
+              emissiveIntensity: 0.28 + avgRate * 0.65,
               roughness: 0.18,
               metalness: 0.78,
             })
@@ -571,17 +868,12 @@ function SolarArrays({ avgRate, hovered, onHover, onSelectAll }) {
   );
 }
 
-/* ============================================================================
-   5. 3 Rotating Wind Turbines (TRK-01)
-   ============================================================================ */
 function SingleTurbine({ pos, height, rate, selected, hovered }) {
   const rotorRef = useRef();
-
   useFrame((_, delta) => {
     if (!rotorRef.current) return;
     const motionScale = PREFERS_REDUCED_MOTION ? 0.15 : 1;
-    const speed = (0.55 + rate * 3.85) * motionScale;
-    rotorRef.current.rotation.z -= delta * speed;
+    rotorRef.current.rotation.z -= delta * (0.55 + rate * 3.85) * motionScale;
   });
 
   return h(
@@ -597,13 +889,8 @@ function SingleTurbine({ pos, height, rate, selected, hovered }) {
       h(
         'mesh',
         { position: [0, 0.03, 0], rotation: [-Math.PI / 2, 0, 0] },
-        h('ringGeometry', { args: [0.28, 0.36, 16] }),
-        h('meshBasicMaterial', {
-          color: '#38bdf8',
-          transparent: true,
-          opacity: selected ? 0.85 : 0.45,
-          side: THREE.DoubleSide,
-        })
+        h('ringGeometry', { args: [0.28, 0.38, 16] }),
+        h('meshBasicMaterial', { color: '#38bdf8', transparent: true, opacity: selected ? 0.88 : 0.48, side: THREE.DoubleSide })
       ),
     h(
       'mesh',
@@ -621,12 +908,7 @@ function SingleTurbine({ pos, height, rate, selected, hovered }) {
       'mesh',
       { position: [0, height + 0.19, 0.02] },
       h('boxGeometry', { args: [0.06, 0.05, 0.06] }),
-      h('meshStandardMaterial', {
-        color: '#38bdf8',
-        emissive: '#0ea5e9',
-        emissiveIntensity: 0.5 + rate * 2.2,
-        toneMapped: false,
-      })
+      h('meshStandardMaterial', { color: '#38bdf8', emissive: '#0ea5e9', emissiveIntensity: 0.5 + rate * 2.2, toneMapped: false })
     ),
     h(
       'group',
@@ -655,11 +937,10 @@ function SingleTurbine({ pos, height, rate, selected, hovered }) {
 
 function WindTurbines({ rate, selected, hovered, onHover, onSelect }) {
   const turbines = [
-    { pos: [-2.25, 0.02, -1.95], height: 1.75 },
-    { pos: [-1.45, 0.02, -2.35], height: 1.48 },
-    { pos: [-2.42, 0.02, -1.02], height: 1.58 },
+    { pos: [-2.55, 0.02, -2.25], height: 1.78 },
+    { pos: [-1.72, 0.02, -2.55], height: 1.5 },
+    { pos: [-2.68, 0.02, -1.28], height: 1.6 },
   ];
-
   return h(
     'group',
     {
@@ -677,33 +958,11 @@ function WindTurbines({ rate, selected, hovered, onHover, onSelect }) {
         onHover(null);
       },
     },
-    ...turbines.map((t, i) =>
-      h(SingleTurbine, {
-        key: `wt-${i}`,
-        pos: t.pos,
-        height: t.height,
-        rate,
-        selected,
-        hovered,
-      })
-    )
+    ...turbines.map((t, i) => h(SingleTurbine, { key: `wt-${i}`, pos: t.pos, height: t.height, rate, selected, hovered }))
   );
 }
 
-/* ============================================================================
-   6. 2 Moving Exploration Rovers (TRK-02)
-   ============================================================================ */
-function ExplorationRover({
-  orbitRadiusX,
-  orbitRadiusZ,
-  phaseOffset,
-  direction,
-  rate,
-  selected,
-  hovered,
-  onHover,
-  onSelect,
-}) {
+function ExplorationRover({ orbitRadiusX, orbitRadiusZ, phaseOffset, direction, rate, selected, hovered, onHover, onSelect }) {
   const roverRef = useRef();
   const angleRef = useRef(phaseOffset);
   const headlightOn = rate > 0;
@@ -712,19 +971,15 @@ function ExplorationRover({
   useFrame((_, delta) => {
     if (!roverRef.current) return;
     const motionScale = PREFERS_REDUCED_MOTION ? 0.15 : 1;
-    const moveSpeed = headlightOn ? (0.2 + rate * 0.42) * direction * motionScale : 0;
+    const moveSpeed = headlightOn ? (0.18 + rate * 0.38) * direction * motionScale : 0;
     angleRef.current += delta * moveSpeed;
 
     const a = angleRef.current;
     const x = Math.cos(a) * orbitRadiusX;
     const z = Math.sin(a) * orbitRadiusZ;
-
     const aNext = a + 0.04 * direction;
-    const xNext = Math.cos(aNext) * orbitRadiusX;
-    const zNext = Math.sin(aNext) * orbitRadiusZ;
-
     roverRef.current.position.set(x, 0.14 + (headlightOn ? Math.sin(a * 12) * 0.012 : 0), z);
-    roverRef.current.rotation.y = Math.atan2(xNext - x, zNext - z);
+    roverRef.current.rotation.y = Math.atan2(Math.cos(aNext) * orbitRadiusX - x, Math.sin(aNext) * orbitRadiusZ - z);
   });
 
   const wheelPositions = [
@@ -812,50 +1067,127 @@ function ExplorationRover({
           depthWrite: false,
         })
       ),
-    headlightOn &&
-      h('pointLight', {
-        position: [0, 0.12, 0.5],
-        color: '#fef3c7',
-        intensity: 0.45 + rate * 1.15,
-        distance: 2.2,
-        decay: 2,
-      }),
+    headlightOn && h('pointLight', { position: [0, 0.12, 0.5], color: '#fef3c7', intensity: 0.45 + rate * 1.15, distance: 2.2, decay: 2 }),
     (selected || hovered) &&
       h(
         'mesh',
         { position: [0, -0.09, 0], rotation: [-Math.PI / 2, 0, 0] },
-        h('ringGeometry', { args: [0.34, 0.42, 16] }),
-        h('meshBasicMaterial', {
-          color: '#fde047',
-          transparent: true,
-          opacity: selected ? 0.85 : 0.45,
-          side: THREE.DoubleSide,
-        })
+        h('ringGeometry', { args: [0.34, 0.44, 16] }),
+        h('meshBasicMaterial', { color: '#fde047', transparent: true, opacity: selected ? 0.88 : 0.48, side: THREE.DoubleSide })
       )
   );
 }
 
 /* ============================================================================
-   7. Reflective Dark Studio Floor + Procedural Studio IBL + Diorama Assembly
+   9. Diegetic Floating 3D Station Pins (Astroneer In-World Hologram Badges)
+   ============================================================================ */
+function DiegeticStationPins({ gameState, selectedStation, onSelect, visible }) {
+  if (!visible) return null;
+  const tracks = gameState.tracks || DEFAULT_GAME_STATE.tracks;
+  const stats = gameState.stats || DEFAULT_GAME_STATE.stats;
+
+  const pins = [
+    {
+      id: 'TRK-01',
+      pos: STATION_ANCHORS['TRK-01'].pinPos,
+      color: '#38bdf8',
+      label: '풍력 발전소',
+      metric: `${Math.round((tracks['TRK-01']?.rate || 0) * 100)}%`,
+    },
+    {
+      id: 'TRK-02',
+      pos: STATION_ANCHORS['TRK-02'].pinPos,
+      color: '#fde047',
+      label: '탐사 로버',
+      metric: `${Math.round((tracks['TRK-02']?.rate || 0) * 100)}%`,
+    },
+    {
+      id: 'TRK-03',
+      pos: STATION_ANCHORS['TRK-03'].pinPos,
+      color: '#ff9f0a',
+      label: '중앙 본부 돔',
+      metric: `${Math.round((tracks['TRK-03']?.rate || 0) * 100)}%`,
+    },
+    {
+      id: 'TRK-04',
+      pos: STATION_ANCHORS['TRK-04'].pinPos,
+      color: '#10b981',
+      label: '생명유지 모듈',
+      metric: `${Math.round((tracks['TRK-04']?.rate || 0) * 100)}%`,
+    },
+    {
+      id: 'radar_jobs',
+      pos: STATION_ANCHORS.radar_jobs.pinPos,
+      color: '#60a5fa',
+      label: '기회 레이더',
+      metric: stats.totalJobs > 0 ? `${stats.totalJobs}건` : 'SCAN',
+    },
+    {
+      id: 'research_lab',
+      pos: STATION_ANCHORS.research_lab.pinPos,
+      color: '#a78bfa',
+      label: 'AI 연구실',
+      metric: 'LAB',
+    },
+    {
+      id: 'warroom_hub',
+      pos: STATION_ANCHORS.warroom_hub.pinPos,
+      color: '#fb7185',
+      label: '워룸 관제탑',
+      metric: 'D-30',
+    },
+  ];
+
+  return h(
+    'group',
+    { name: 'DiegeticStationPins' },
+    ...pins.map((p) => {
+      const isSelected = selectedStation === p.id;
+      return h(
+        Html,
+        { key: `pin-${p.id}`, position: p.pos, center: true, zIndexRange: [15, 0] },
+        h(
+          'button',
+          {
+            type: 'button',
+            className: `astro-pin ${isSelected ? 'is-selected' : ''}`,
+            style: { '--pin-accent': p.color },
+            onClick: (e) => {
+              e.stopPropagation();
+              onSelect(p.id);
+            },
+          },
+          h('span', { className: 'astro-pin-dot' }),
+          h('span', { className: 'astro-pin-label' }, p.label),
+          h('span', { className: 'astro-pin-val num' }, p.metric)
+        )
+      );
+    })
+  );
+}
+
+/* ============================================================================
+   10. Full Scene Assembly
    ============================================================================ */
 function MarsDioramaScene({
-  trackState,
-  selectedTrack,
-  onSelectTrack,
+  gameState,
+  selectedStation,
+  drawerOpen,
+  onSelectStation,
   screensaverMode,
   burstSignal,
   resetSignal,
 }) {
-  const [hoveredTrack, setHoveredTrack] = useState(null);
+  const [hoveredStation, setHoveredStation] = useState(null);
   const dioramaRef = useRef();
   const controlsRef = useRef();
 
   useEffect(() => {
-    document.body.style.cursor = hoveredTrack ? 'pointer' : 'auto';
+    document.body.style.cursor = hoveredStation ? 'pointer' : 'auto';
     return () => {
       document.body.style.cursor = 'auto';
     };
-  }, [hoveredTrack]);
+  }, [hoveredStation]);
 
   useEffect(() => {
     if (resetSignal > 0 && controlsRef.current) {
@@ -865,225 +1197,164 @@ function MarsDioramaScene({
 
   useFrame((state) => {
     if (dioramaRef.current && !PREFERS_REDUCED_MOTION) {
-      dioramaRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.85) * 0.05;
+      dioramaRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.8) * 0.045;
     }
   });
 
-  const trk1 = trackState['TRK-01']?.rate ?? 0.33;
-  const trk2 = trackState['TRK-02']?.rate ?? 0.33;
-  const trk3 = trackState['TRK-03']?.rate ?? 0.33;
-  const trk4 = trackState['TRK-04']?.rate ?? 0.33;
+  const tracks = gameState.tracks || DEFAULT_GAME_STATE.tracks;
+  const trk1 = tracks['TRK-01']?.rate ?? 0.33;
+  const trk2 = tracks['TRK-02']?.rate ?? 0.33;
+  const trk3 = tracks['TRK-03']?.rate ?? 0.33;
+  const trk4 = tracks['TRK-04']?.rate ?? 0.33;
   const avgRate = (trk1 + trk2 + trk3 + trk4) / 4;
-
-  // Strictly disguised Sector Twin terminology (never expose job-hunting terms on the 3D canvas)
-  const hoverLabels = {
-    'TRK-01': { title: 'WIND TURBINE ×3', sub: 'SECTOR-01 · POWER OUTPUT', pos: [-2.1, 2.3, -1.8] },
-    'TRK-02': { title: 'SCOUT ROVER ×2', sub: 'SECTOR-02 · PERIMETER PATROL', pos: [0, 1.25, 2.3] },
-    'TRK-03': { title: 'GEODESIC DOME', sub: 'SECTOR-03 · ASSET CORE', pos: [0, 2.05, 0] },
-    'TRK-04': { title: 'HABITAT MODULE ×3', sub: 'SECTOR-04 · LIFE SUPPORT', pos: [1.7, 1.25, 1.0] },
-    ALL: { title: 'SOLAR ARRAY ×3', sub: 'GLOBAL GRID · SHOW ALL SECTORS', pos: [1.8, 1.0, -1.3] },
-  };
-  const activeHover = hoveredTrack ? hoverLabels[hoveredTrack] : null;
 
   return h(
     React.Fragment,
     null,
     h('color', { attach: 'background', args: ['#080c15'] }),
-    h('fog', { attach: 'fog', args: ['#080c15', 19, 44] }),
+    h('fog', { attach: 'fog', args: ['#080c15', 22, 48] }),
 
-    // Procedural Studio IBL (zero external HDRI fetch; brings reflective dark floor & metallic struts to life)
+    // Procedural Studio IBL
     h(
       Environment,
       { resolution: 256, frames: 1 },
-      h(Lightformer, {
-        form: 'rect',
-        intensity: 2.2,
-        color: '#ffb074',
-        position: [6, 8, 6],
-        scale: [8, 4, 1],
-        target: [0, 0, 0],
-      }),
-      h(Lightformer, {
-        form: 'rect',
-        intensity: 1.6,
-        color: '#6ca6ff',
-        position: [-8, 5, -7],
-        scale: [10, 4, 1],
-        target: [0, 0, 0],
-      }),
-      h(Lightformer, {
-        form: 'ring',
-        intensity: 1.1,
-        color: '#ff8a4c',
-        position: [0, 10, 0],
-        rotation: [Math.PI / 2, 0, 0],
-        scale: 12,
-      })
+      h(Lightformer, { form: 'rect', intensity: 2.2, color: '#ffb074', position: [6, 8, 6], scale: [8, 4, 1], target: [0, 0, 0] }),
+      h(Lightformer, { form: 'rect', intensity: 1.6, color: '#6ca6ff', position: [-8, 5, -7], scale: [10, 4, 1], target: [0, 0, 0] }),
+      h(Lightformer, { form: 'ring', intensity: 1.1, color: '#ff8a4c', position: [0, 10, 0], rotation: [Math.PI / 2, 0, 0], scale: 12 })
     ),
 
-    // Responsive Orthographic Camera Zoom
-    h(ResponsiveCameraRig, { screensaverMode }),
+    h(AstroneerCameraRig, { controlsRef, selectedStation, drawerOpen, screensaverMode }),
 
-    // Warm Amber Key Light + Soft Shadows + Cool Rim Light
-    h('hemisphereLight', { args: ['#ffd5b3', '#161b29', 0.62] }),
+    h('hemisphereLight', { args: ['#ffd5b3', '#161b29', 0.64] }),
     h('directionalLight', {
-      position: [9, 13, 8],
-      intensity: 2.2,
+      position: [10, 14, 9],
+      intensity: 2.25,
       color: '#ffab6b',
       castShadow: true,
       'shadow-mapSize-width': 2048,
       'shadow-mapSize-height': 2048,
       'shadow-camera-near': 2,
-      'shadow-camera-far': 30,
-      'shadow-camera-left': -6,
-      'shadow-camera-right': 6,
-      'shadow-camera-top': 6,
-      'shadow-camera-bottom': -6,
+      'shadow-camera-far': 34,
+      'shadow-camera-left': -7.5,
+      'shadow-camera-right': 7.5,
+      'shadow-camera-top': 7.5,
+      'shadow-camera-bottom': -7.5,
       'shadow-bias': -0.0004,
       'shadow-radius': 4,
     }),
-    h('directionalLight', {
-      position: [-10, 6, -9],
-      intensity: 1.05,
-      color: '#6ca6ff',
-    }),
-    h('pointLight', {
-      position: [0, -1.42, 0],
-      intensity: 0.72,
-      color: '#e0622d',
-      distance: 9,
-    }),
+    h('directionalLight', { position: [-11, 7, -10], intensity: 1.05, color: '#6ca6ff' }),
+    h('pointLight', { position: [0, -1.42, 0], intensity: 0.78, color: '#e0622d', distance: 10 }),
 
-    // Subtle Martian Atmospheric Dust Motes
     !PREFERS_REDUCED_MOTION &&
-      h(Sparkles, {
-        count: 34,
-        scale: [9, 5, 9],
-        position: [0, 1.2, 0],
-        size: 1.6,
-        speed: 0.22,
-        opacity: 0.32,
-        color: '#ffbe8a',
-      }),
+      h(Sparkles, { count: 40, scale: [11, 5.5, 11], position: [0, 1.3, 0], size: 1.6, speed: 0.22, opacity: 0.34, color: '#ffbe8a' }),
 
-    // Floating Diorama Group
     h(
       'group',
       { ref: dioramaRef },
       h(MarsTerrainBlock),
+      h(TetherNetwork, { tracks }),
       h(GeodesicDome, {
         rate: trk3,
-        selected: selectedTrack === 'TRK-03',
-        hovered: hoveredTrack === 'TRK-03',
-        onHover: setHoveredTrack,
-        onSelect: onSelectTrack,
+        selected: selectedStation === 'TRK-03',
+        hovered: hoveredStation === 'TRK-03',
+        onHover: setHoveredStation,
+        onSelect: onSelectStation,
         burstSignal,
       }),
       h(HabitatModules, {
         rate: trk4,
-        selected: selectedTrack === 'TRK-04',
-        hovered: hoveredTrack === 'TRK-04',
-        onHover: setHoveredTrack,
-        onSelect: onSelectTrack,
+        selected: selectedStation === 'TRK-04',
+        hovered: hoveredStation === 'TRK-04',
+        onHover: setHoveredStation,
+        onSelect: onSelectStation,
       }),
-      h(SolarArrays, {
-        avgRate,
-        hovered: hoveredTrack === 'ALL',
-        onHover: setHoveredTrack,
-        onSelectAll: () => onSelectTrack(null),
+      h(DeepSpaceRadarStation, {
+        selected: selectedStation === 'radar_jobs',
+        hovered: hoveredStation === 'radar_jobs',
+        onHover: setHoveredStation,
+        onSelect: onSelectStation,
       }),
+      h(ResearchLabStation, {
+        selected: selectedStation === 'research_lab',
+        hovered: hoveredStation === 'research_lab',
+        onHover: setHoveredStation,
+        onSelect: onSelectStation,
+      }),
+      h(WarRoomControlStation, {
+        selected: selectedStation === 'warroom_hub',
+        hovered: hoveredStation === 'warroom_hub',
+        onHover: setHoveredStation,
+        onSelect: onSelectStation,
+      }),
+      h(SolarArrays, { avgRate }),
       h(WindTurbines, {
         rate: trk1,
-        selected: selectedTrack === 'TRK-01',
-        hovered: hoveredTrack === 'TRK-01',
-        onHover: setHoveredTrack,
-        onSelect: onSelectTrack,
+        selected: selectedStation === 'TRK-01',
+        hovered: hoveredStation === 'TRK-01',
+        onHover: setHoveredStation,
+        onSelect: onSelectStation,
       }),
       h(ExplorationRover, {
-        orbitRadiusX: 2.48,
-        orbitRadiusZ: 2.38,
-        phaseOffset: 0.55,
+        orbitRadiusX: 3.05,
+        orbitRadiusZ: 2.9,
+        phaseOffset: 0.65,
         direction: 1,
         rate: trk2,
-        selected: selectedTrack === 'TRK-02',
-        hovered: hoveredTrack === 'TRK-02',
-        onHover: setHoveredTrack,
-        onSelect: onSelectTrack,
+        selected: selectedStation === 'TRK-02',
+        hovered: hoveredStation === 'TRK-02',
+        onHover: setHoveredStation,
+        onSelect: onSelectStation,
       }),
       h(ExplorationRover, {
-        orbitRadiusX: 2.18,
-        orbitRadiusZ: 2.58,
-        phaseOffset: 3.65,
+        orbitRadiusX: 2.75,
+        orbitRadiusZ: 3.12,
+        phaseOffset: 3.75,
         direction: -1,
         rate: trk2,
-        selected: selectedTrack === 'TRK-02',
-        hovered: hoveredTrack === 'TRK-02',
-        onHover: setHoveredTrack,
-        onSelect: onSelectTrack,
+        selected: selectedStation === 'TRK-02',
+        hovered: hoveredStation === 'TRK-02',
+        onHover: setHoveredStation,
+        onSelect: onSelectStation,
       }),
-      !screensaverMode &&
-        activeHover &&
-        h(
-          Html,
-          { position: activeHover.pos, center: true, style: { pointerEvents: 'none' } },
-          h(
-            'div',
-            { className: 'mars-3d-tooltip' },
-            h('strong', null, activeHover.title),
-            h('span', null, activeHover.sub)
-          )
-        )
+      h(DiegeticStationPins, {
+        gameState,
+        selectedStation,
+        onSelect: onSelectStation,
+        visible: !screensaverMode,
+      })
     ),
 
-    // Reflective Dark Studio Floor Plane (now catching procedural Lightformer reflections)
+    // Reflective Dark Studio Floor Plane (clicking empty space pulls camera back & closes drawer)
     h(
       'mesh',
       {
         position: [0, -1.72, 0],
         rotation: [-Math.PI / 2, 0, 0],
         receiveShadow: true,
-        onClick: () => onSelectTrack(null),
+        onClick: () => onSelectStation(null),
       },
-      h('planeGeometry', { args: [60, 60] }),
-      h('meshStandardMaterial', {
-        color: '#0e1422',
-        roughness: 0.2,
-        metalness: 0.78,
-      })
+      h('planeGeometry', { args: [70, 70] }),
+      h('meshStandardMaterial', { color: '#0e1422', roughness: 0.2, metalness: 0.78 })
     ),
-    // Subtle studio plinth halo ring on the reflective floor
     h(
       'mesh',
       { position: [0, -1.71, 0], rotation: [-Math.PI / 2, 0, 0] },
-      h('ringGeometry', { args: [4.25, 4.35, 64] }),
-      h('meshBasicMaterial', {
-        color: '#ff9f4a',
-        transparent: true,
-        opacity: 0.14,
-        side: THREE.DoubleSide,
-      })
+      h('ringGeometry', { args: [5.1, 5.22, 72] }),
+      h('meshBasicMaterial', { color: '#ff9f4a', transparent: true, opacity: 0.15, side: THREE.DoubleSide })
     ),
-    h(ContactShadows, {
-      position: [0, -1.7, 0],
-      opacity: 0.72,
-      scale: 13.5,
-      blur: 2.4,
-      far: 4.5,
-      color: '#000000',
-    }),
+    h(ContactShadows, { position: [0, -1.7, 0], opacity: 0.72, scale: 16, blur: 2.4, far: 4.8, color: '#000000' }),
 
-    // Isometric OrbitControls centered slightly lower to balance HUD
     h(OrbitControls, {
       ref: controlsRef,
       makeDefault: true,
-      target: [0, -0.18, 0],
+      target: [0, -0.1, 0],
       enablePan: false,
       enableDamping: true,
       dampingFactor: 0.06,
       minPolarAngle: Math.PI / 6,
       maxPolarAngle: Math.PI / 2.25,
-      minZoom: 40,
-      maxZoom: 112,
+      minZoom: 36,
+      maxZoom: 118,
       autoRotate: screensaverMode && !PREFERS_REDUCED_MOTION,
       autoRotateSpeed: screensaverMode ? 0.55 : 0,
     })
@@ -1091,53 +1362,68 @@ function MarsDioramaScene({
 }
 
 /* ============================================================================
-   8. React Root Wrapper + Event Bridge to app.js
+   11. React Root Wrapper + Event Bridge
    ============================================================================ */
 function MarsViewportApp() {
-  const [trackState, setTrackState] = useState(() => window.__MARS_TRACK_STATE__ || DEFAULT_TRACK_STATE);
-  const [selectedTrack, setSelectedTrack] = useState(null);
+  const [gameState, setGameState] = useState(() => window.__MARS_GAME_STATE__ || DEFAULT_GAME_STATE);
+  const [selectedStation, setSelectedStation] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [screensaverMode, setScreensaverMode] = useState(() => Boolean(window.__MARS_SCREENSAVER_MODE__));
   const [burstSignal, setBurstSignal] = useState(0);
   const [resetSignal, setResetSignal] = useState(0);
 
   useEffect(() => {
-    const onTracksUpdated = (ev) => {
-      if (ev?.detail) setTrackState({ ...ev.detail });
+    const onGameUpdated = (ev) => {
+      if (ev?.detail) setGameState({ ...ev.detail });
     };
     const onScreensaverChanged = (ev) => {
-      setScreensaverMode(Boolean(ev?.detail?.active));
-      if (ev?.detail?.active) setSelectedTrack(null);
+      const active = Boolean(ev?.detail?.active);
+      setScreensaverMode(active);
+      if (active) {
+        setSelectedStation(null);
+        setDrawerOpen(false);
+      }
     };
-    const onTrackSelectedFromUI = (ev) => {
-      setSelectedTrack(ev?.detail?.trackId || null);
+    const onStationChangedFromUI = (ev) => {
+      setSelectedStation(ev?.detail?.stationId || null);
+      setDrawerOpen(Boolean(ev?.detail?.drawerOpen));
     };
-    const onXpBurst = () => {
-      setBurstSignal((n) => n + 1);
-    };
+    const onXpBurst = () => setBurstSignal((n) => n + 1);
     const onResetCamera = () => {
+      setSelectedStation(null);
+      setDrawerOpen(false);
       setResetSignal((n) => n + 1);
     };
 
-    window.addEventListener('mars:tracks-updated', onTracksUpdated);
+    window.addEventListener('mars:game-updated', onGameUpdated);
     window.addEventListener('mars:screensaver', onScreensaverChanged);
-    window.addEventListener('mars:select-track', onTrackSelectedFromUI);
+    window.addEventListener('mars:station-changed', onStationChangedFromUI);
     window.addEventListener('mars:xp-burst', onXpBurst);
     window.addEventListener('mars:reset-camera', onResetCamera);
 
     return () => {
-      window.removeEventListener('mars:tracks-updated', onTracksUpdated);
+      window.removeEventListener('mars:game-updated', onGameUpdated);
       window.removeEventListener('mars:screensaver', onScreensaverChanged);
-      window.removeEventListener('mars:select-track', onTrackSelectedFromUI);
+      window.removeEventListener('mars:station-changed', onStationChangedFromUI);
       window.removeEventListener('mars:xp-burst', onXpBurst);
       window.removeEventListener('mars:reset-camera', onResetCamera);
     };
   }, []);
 
-  const handleSelectTrack = (trackId) => {
+  const handleSelectStation = (stationId) => {
     if (screensaverMode) return;
-    setSelectedTrack(trackId);
-    if (typeof window.onMarsStructureSelected === 'function') {
-      window.onMarsStructureSelected(trackId);
+    if (!stationId) {
+      setSelectedStation(null);
+      setDrawerOpen(false);
+      if (typeof window.closeMarsStationDrawer === 'function') {
+        window.closeMarsStationDrawer(true);
+      }
+      return;
+    }
+    setSelectedStation(stationId);
+    setDrawerOpen(true);
+    if (typeof window.openMarsStation === 'function') {
+      window.openMarsStation(stationId, true);
     }
   };
 
@@ -1146,15 +1432,16 @@ function MarsViewportApp() {
     {
       shadows: 'percentage',
       orthographic: true,
-      camera: { position: [12, 10.5, 12], zoom: 72, near: -20, far: 100 },
+      camera: { position: [14, 11.8, 14], zoom: 68, near: -25, far: 120 },
       dpr: [1, 2],
       gl: { antialias: true, powerPreference: 'high-performance' },
       style: { width: '100%', height: '100%', display: 'block' },
     },
     h(MarsDioramaScene, {
-      trackState,
-      selectedTrack,
-      onSelectTrack: handleSelectTrack,
+      gameState,
+      selectedStation,
+      drawerOpen,
+      onSelectStation: handleSelectStation,
       screensaverMode,
       burstSignal,
       resetSignal,
@@ -1173,9 +1460,7 @@ function mountMarsDiorama() {
   } catch (err) {
     console.error('[MarsDiorama] Mount error:', err);
     const loader = document.getElementById('marsLoadingBadge');
-    if (loader) {
-      loader.textContent = '3D WebGL 초기화 실패 (브라우저 WebGL 확인)';
-    }
+    if (loader) loader.textContent = '3D WebGL 초기화 실패 (브라우저 WebGL 확인)';
   }
 }
 
