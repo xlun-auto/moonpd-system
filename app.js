@@ -1263,11 +1263,15 @@ async function bootstrapAuthenticatedAppData() {
       fetchLatestDataFromServer(),
       refreshAiCareerDataFromServer(),
     ]);
-    await pullSavedJobsFromGoogleSheets(false);
+    await Promise.all([
+      pullSavedJobsFromGoogleSheets(false),
+      pullFinanceFromGoogleSheets(false),
+    ]);
   } else {
     await Promise.all([
       fetchFreshWebSeeds(),
       pullSavedJobsFromGoogleSheets(false),
+      pullFinanceFromGoogleSheets(false),
     ]);
   }
   populateSiteFilterOptions();
@@ -1697,8 +1701,13 @@ function switchTab(tabName) {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tabName);
   });
-  if (tabName === 'life_hub' && HAS_BACKEND_API && !doorayOverview && !doorayLoading) {
-    fetchDoorayOverview(false);
+  if (tabName === 'life_hub') {
+    if (HAS_BACKEND_API && !doorayOverview && !doorayLoading) {
+      fetchDoorayOverview(false);
+    }
+    if (!financeSyncedOnce) {
+      pullFinanceFromGoogleSheets(false);
+    }
   }
   renderActiveTab();
 }
@@ -3680,6 +3689,179 @@ let doorayLoading = false;
 let doorayError = '';
 let doorayProjectFilter = 'ALL';
 let doorayIncludeClosed = false;
+let doorayWarRoomOnly = false;
+
+const FINANCE_STORAGE_KEY = 'MOONPD_FINANCE_RUNWAY_V1';
+const DEFAULT_FINANCE_STATE = {
+  monthlyFixedCost: 250,
+  cashBuffer: 500,
+  monthlySideIncome: 80,
+  targetExitDate: '2026-12-21',
+  payslips: [],
+  updatedAt: ''
+};
+
+let financeState = loadFinanceState();
+let financeSyncedOnce = false;
+let financeSyncing = false;
+
+function loadFinanceState() {
+  try {
+    const raw = localStorage.getItem(FINANCE_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          ...DEFAULT_FINANCE_STATE,
+          ...parsed,
+          payslips: Array.isArray(parsed.payslips) ? parsed.payslips : []
+        };
+      }
+    }
+  } catch (e) {}
+  return { ...DEFAULT_FINANCE_STATE };
+}
+
+function persistFinanceStateLocal(patch) {
+  financeState = {
+    ...financeState,
+    ...patch,
+    updatedAt: new Date().toLocaleString()
+  };
+  try {
+    localStorage.setItem(FINANCE_STORAGE_KEY, JSON.stringify(financeState));
+  } catch (e) {}
+}
+
+async function pullFinanceFromGoogleSheets(showFeedback = false) {
+  const url = getSheetsWebAppUrl();
+  if (!url) return false;
+  financeSyncedOnce = true;
+  try {
+    const sep = url.includes('?') ? '&' : '?';
+    const res = await fetch(`${url}${sep}action=getFinance&t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error(data?.error || '응답 형식 오류');
+    if (data.finance && typeof data.finance === 'object') {
+      financeState = {
+        ...DEFAULT_FINANCE_STATE,
+        ...data.finance,
+        payslips: Array.isArray(data.finance.payslips) ? data.finance.payslips : (financeState.payslips || [])
+      };
+      try {
+        localStorage.setItem(FINANCE_STORAGE_KEY, JSON.stringify(financeState));
+      } catch (e) {}
+      if (currentTab === 'life_hub') renderActiveTab();
+    }
+    if (showFeedback) showToast('Google Sheets에서 재무 런웨이 데이터를 불러왔습니다.');
+    return true;
+  } catch (err) {
+    if (showFeedback) showToast(`재무 런웨이 동기화 실패: ${err.message}`);
+    return false;
+  }
+}
+
+async function pushFinanceToGoogleSheets() {
+  const url = getSheetsWebAppUrl();
+  if (!url) return false;
+  financeSyncing = true;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        action: 'saveFinance',
+        finance: financeState
+      })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error(data?.error || '저장 실패');
+    return true;
+  } finally {
+    financeSyncing = false;
+  }
+}
+
+function getFinanceMetrics(state = financeState) {
+  const fixed = Math.max(0, Number(state.monthlyFixedCost) || 0);
+  const buffer = Math.max(0, Number(state.cashBuffer) || 0);
+  const side = Math.max(0, Number(state.monthlySideIncome) || 0);
+  const freedomIndex = Math.min(100, Math.round((side / Math.max(1, fixed)) * 100));
+  const runwayText = side >= fixed
+    ? '자립 달성 (무제한)'
+    : `${(buffer / (fixed - side)).toFixed(1)}개월`;
+  return { fixed, buffer, side, freedomIndex, runwayText };
+}
+
+function getTargetExitDDayLabel(dateStr) {
+  const clean = String(dateStr || DEFAULT_FINANCE_STATE.targetExitDate).slice(0, 10);
+  const target = new Date(`${clean}T00:00:00`);
+  if (isNaN(target.getTime())) return 'D-30';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = Math.ceil((target.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+  if (diffDays > 0) return `D-${diffDays}`;
+  if (diffDays === 0) return 'D-Day';
+  return `D+${Math.abs(diffDays)}`;
+}
+
+function onFinanceInputChanged() {
+  const fixedEl = document.getElementById('finFixedCost');
+  const bufEl = document.getElementById('finCashBuffer');
+  const sideEl = document.getElementById('finSideIncome');
+  const dateEl = document.getElementById('finTargetExitDate');
+  const preview = {
+    monthlyFixedCost: Number(fixedEl?.value ?? financeState.monthlyFixedCost) || 0,
+    cashBuffer: Number(bufEl?.value ?? financeState.cashBuffer) || 0,
+    monthlySideIncome: Number(sideEl?.value ?? financeState.monthlySideIncome) || 0,
+    targetExitDate: dateEl?.value || financeState.targetExitDate
+  };
+  const m = getFinanceMetrics(preview);
+  const idxEl = document.getElementById('finFreedomIndexValue');
+  const barEl = document.getElementById('finFreedomBarFill');
+  const runEl = document.getElementById('finRunwayValue');
+  const ddayEl = document.getElementById('warroomDDayBadge');
+  if (idxEl) idxEl.textContent = `${m.freedomIndex}%`;
+  if (barEl) barEl.style.width = `${m.freedomIndex}%`;
+  if (runEl) runEl.textContent = m.runwayText;
+  if (ddayEl) ddayEl.textContent = getTargetExitDDayLabel(preview.targetExitDate);
+}
+
+async function saveFinanceRunwayFromInputs() {
+  const fixed = Math.max(0, Number(document.getElementById('finFixedCost')?.value) || 0);
+  const buffer = Math.max(0, Number(document.getElementById('finCashBuffer')?.value) || 0);
+  const side = Math.max(0, Number(document.getElementById('finSideIncome')?.value) || 0);
+  const targetExitDate = (document.getElementById('finTargetExitDate')?.value || DEFAULT_FINANCE_STATE.targetExitDate).slice(0, 10);
+
+  persistFinanceStateLocal({
+    monthlyFixedCost: fixed,
+    cashBuffer: buffer,
+    monthlySideIncome: side,
+    targetExitDate
+  });
+
+  const url = getSheetsWebAppUrl();
+  if (!url) {
+    renderActiveTab();
+    showToast('브라우저에 저장되었습니다. (Sheets 동기화 URL 미설정)');
+    return;
+  }
+  try {
+    await pushFinanceToGoogleSheets();
+    renderActiveTab();
+    showToast('재무 런웨이가 로컬 및 Google Sheets에 동기화되었습니다.');
+  } catch (err) {
+    renderActiveTab();
+    showToast(`로컬 저장 완료 (Sheets 동기화 실패: ${err.message})`);
+  }
+}
+
+function toggleDoorayWarRoomOnly() {
+  doorayWarRoomOnly = !doorayWarRoomOnly;
+  renderActiveTab();
+}
 
 async function fetchDoorayOverview(showFeedback = false) {
   if (!HAS_BACKEND_API) return null;
@@ -3830,9 +4012,100 @@ function renderDoorayGanttHtml(tasks) {
   `;
 }
 
+function renderFinanceAndWarRoomHtml(allTasks) {
+  const warRoomTasks = (allTasks || []).filter(t => String(t.subject || '').includes('[D-30 워룸'));
+  const warRoomClosed = warRoomTasks.filter(t => t.workflowClass === 'closed').length;
+  const ddayLabel = getTargetExitDDayLabel(financeState.targetExitDate);
+  const metrics = getFinanceMetrics(financeState);
+  const payslips = Array.isArray(financeState.payslips) ? financeState.payslips : [];
+
+  const payslipsHtml = payslips.length ? `
+    <div style="margin-top:12px;">
+      <div style="font-size:12px;color:var(--text-muted);font-weight:500;">최근 급여 실수령 내역 (회사 PC 동기화)</div>
+      <div class="finance-payslip-list">
+        ${payslips.slice(0, 6).map(p => {
+          const ym = p.month || p.ym || p.period || p.date || '-';
+          const rawNet = p.netPay ?? p.amount ?? p.net ?? '-';
+          const netLabel = typeof rawNet === 'number' ? `${rawNet.toLocaleString()}원` : String(rawNet);
+          return `<span class="finance-payslip-chip num">${escapeHtml(ym)} / <strong>${escapeHtml(netLabel)}</strong></span>`;
+        }).join('')}
+      </div>
+    </div>
+  ` : '';
+
+  return `
+    <div class="warroom-banner">
+      <div class="warroom-banner-left">
+        <span id="warroomDDayBadge" class="warroom-dday-badge num">${escapeHtml(ddayLabel)}</span>
+        <div>
+          <div style="font-size:14px;font-weight:600;color:var(--text-main);">D-30 엑싯 워룸 & 독립 준비</div>
+          <div style="font-size:12px;color:var(--text-sub);margin-top:2px;" class="num">
+            목표 독립일 ${escapeHtml(String(financeState.targetExitDate || '2026-12-21').slice(0, 10))} · 워룸 미션 <strong>${warRoomClosed}/${warRoomTasks.length}</strong>건 완료
+          </div>
+        </div>
+      </div>
+      <div class="hub-action-group">
+        <button type="button" class="btn btn-outline btn-sm ${doorayWarRoomOnly ? 'btn-toggle-active' : ''}" onclick="toggleDoorayWarRoomOnly()">
+          ${doorayWarRoomOnly ? '워룸만 보기 ON' : '워룸만 보기'}
+        </button>
+      </div>
+    </div>
+
+    <div class="panel-card" style="margin-bottom:16px;">
+      <h3>
+        <span>재무 & 독립 런웨이 관제</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          ${financeState.updatedAt ? `<span class="chip num">저장: ${escapeHtml(financeState.updatedAt)}</span>` : ''}
+          <button type="button" class="btn btn-primary btn-sm" onclick="saveFinanceRunwayFromInputs()">
+            ${icon('cloud', 13)} 저장 (Sheets 동기화)
+          </button>
+        </div>
+      </h3>
+
+      <div class="finance-inputs-grid">
+        <label class="field-label">월 고정 생활비 (만원)
+          <input type="number" id="finFixedCost" class="field-input num" min="0" value="${escapeHtml(metrics.fixed)}" oninput="onFinanceInputChanged()" />
+        </label>
+        <label class="field-label">현재 현금 버퍼 (만원)
+          <input type="number" id="finCashBuffer" class="field-input num" min="0" value="${escapeHtml(metrics.buffer)}" oninput="onFinanceInputChanged()" />
+        </label>
+        <label class="field-label">월 부업·외주 수익 (만원)
+          <input type="number" id="finSideIncome" class="field-input num" min="0" value="${escapeHtml(metrics.side)}" oninput="onFinanceInputChanged()" />
+        </label>
+        <label class="field-label">목표 독립일
+          <input type="date" id="finTargetExitDate" class="field-input num" value="${escapeHtml(String(financeState.targetExitDate || '2026-12-21').slice(0, 10))}" oninput="onFinanceInputChanged()" />
+        </label>
+      </div>
+
+      <div class="finance-kpi-grid">
+        <div class="finance-kpi-tile">
+          <div class="finance-kpi-label">독립 가능 지수 (부업수익 ÷ 고정생활비)</div>
+          <div class="finance-kpi-value num" id="finFreedomIndexValue">${metrics.freedomIndex}%</div>
+          <div class="bar-row" style="margin-top:8px;">
+            <div class="bar-track"><div class="bar-fill" id="finFreedomBarFill" style="width:${metrics.freedomIndex}%"></div></div>
+          </div>
+        </div>
+        <div class="finance-kpi-tile">
+          <div class="finance-kpi-label">생존 런웨이 (현금 버퍼 기준)</div>
+          <div class="finance-kpi-value num" id="finRunwayValue">${escapeHtml(metrics.runwayText)}</div>
+          <div style="font-size:11.5px;color:var(--text-muted);margin-top:6px;">고정비 대비 월 부업·외주 현금흐름 반영</div>
+        </div>
+      </div>
+
+      ${payslipsHtml}
+    </div>
+  `;
+}
+
 function renderLifeHubTab(area) {
+  const projects = doorayOverview?.projects || [];
+  const allTasks = doorayOverview?.tasks || [];
+  const calendars = doorayOverview?.calendars || [];
+  const allEvents = doorayOverview?.events || [];
+  const financeAndWarRoomHtml = renderFinanceAndWarRoomHtml(allTasks);
+
   if (!HAS_BACKEND_API) {
-    area.innerHTML = `
+    area.innerHTML = financeAndWarRoomHtml + `
       <div class="panel-card">
         <h3>
           <span>${icon('calendar', 15)} Dooray 일정·프로젝트 허브</span>
@@ -3846,14 +4119,10 @@ function renderLifeHubTab(area) {
     return;
   }
 
-  const projects = doorayOverview?.projects || [];
-  const allTasks = doorayOverview?.tasks || [];
-  const calendars = doorayOverview?.calendars || [];
-  const allEvents = doorayOverview?.events || [];
-
   const filteredTasks = allTasks.filter(t => {
     if (!doorayIncludeClosed && t.workflowClass === 'closed') return false;
     if (doorayProjectFilter !== 'ALL' && String(t.projectCode || t.projectId) !== doorayProjectFilter) return false;
+    if (doorayWarRoomOnly && !String(t.subject || '').includes('[D-30 워룸')) return false;
     return true;
   });
 
@@ -3880,12 +4149,13 @@ function renderLifeHubTab(area) {
     })
   ].join('');
 
-  area.innerHTML = `
+  area.innerHTML = financeAndWarRoomHtml + `
     <div class="panel-card" style="margin-bottom:16px;">
       <div class="hub-toolbar">
         <div class="hub-filter-group">
           <strong style="font-size:14px;font-weight:600;margin-right:6px;">${icon('calendar', 14)} Dooray 허브</strong>
           ${projectPillsHtml}
+          <button type="button" class="cat-pill ${doorayWarRoomOnly ? 'active' : ''}" onclick="toggleDoorayWarRoomOnly()">워룸만 보기</button>
         </div>
         <div class="hub-action-group">
           <button type="button" class="btn btn-outline btn-sm ${doorayIncludeClosed ? 'btn-toggle-active' : ''}" onclick="toggleDoorayIncludeClosed()">
