@@ -5,17 +5,41 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import * as THREE from 'three';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { ContactShadows, Html, OrbitControls } from '@react-three/drei';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { ContactShadows, Environment, Html, Lightformer, OrbitControls, Sparkles } from '@react-three/drei';
 
 const h = React.createElement;
 
+const PREFERS_REDUCED_MOTION =
+  typeof window !== 'undefined' &&
+  window.matchMedia &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 const DEFAULT_TRACK_STATE = {
-  'TRK-01': { id: 'TRK-01', name: '핵심업무', structure: '풍력 발전기 (x3)', completed: 1, total: 3, rate: 0.33 },
-  'TRK-02': { id: 'TRK-02', name: '일상루틴', structure: '탐사 로버 (x2)', completed: 1, total: 3, rate: 0.33 },
-  'TRK-03': { id: 'TRK-03', name: '미래자산·이직', structure: '중앙 지오데식 돔', completed: 1, total: 3, rate: 0.33 },
-  'TRK-04': { id: 'TRK-04', name: '건강·라이프', structure: '거주 모듈 (x3)', completed: 1, total: 3, rate: 0.33 },
+  'TRK-01': { id: 'TRK-01', name: '핵심업무', structure: 'WIND TURBINE ×3', completed: 1, total: 3, rate: 0.33 },
+  'TRK-02': { id: 'TRK-02', name: '일상루틴', structure: 'SCOUT ROVER ×2', completed: 1, total: 3, rate: 0.33 },
+  'TRK-03': { id: 'TRK-03', name: '미래자산·이직', structure: 'GEODESIC DOME', completed: 1, total: 3, rate: 0.33 },
+  'TRK-04': { id: 'TRK-04', name: '건강·라이프', structure: 'HABITAT MODULE ×3', completed: 1, total: 3, rate: 0.33 },
 };
+
+/* ============================================================================
+   0. Responsive Isometric Camera Zoom Rig (Fills 55-65% of Viewport Cleanly)
+   ============================================================================ */
+function ResponsiveCameraRig({ screensaverMode }) {
+  const { camera, size } = useThree();
+
+  useEffect(() => {
+    if (!camera || !camera.isOrthographicCamera) return;
+    const minDim = Math.min(size.width, size.height);
+    // Larger confident framing on desktop split view, slightly wider breathing room in fullscreen screensaver
+    const baseFactor = screensaverMode ? 0.088 : 0.098;
+    const nextZoom = THREE.MathUtils.clamp(minDim * baseFactor, 42, 92);
+    camera.zoom = nextZoom;
+    camera.updateProjectionMatrix();
+  }, [camera, size.width, size.height, screensaverMode]);
+
+  return null;
+}
 
 /* ============================================================================
    1. Mars Terrain Cross-Section Cube (Floating Miniature Diorama Plinth)
@@ -30,13 +54,11 @@ function MarsTerrainBlock() {
       const z = pos.getZ(i);
       const dist = Math.hypot(x, z);
       const edgeDist = Math.max(Math.abs(x), Math.abs(z));
-      // Keep central base pad flat so buildings sit flush
       let y = 0.02;
       if (dist > 1.7 && edgeDist < 2.95) {
         const wave =
           Math.sin(x * 1.15) * Math.cos(z * 1.1) * 0.14 +
           Math.sin(x * 2.4 + z * 1.7) * 0.06;
-        // Subtle crater depression near front-right
         const craterDist = Math.hypot(x - 1.95, z - 1.95);
         const crater = craterDist < 0.72 ? -0.16 * Math.cos((craterDist / 0.72) * (Math.PI / 2)) : 0;
         const blend = THREE.MathUtils.clamp((dist - 1.7) / 0.85, 0, 1);
@@ -65,46 +87,40 @@ function MarsTerrainBlock() {
   return h(
     'group',
     { name: 'MarsTerrainBlock' },
-    // Top sculpted low-poly regolith surface
     h(
       'mesh',
       { geometry: topGeo, receiveShadow: true, castShadow: true },
       h('meshStandardMaterial', {
         color: '#c95c36',
-        roughness: 0.88,
-        metalness: 0.04,
+        roughness: 0.86,
+        metalness: 0.05,
         flatShading: true,
       })
     ),
-    // Upper regolith strata
     h(
       'mesh',
       { position: [0, -0.18, 0], receiveShadow: true, castShadow: true },
       h('boxGeometry', { args: [6.24, 0.38, 6.24] }),
-      h('meshStandardMaterial', { color: '#a34022', roughness: 0.9, metalness: 0.05 })
+      h('meshStandardMaterial', { color: '#a34022', roughness: 0.88, metalness: 0.05 })
     ),
-    // Mid terracotta sedimentary strata
     h(
       'mesh',
       { position: [0, -0.6, 0], receiveShadow: true, castShadow: true },
       h('boxGeometry', { args: [6.2, 0.48, 6.2] }),
-      h('meshStandardMaterial', { color: '#6b2919', roughness: 0.92, metalness: 0.06 })
+      h('meshStandardMaterial', { color: '#6b2919', roughness: 0.9, metalness: 0.06 })
     ),
-    // Deep basalt bedrock base
     h(
       'mesh',
       { position: [0, -1.04, 0], receiveShadow: true, castShadow: true },
       h('boxGeometry', { args: [6.14, 0.42, 6.14] }),
-      h('meshStandardMaterial', { color: '#2b1817', roughness: 0.86, metalness: 0.12 })
+      h('meshStandardMaterial', { color: '#2b1817', roughness: 0.84, metalness: 0.14 })
     ),
-    // Subtle dark brushed metallic plinth rim
     h(
       'mesh',
       { position: [0, -1.27, 0] },
       h('boxGeometry', { args: [6.2, 0.05, 6.2] }),
-      h('meshStandardMaterial', { color: '#1b2230', roughness: 0.45, metalness: 0.65 })
+      h('meshStandardMaterial', { color: '#243044', roughness: 0.35, metalness: 0.72 })
     ),
-    // Low-poly Martian rocks
     ...rocks.map((r, idx) =>
       h(
         'mesh',
@@ -124,7 +140,7 @@ function MarsTerrainBlock() {
 }
 
 /* ============================================================================
-   2. Central Geodesic Dome (TRK-03 미래자산·이직) + Amber Glow & XP Particles
+   2. Central Geodesic Dome (TRK-03) + Amber Glow & XP Particles
    ============================================================================ */
 function XpParticles({ rate, burstSignal }) {
   const count = 26;
@@ -141,9 +157,7 @@ function XpParticles({ rate, burstSignal }) {
   }, []);
 
   useEffect(() => {
-    if (burstSignal > 0) {
-      burstRef.current = 1.6;
-    }
+    if (burstSignal > 0) burstRef.current = 1.6;
   }, [burstSignal]);
 
   useFrame((_, delta) => {
@@ -151,11 +165,12 @@ function XpParticles({ rate, burstSignal }) {
     if (burstRef.current > 0) {
       burstRef.current = Math.max(0, burstRef.current - delta * 0.9);
     }
+    const motionScale = PREFERS_REDUCED_MOTION ? 0.2 : 1;
     const activeIntensity = Math.min(1, rate * 1.15 + burstRef.current);
     const children = groupRef.current.children;
     for (let i = 0; i < children.length; i++) {
       const p = particles[i];
-      p.phase += delta * p.speed * (0.7 + activeIntensity * 1.4);
+      p.phase += delta * p.speed * (0.7 + activeIntensity * 1.4) * motionScale;
       if (p.phase > 2.6) p.phase -= 2.6;
       const t = p.phase / 2.6;
       const mesh = children[i];
@@ -167,8 +182,8 @@ function XpParticles({ rate, burstSignal }) {
           0.65 + t * 2.15,
           Math.sin(p.angle + t * 1.4) * (p.radius * (1 - t * 0.35))
         );
-        mesh.rotation.y += delta * 2.2;
-        mesh.rotation.x += delta * 1.5;
+        mesh.rotation.y += delta * 2.2 * motionScale;
+        mesh.rotation.x += delta * 1.5 * motionScale;
         const fade = Math.sin(t * Math.PI);
         const s = p.scale * fade * (1 + burstRef.current * 0.45);
         mesh.scale.setScalar(Math.max(0.001, s));
@@ -230,14 +245,12 @@ function GeodesicDome({ rate, selected, hovered, onHover, onSelect, burstSignal 
         onHover(null);
       },
     },
-    // Foundation ring
     h(
       'mesh',
       { position: [0, 0.09, 0], castShadow: true, receiveShadow: true },
       h('cylinderGeometry', { args: [1.18, 1.28, 0.18, 10] }),
-      h('meshStandardMaterial', { color: '#39414f', roughness: 0.72, metalness: 0.28, flatShading: true })
+      h('meshStandardMaterial', { color: '#39414f', roughness: 0.65, metalness: 0.35, flatShading: true })
     ),
-    // Selection highlight ring
     (selected || hovered) &&
       h(
         'mesh',
@@ -246,23 +259,21 @@ function GeodesicDome({ rate, selected, hovered, onHover, onSelect, burstSignal 
         h('meshBasicMaterial', {
           color: '#ff9f0a',
           transparent: true,
-          opacity: selected ? 0.85 : 0.45,
+          opacity: selected ? 0.88 : 0.48,
           side: THREE.DoubleSide,
         })
       ),
-    // Outer geodesic matte shell (hemisphere)
     h(
       'mesh',
       { position: [0, 0.16, 0], castShadow: true, receiveShadow: true },
       h('sphereGeometry', { args: [1.02, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.52] }),
       h('meshStandardMaterial', {
         color: '#e8e2d8',
-        roughness: 0.68,
-        metalness: 0.08,
+        roughness: 0.62,
+        metalness: 0.12,
         flatShading: true,
       })
     ),
-    // Geodesic wireframe structural ribs
     h(
       'mesh',
       { position: [0, 0.16, 0] },
@@ -270,11 +281,10 @@ function GeodesicDome({ rate, selected, hovered, onHover, onSelect, burstSignal 
       h('meshStandardMaterial', {
         color: '#2b3442',
         wireframe: true,
-        roughness: 0.5,
-        metalness: 0.55,
+        roughness: 0.45,
+        metalness: 0.65,
       })
     ),
-    // 6 Glowing Warm Amber Dome Windows
     ...windowAngles.map((ang, i) =>
       h(
         'mesh',
@@ -292,7 +302,6 @@ function GeodesicDome({ rate, selected, hovered, onHover, onSelect, burstSignal 
         })
       )
     ),
-    // Top skylight ring
     h(
       'mesh',
       { position: [0, 1.07, 0] },
@@ -305,12 +314,11 @@ function GeodesicDome({ rate, selected, hovered, onHover, onSelect, burstSignal 
         flatShading: true,
       })
     ),
-    // Comms spire + pulsing beacon
     h(
       'mesh',
       { position: [0, 1.38, 0], castShadow: true },
       h('cylinderGeometry', { args: [0.025, 0.05, 0.58, 6] }),
-      h('meshStandardMaterial', { color: '#5c6678', roughness: 0.4, metalness: 0.6 })
+      h('meshStandardMaterial', { color: '#5c6678', roughness: 0.35, metalness: 0.68 })
     ),
     h(
       'mesh',
@@ -323,7 +331,6 @@ function GeodesicDome({ rate, selected, hovered, onHover, onSelect, burstSignal 
         toneMapped: false,
       })
     ),
-    // Warm amber interior point light
     h('pointLight', {
       ref: windowLightRef,
       position: [0, 0.72, 0],
@@ -332,13 +339,12 @@ function GeodesicDome({ rate, selected, hovered, onHover, onSelect, burstSignal 
       decay: 2,
       intensity: 0.4 + rate * 2.2,
     }),
-    // Rising XP Particles
     h(XpParticles, { rate, burstSignal })
   );
 }
 
 /* ============================================================================
-   3. Connecting Tunnels + 3 Cylindrical Habitat Modules (TRK-04 건강·라이프)
+   3. Connecting Tunnels + 3 Cylindrical Habitat Modules (TRK-04)
    ============================================================================ */
 function HabitatModules({ rate, selected, hovered, onHover, onSelect }) {
   const modules = useMemo(
@@ -379,7 +385,6 @@ function HabitatModules({ rate, selected, hovered, onHover, onSelect }) {
       return h(
         'group',
         { key: `hab-${idx}` },
-        // Pressurized connecting tunnel
         h(
           'group',
           { position: [tx, 0.34, tz], rotation: [0, rotY, 0] },
@@ -387,57 +392,50 @@ function HabitatModules({ rate, selected, hovered, onHover, onSelect }) {
             'mesh',
             { rotation: [Math.PI / 2, 0, 0], castShadow: true, receiveShadow: true },
             h('cylinderGeometry', { args: [0.18, 0.18, 0.86, 8] }),
-            h('meshStandardMaterial', { color: '#9aa4b2', roughness: 0.6, metalness: 0.35, flatShading: true })
+            h('meshStandardMaterial', { color: '#9aa4b2', roughness: 0.55, metalness: 0.4, flatShading: true })
           ),
-          // Tunnel structural ribs
           ...[-0.22, 0, 0.22].map((zOff, ri) =>
             h(
               'mesh',
               { key: `rib-${ri}`, position: [0, 0, zOff], rotation: [Math.PI / 2, 0, 0] },
               h('cylinderGeometry', { args: [0.21, 0.21, 0.06, 8] }),
-              h('meshStandardMaterial', { color: '#394352', roughness: 0.5, metalness: 0.5 })
+              h('meshStandardMaterial', { color: '#394352', roughness: 0.45, metalness: 0.55 })
             )
           )
         ),
-        // Cylindrical habitat module
         h(
           'group',
           { position: [mx, 0.42, mz], rotation: [0, rotY, 0] },
-          // Support legs
           ...[-0.32, 0.32].map((xOff, li) =>
             h(
               'mesh',
               { key: `leg-${li}`, position: [xOff, -0.26, 0], castShadow: true },
               h('boxGeometry', { args: [0.12, 0.32, 0.52] }),
-              h('meshStandardMaterial', { color: '#353e4c', roughness: 0.7, metalness: 0.4 })
+              h('meshStandardMaterial', { color: '#353e4c', roughness: 0.65, metalness: 0.45 })
             )
           ),
-          // Main horizontal cylinder hull
           h(
             'mesh',
             { rotation: [0, 0, Math.PI / 2], castShadow: true, receiveShadow: true },
             h('cylinderGeometry', { args: [0.36, 0.36, 1.08, 10] }),
-            h('meshStandardMaterial', { color: '#dfe4ec', roughness: 0.65, metalness: 0.12, flatShading: true })
+            h('meshStandardMaterial', { color: '#dfe4ec', roughness: 0.6, metalness: 0.15, flatShading: true })
           ),
-          // End caps
           ...[-0.54, 0.54].map((xEnd, ei) =>
             h(
               'mesh',
               { key: `cap-${ei}`, position: [xEnd, 0, 0], castShadow: true },
               h('sphereGeometry', { args: [0.355, 8, 6] }),
-              h('meshStandardMaterial', { color: '#c4ccd8', roughness: 0.68, flatShading: true })
+              h('meshStandardMaterial', { color: '#c4ccd8', roughness: 0.65, flatShading: true })
             )
           ),
-          // Dark hull ribs
           ...[-0.28, 0.28].map((xRib, ri) =>
             h(
               'mesh',
               { key: `hrib-${ri}`, position: [xRib, 0, 0], rotation: [0, 0, Math.PI / 2] },
               h('cylinderGeometry', { args: [0.375, 0.375, 0.08, 10] }),
-              h('meshStandardMaterial', { color: '#3b4555', roughness: 0.55, metalness: 0.4 })
+              h('meshStandardMaterial', { color: '#3b4555', roughness: 0.5, metalness: 0.45 })
             )
           ),
-          // Emerald / Cyan Life-Support Accent Strip & Porthole Windows
           h(
             'mesh',
             { position: [0, 0.06, 0.35] },
@@ -460,7 +458,6 @@ function HabitatModules({ rate, selected, hovered, onHover, onSelect }) {
               roughness: 0.2,
             })
           ),
-          // Rooftop life-support status beacon
           h(
             'mesh',
             { position: [0, 0.39, 0] },
@@ -472,7 +469,6 @@ function HabitatModules({ rate, selected, hovered, onHover, onSelect }) {
               toneMapped: false,
             })
           ),
-          // Selection ring under module
           (selected || hovered) &&
             h(
               'mesh',
@@ -485,7 +481,6 @@ function HabitatModules({ rate, selected, hovered, onHover, onSelect }) {
                 side: THREE.DoubleSide,
               })
             ),
-          // Localized emerald/cyan life-support point light
           rate > 0 &&
             h('pointLight', {
               position: [0, 0.32, 0.45],
@@ -501,9 +496,9 @@ function HabitatModules({ rate, selected, hovered, onHover, onSelect }) {
 }
 
 /* ============================================================================
-   4. Solar Panel Arrays
+   4. Solar Panel Arrays (Interactive Global Power Grid -> Show All Tracks)
    ============================================================================ */
-function SolarArrays() {
+function SolarArrays({ avgRate, hovered, onHover, onSelectAll }) {
   const arrays = [
     { pos: [1.55, 0.04, -1.55], rotY: -0.55 },
     { pos: [2.15, 0.04, -1.05], rotY: -0.55 },
@@ -512,19 +507,43 @@ function SolarArrays() {
 
   return h(
     'group',
-    { name: 'SolarArrays' },
+    {
+      name: 'SolarArrays',
+      onClick: (e) => {
+        e.stopPropagation();
+        onSelectAll();
+      },
+      onPointerOver: (e) => {
+        e.stopPropagation();
+        onHover('ALL');
+      },
+      onPointerOut: (e) => {
+        e.stopPropagation();
+        onHover(null);
+      },
+    },
     ...arrays.map((a, idx) =>
       h(
         'group',
         { key: `solar-${idx}`, position: a.pos, rotation: [0, a.rotY, 0] },
-        // Pedestal
         h(
           'mesh',
           { position: [0, 0.16, 0], castShadow: true },
           h('cylinderGeometry', { args: [0.045, 0.07, 0.32, 6] }),
-          h('meshStandardMaterial', { color: '#475569', roughness: 0.55, metalness: 0.5 })
+          h('meshStandardMaterial', { color: '#475569', roughness: 0.5, metalness: 0.55 })
         ),
-        // Angled solar frame
+        hovered &&
+          h(
+            'mesh',
+            { position: [0, 0.02, 0], rotation: [-Math.PI / 2, 0, 0] },
+            h('ringGeometry', { args: [0.46, 0.54, 16] }),
+            h('meshBasicMaterial', {
+              color: '#60a5fa',
+              transparent: true,
+              opacity: 0.65,
+              side: THREE.DoubleSide,
+            })
+          ),
         h(
           'group',
           { position: [0, 0.34, 0], rotation: [0.46, 0, 0] },
@@ -532,18 +551,18 @@ function SolarArrays() {
             'mesh',
             { castShadow: true, receiveShadow: true },
             h('boxGeometry', { args: [0.92, 0.04, 0.56] }),
-            h('meshStandardMaterial', { color: '#cbd5e1', roughness: 0.4, metalness: 0.6 })
+            h('meshStandardMaterial', { color: '#cbd5e1', roughness: 0.35, metalness: 0.68 })
           ),
           h(
             'mesh',
             { position: [0, 0.025, 0] },
             h('boxGeometry', { args: [0.84, 0.015, 0.48] }),
             h('meshStandardMaterial', {
-              color: '#163b72',
-              emissive: '#0a254d',
-              emissiveIntensity: 0.45,
-              roughness: 0.22,
-              metalness: 0.72,
+              color: '#1b4a8f',
+              emissive: '#0ea5e9',
+              emissiveIntensity: 0.28 + avgRate * 0.65 + (hovered ? 0.35 : 0),
+              roughness: 0.18,
+              metalness: 0.78,
             })
           )
         )
@@ -553,29 +572,27 @@ function SolarArrays() {
 }
 
 /* ============================================================================
-   5. 3 Rotating Wind Turbines (TRK-01 핵심업무)
+   5. 3 Rotating Wind Turbines (TRK-01)
    ============================================================================ */
 function SingleTurbine({ pos, height, rate, selected, hovered }) {
   const rotorRef = useRef();
 
   useFrame((_, delta) => {
     if (!rotorRef.current) return;
-    // Speed scales from gentle idle (0.55) to high-output (4.4) with TRK-01 completion
-    const speed = 0.55 + rate * 3.85;
+    const motionScale = PREFERS_REDUCED_MOTION ? 0.15 : 1;
+    const speed = (0.55 + rate * 3.85) * motionScale;
     rotorRef.current.rotation.z -= delta * speed;
   });
 
   return h(
     'group',
     { position: pos },
-    // Base pad
     h(
       'mesh',
       { position: [0, 0.06, 0], castShadow: true, receiveShadow: true },
       h('cylinderGeometry', { args: [0.18, 0.24, 0.12, 8] }),
-      h('meshStandardMaterial', { color: '#3b4454', roughness: 0.75, flatShading: true })
+      h('meshStandardMaterial', { color: '#3b4454', roughness: 0.72, flatShading: true })
     ),
-    // Selection ring
     (selected || hovered) &&
       h(
         'mesh',
@@ -588,21 +605,18 @@ function SingleTurbine({ pos, height, rate, selected, hovered }) {
           side: THREE.DoubleSide,
         })
       ),
-    // Tower
     h(
       'mesh',
       { position: [0, height / 2 + 0.08, 0], castShadow: true },
       h('cylinderGeometry', { args: [0.04, 0.085, height, 7] }),
-      h('meshStandardMaterial', { color: '#e2e8f0', roughness: 0.6, metalness: 0.15, flatShading: true })
+      h('meshStandardMaterial', { color: '#e2e8f0', roughness: 0.55, metalness: 0.18, flatShading: true })
     ),
-    // Nacelle
     h(
       'mesh',
       { position: [0, height + 0.1, 0.04], castShadow: true },
       h('boxGeometry', { args: [0.14, 0.14, 0.3] }),
-      h('meshStandardMaterial', { color: '#cbd5e1', roughness: 0.5, metalness: 0.3, flatShading: true })
+      h('meshStandardMaterial', { color: '#cbd5e1', roughness: 0.48, metalness: 0.32, flatShading: true })
     ),
-    // Status LED on nacelle
     h(
       'mesh',
       { position: [0, height + 0.19, 0.02] },
@@ -614,11 +628,9 @@ function SingleTurbine({ pos, height, rate, selected, hovered }) {
         toneMapped: false,
       })
     ),
-    // Rotating 3-blade rotor
     h(
       'group',
       { ref: rotorRef, position: [0, height + 0.1, 0.2] },
-      // Hub nose cone
       h(
         'mesh',
         { rotation: [Math.PI / 2, 0, 0] },
@@ -633,7 +645,7 @@ function SingleTurbine({ pos, height, rate, selected, hovered }) {
             'mesh',
             { position: [0, 0.34, 0], rotation: [0, 0.18, 0], castShadow: true },
             h('boxGeometry', { args: [0.065, 0.62, 0.018] }),
-            h('meshStandardMaterial', { color: '#f1f5f9', roughness: 0.55, flatShading: true })
+            h('meshStandardMaterial', { color: '#f1f5f9', roughness: 0.52, flatShading: true })
           )
         )
       )
@@ -679,7 +691,7 @@ function WindTurbines({ rate, selected, hovered, onHover, onSelect }) {
 }
 
 /* ============================================================================
-   6. 2 Moving Exploration Rovers (TRK-02 일상루틴)
+   6. 2 Moving Exploration Rovers (TRK-02)
    ============================================================================ */
 function ExplorationRover({
   orbitRadiusX,
@@ -699,15 +711,14 @@ function ExplorationRover({
 
   useFrame((_, delta) => {
     if (!roverRef.current) return;
-    // Active patrol when TRK-02 routines are checked; parked in standby if 0%
-    const moveSpeed = headlightOn ? (0.2 + rate * 0.42) * direction : 0;
+    const motionScale = PREFERS_REDUCED_MOTION ? 0.15 : 1;
+    const moveSpeed = headlightOn ? (0.2 + rate * 0.42) * direction * motionScale : 0;
     angleRef.current += delta * moveSpeed;
 
     const a = angleRef.current;
     const x = Math.cos(a) * orbitRadiusX;
     const z = Math.sin(a) * orbitRadiusZ;
 
-    // Next point for smooth heading orientation
     const aNext = a + 0.04 * direction;
     const xNext = Math.cos(aNext) * orbitRadiusX;
     const zNext = Math.sin(aNext) * orbitRadiusZ;
@@ -743,26 +754,23 @@ function ExplorationRover({
         onHover(null);
       },
     },
-    // Chassis
     h(
       'mesh',
       { position: [0, 0.05, 0], castShadow: true },
       h('boxGeometry', { args: [0.28, 0.13, 0.44] }),
-      h('meshStandardMaterial', { color: '#e6a856', roughness: 0.58, metalness: 0.18, flatShading: true })
+      h('meshStandardMaterial', { color: '#e6a856', roughness: 0.55, metalness: 0.2, flatShading: true })
     ),
-    // Upper deck
     h(
       'mesh',
       { position: [0, 0.13, -0.04], castShadow: true },
       h('boxGeometry', { args: [0.22, 0.05, 0.28] }),
-      h('meshStandardMaterial', { color: '#1e3a5f', roughness: 0.35, metalness: 0.65 })
+      h('meshStandardMaterial', { color: '#1e3a5f', roughness: 0.3, metalness: 0.68 })
     ),
-    // Sensor mast
     h(
       'mesh',
       { position: [0, 0.23, 0.12], castShadow: true },
       h('cylinderGeometry', { args: [0.02, 0.025, 0.18, 6] }),
-      h('meshStandardMaterial', { color: '#cbd5e1', roughness: 0.45, metalness: 0.5 })
+      h('meshStandardMaterial', { color: '#cbd5e1', roughness: 0.4, metalness: 0.55 })
     ),
     h(
       'mesh',
@@ -770,7 +778,6 @@ function ExplorationRover({
       h('boxGeometry', { args: [0.11, 0.06, 0.07] }),
       h('meshStandardMaterial', { color: '#e2e8f0', roughness: 0.45, flatShading: true })
     ),
-    // 6 Wheels
     ...wheelPositions.map((wp, wi) =>
       h(
         'mesh',
@@ -779,7 +786,6 @@ function ExplorationRover({
         h('meshStandardMaterial', { color: '#272c36', roughness: 0.85, flatShading: true })
       )
     ),
-    // Dual Headlights
     ...[-0.08, 0.08].map((hx, hi) =>
       h(
         'mesh',
@@ -793,7 +799,6 @@ function ExplorationRover({
         })
       )
     ),
-    // Volumetric-style headlight beam cone when active
     headlightOn &&
       h(
         'mesh',
@@ -815,7 +820,6 @@ function ExplorationRover({
         distance: 2.2,
         decay: 2,
       }),
-    // Selection ring
     (selected || hovered) &&
       h(
         'mesh',
@@ -832,7 +836,7 @@ function ExplorationRover({
 }
 
 /* ============================================================================
-   7. Reflective Dark Studio Floor + Diorama Scene Assembly
+   7. Reflective Dark Studio Floor + Procedural Studio IBL + Diorama Assembly
    ============================================================================ */
 function MarsDioramaScene({
   trackState,
@@ -860,9 +864,8 @@ function MarsDioramaScene({
   }, [resetSignal]);
 
   useFrame((state) => {
-    if (dioramaRef.current) {
-      // Gentle museum-plinth float
-      dioramaRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.85) * 0.055;
+    if (dioramaRef.current && !PREFERS_REDUCED_MOTION) {
+      dioramaRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.85) * 0.05;
     }
   });
 
@@ -870,27 +873,62 @@ function MarsDioramaScene({
   const trk2 = trackState['TRK-02']?.rate ?? 0.33;
   const trk3 = trackState['TRK-03']?.rate ?? 0.33;
   const trk4 = trackState['TRK-04']?.rate ?? 0.33;
+  const avgRate = (trk1 + trk2 + trk3 + trk4) / 4;
 
+  // Strictly disguised Sector Twin terminology (never expose job-hunting terms on the 3D canvas)
   const hoverLabels = {
-    'TRK-01': { title: '풍력 발전기 ×3', sub: 'TRK-01 핵심업무', pos: [-2.1, 2.3, -1.8] },
-    'TRK-02': { title: '탐사 로버 ×2', sub: 'TRK-02 일상루틴', pos: [0, 1.25, 2.3] },
-    'TRK-03': { title: '중앙 지오데식 돔', sub: 'TRK-03 미래자산·이직', pos: [0, 2.05, 0] },
-    'TRK-04': { title: '거주 모듈 ×3', sub: 'TRK-04 건강·라이프', pos: [1.7, 1.25, 1.0] },
+    'TRK-01': { title: 'WIND TURBINE ×3', sub: 'SECTOR-01 · POWER OUTPUT', pos: [-2.1, 2.3, -1.8] },
+    'TRK-02': { title: 'SCOUT ROVER ×2', sub: 'SECTOR-02 · PERIMETER PATROL', pos: [0, 1.25, 2.3] },
+    'TRK-03': { title: 'GEODESIC DOME', sub: 'SECTOR-03 · ASSET CORE', pos: [0, 2.05, 0] },
+    'TRK-04': { title: 'HABITAT MODULE ×3', sub: 'SECTOR-04 · LIFE SUPPORT', pos: [1.7, 1.25, 1.0] },
+    ALL: { title: 'SOLAR ARRAY ×3', sub: 'GLOBAL GRID · SHOW ALL SECTORS', pos: [1.8, 1.0, -1.3] },
   };
   const activeHover = hoveredTrack ? hoverLabels[hoveredTrack] : null;
 
   return h(
     React.Fragment,
     null,
-    // Studio Background & Atmospheric Fog
-    h('color', { attach: 'background', args: ['#080b12'] }),
-    h('fog', { attach: 'fog', args: ['#080b12', 18, 42] }),
+    h('color', { attach: 'background', args: ['#080c15'] }),
+    h('fog', { attach: 'fog', args: ['#080c15', 19, 44] }),
+
+    // Procedural Studio IBL (zero external HDRI fetch; brings reflective dark floor & metallic struts to life)
+    h(
+      Environment,
+      { resolution: 256, frames: 1 },
+      h(Lightformer, {
+        form: 'rect',
+        intensity: 2.2,
+        color: '#ffb074',
+        position: [6, 8, 6],
+        scale: [8, 4, 1],
+        target: [0, 0, 0],
+      }),
+      h(Lightformer, {
+        form: 'rect',
+        intensity: 1.6,
+        color: '#6ca6ff',
+        position: [-8, 5, -7],
+        scale: [10, 4, 1],
+        target: [0, 0, 0],
+      }),
+      h(Lightformer, {
+        form: 'ring',
+        intensity: 1.1,
+        color: '#ff8a4c',
+        position: [0, 10, 0],
+        rotation: [Math.PI / 2, 0, 0],
+        scale: 12,
+      })
+    ),
+
+    // Responsive Orthographic Camera Zoom
+    h(ResponsiveCameraRig, { screensaverMode }),
 
     // Warm Amber Key Light + Soft Shadows + Cool Rim Light
-    h('hemisphereLight', { args: ['#ffd5b3', '#161b29', 0.58] }),
+    h('hemisphereLight', { args: ['#ffd5b3', '#161b29', 0.62] }),
     h('directionalLight', {
       position: [9, 13, 8],
-      intensity: 2.15,
+      intensity: 2.2,
       color: '#ffab6b',
       castShadow: true,
       'shadow-mapSize-width': 2048,
@@ -904,19 +942,29 @@ function MarsDioramaScene({
       'shadow-bias': -0.0004,
       'shadow-radius': 4,
     }),
-    // Cool indigo/cyan rim light for miniature silhouette pop
     h('directionalLight', {
       position: [-10, 6, -9],
-      intensity: 0.95,
+      intensity: 1.05,
       color: '#6ca6ff',
     }),
-    // Warm under-bounce accent
     h('pointLight', {
-      position: [0, -1.45, 0],
-      intensity: 0.55,
-      color: '#d95b26',
-      distance: 8,
+      position: [0, -1.42, 0],
+      intensity: 0.72,
+      color: '#e0622d',
+      distance: 9,
     }),
+
+    // Subtle Martian Atmospheric Dust Motes
+    !PREFERS_REDUCED_MOTION &&
+      h(Sparkles, {
+        count: 34,
+        scale: [9, 5, 9],
+        position: [0, 1.2, 0],
+        size: 1.6,
+        speed: 0.22,
+        opacity: 0.32,
+        color: '#ffbe8a',
+      }),
 
     // Floating Diorama Group
     h(
@@ -938,7 +986,12 @@ function MarsDioramaScene({
         onHover: setHoveredTrack,
         onSelect: onSelectTrack,
       }),
-      h(SolarArrays),
+      h(SolarArrays, {
+        avgRate,
+        hovered: hoveredTrack === 'ALL',
+        onHover: setHoveredTrack,
+        onSelectAll: () => onSelectTrack(null),
+      }),
       h(WindTurbines, {
         rate: trk1,
         selected: selectedTrack === 'TRK-01',
@@ -968,7 +1021,6 @@ function MarsDioramaScene({
         onHover: setHoveredTrack,
         onSelect: onSelectTrack,
       }),
-      // Floating hover tooltip in 3D space (hidden during screensaver)
       !screensaverMode &&
         activeHover &&
         h(
@@ -983,7 +1035,7 @@ function MarsDioramaScene({
         )
     ),
 
-    // Dark Reflective Studio Floor Plane
+    // Reflective Dark Studio Floor Plane (now catching procedural Lightformer reflections)
     h(
       'mesh',
       {
@@ -994,33 +1046,45 @@ function MarsDioramaScene({
       },
       h('planeGeometry', { args: [60, 60] }),
       h('meshStandardMaterial', {
-        color: '#070a11',
-        roughness: 0.22,
-        metalness: 0.68,
+        color: '#0e1422',
+        roughness: 0.2,
+        metalness: 0.78,
       })
     ),
-    // Soft contact shadows on the dark floor under the floating diorama
+    // Subtle studio plinth halo ring on the reflective floor
+    h(
+      'mesh',
+      { position: [0, -1.71, 0], rotation: [-Math.PI / 2, 0, 0] },
+      h('ringGeometry', { args: [4.25, 4.35, 64] }),
+      h('meshBasicMaterial', {
+        color: '#ff9f4a',
+        transparent: true,
+        opacity: 0.14,
+        side: THREE.DoubleSide,
+      })
+    ),
     h(ContactShadows, {
       position: [0, -1.7, 0],
-      opacity: 0.68,
+      opacity: 0.72,
       scale: 13.5,
       blur: 2.4,
       far: 4.5,
       color: '#000000',
     }),
 
-    // Isometric OrbitControls with zoom & polar angle limits
+    // Isometric OrbitControls centered slightly lower to balance HUD
     h(OrbitControls, {
       ref: controlsRef,
       makeDefault: true,
+      target: [0, -0.18, 0],
       enablePan: false,
       enableDamping: true,
       dampingFactor: 0.06,
       minPolarAngle: Math.PI / 6,
       maxPolarAngle: Math.PI / 2.25,
-      minZoom: 34,
-      maxZoom: 86,
-      autoRotate: screensaverMode,
+      minZoom: 40,
+      maxZoom: 112,
+      autoRotate: screensaverMode && !PREFERS_REDUCED_MOTION,
       autoRotateSpeed: screensaverMode ? 0.55 : 0,
     })
   );
@@ -1082,7 +1146,7 @@ function MarsViewportApp() {
     {
       shadows: 'percentage',
       orthographic: true,
-      camera: { position: [12, 10.5, 12], zoom: 54, near: -20, far: 100 },
+      camera: { position: [12, 10.5, 12], zoom: 72, near: -20, far: 100 },
       dpr: [1, 2],
       gl: { antialias: true, powerPreference: 'high-performance' },
       style: { width: '100%', height: '100%', display: 'block' },
