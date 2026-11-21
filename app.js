@@ -5601,3 +5601,307 @@ window.addEventListener('DOMContentLoaded', () => {
   updateAstroAudioUI();
   scanLocalMusicFolder(false);
 });
+
+
+// ============================================================================
+// 16. 구글 드라이브(MoonPD_BGM) · Spotify 임베드 · 4대 트랙 Sheets 양방향 동기화 · 원격 명령 큐
+// ============================================================================
+const ASTRO_SPOTIFY_STORAGE_KEY = 'moonpd_astro_spotify_v1';
+const DEFAULT_SPOTIFY_ITEMS = [
+  {
+    id: 'sp-default-lofi',
+    title: 'Lo-Fi Beats (기본 집중 플레이리스트)',
+    embedUrl: 'https://open.spotify.com/embed/playlist/37i9dQZF1DWWQRwui0ExPn?utm_source=generator&theme=0',
+  },
+];
+
+let astroSpotifyItems = loadAstroSpotifyItems();
+let activeSpotifyId = astroSpotifyItems[0]?.id || null;
+let astroAudioActiveTab = 'local';
+let driveBgmFolderUrl = 'https://drive.google.com/drive/folders/1iLuXv3tbem-SzHNn-erlbLdtH2Yxyf5K';
+let marsMissionsSyncTimer = null;
+
+function loadAstroSpotifyItems() {
+  try {
+    const raw = localStorage.getItem(ASTRO_SPOTIFY_STORAGE_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length) return arr;
+    }
+  } catch (e) {}
+  return DEFAULT_SPOTIFY_ITEMS.map((x) => ({ ...x }));
+}
+
+function saveAstroSpotifyItems() {
+  try {
+    localStorage.setItem(ASTRO_SPOTIFY_STORAGE_KEY, JSON.stringify(astroSpotifyItems));
+  } catch (e) {}
+}
+
+function parseSpotifyToEmbedUrl(rawUrl) {
+  const txt = String(rawUrl || '').trim();
+  const m = txt.match(/open\.spotify\.com\/(?:intl-[a-z-]+\/)?(playlist|album|track|episode|show)\/([a-zA-Z0-9]+)/i);
+  if (!m) return null;
+  const kind = m[1].toLowerCase();
+  const id = m[2];
+  return {
+    kind,
+    id,
+    embedUrl: `https://open.spotify.com/embed/${kind}/${id}?utm_source=generator&theme=0`,
+  };
+}
+
+function switchAstroAudioTab(tabName) {
+  astroAudioActiveTab = tabName === 'spotify' ? 'spotify' : 'local';
+  const localPane = document.getElementById('astroAudioPaneLocal');
+  const spPane = document.getElementById('astroAudioPaneSpotify');
+  if (localPane) localPane.style.display = astroAudioActiveTab === 'local' ? 'flex' : 'none';
+  if (spPane) spPane.style.display = astroAudioActiveTab === 'spotify' ? 'flex' : 'none';
+  document.querySelectorAll('.astro-audio-tab').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.audioTab === astroAudioActiveTab);
+  });
+  if (astroAudioActiveTab === 'spotify') renderSpotifyPanel();
+}
+
+function renderSpotifyPanel() {
+  const wrap = document.getElementById('astroSpotifyEmbedWrap');
+  const listBox = document.getElementById('astroSpotifyListBox');
+  const current = astroSpotifyItems.find((x) => x.id === activeSpotifyId) || astroSpotifyItems[0];
+  if (current) activeSpotifyId = current.id;
+
+  if (wrap) {
+    if (current) {
+      const existingIframe = wrap.querySelector('iframe');
+      if (!existingIframe || existingIframe.src !== current.embedUrl) {
+        wrap.innerHTML = `<iframe src="${escapeHtml(current.embedUrl)}" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`;
+      }
+    } else {
+      wrap.innerHTML = `<div class="astro-track-empty" style="padding:14px;">Spotify 플레이리스트 또는 곡 링크를 위에 붙여넣어 주세요.</div>`;
+    }
+  }
+
+  if (listBox) {
+    listBox.innerHTML = astroSpotifyItems
+      .map((item) => {
+        const isCur = item.id === activeSpotifyId;
+        const safeId = escapeJsSingleQuoteAttr(item.id);
+        return `
+          <div class="astro-track-row ${isCur ? 'active' : ''}" onclick="selectSpotifyEmbed('${safeId}')">
+            <span>🎧</span>
+            <span class="astro-track-name">${escapeHtml(item.title)}</span>
+            <button type="button" class="mission-del-btn" onclick="removeSpotifyEmbed('${safeId}', event)" title="삭제">✕</button>
+          </div>
+        `;
+      })
+      .join('');
+  }
+}
+
+function addSpotifyUrlFromInput(event) {
+  if (event) event.preventDefault();
+  const input = document.getElementById('astroSpotifyUrlInput');
+  const raw = (input?.value || '').trim();
+  const parsed = parseSpotifyToEmbedUrl(raw);
+  if (!parsed) {
+    showToast('올바른 Spotify 공유 링크(open.spotify.com/playlist/...)를 붙여넣어 주세요.');
+    return;
+  }
+  const newItem = {
+    id: 'sp-' + Date.now(),
+    title: `Spotify ${parsed.kind.toUpperCase()} (${parsed.id.slice(0, 6)})`,
+    embedUrl: parsed.embedUrl,
+  };
+  astroSpotifyItems.unshift(newItem);
+  activeSpotifyId = newItem.id;
+  saveAstroSpotifyItems();
+  if (input) input.value = '';
+  renderSpotifyPanel();
+  showToast('Spotify 플레이리스트가 추가되었습니다.');
+}
+
+function selectSpotifyEmbed(id) {
+  activeSpotifyId = id;
+  renderSpotifyPanel();
+}
+
+function removeSpotifyEmbed(id, event) {
+  if (event) event.stopPropagation();
+  astroSpotifyItems = astroSpotifyItems.filter((x) => x.id !== id);
+  if (activeSpotifyId === id) activeSpotifyId = astroSpotifyItems[0]?.id || null;
+  saveAstroSpotifyItems();
+  renderSpotifyPanel();
+}
+
+// Google Drive MoonPD_BGM 폴더 음악 자동 로드 (어디서든 스트리밍)
+async function loadDriveMusicTracks(showNotice = false) {
+  const webAppUrl = typeof getSheetsWebAppUrl === 'function' ? getSheetsWebAppUrl() : '';
+  if (!webAppUrl) {
+    if (showNotice) showToast('Google Apps Script 웹앱 URL이 설정되지 않았습니다.');
+    return;
+  }
+  try {
+    const res = await fetch(`${webAppUrl}?action=getDriveMusic&t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!data?.ok) throw new Error(data?.error || '드라이브 음악 조회 실패');
+
+    if (data.folderUrl) driveBgmFolderUrl = data.folderUrl;
+    const tracks = Array.isArray(data.tracks) ? data.tracks : [];
+    const existingUrls = new Set(astroPlaylist.map((t) => t.url));
+    let added = 0;
+    tracks.forEach((t) => {
+      if (t.url && !existingUrls.has(t.url)) {
+        astroPlaylist.push({
+          id: t.id || 'drv-' + t.name,
+          title: `☁️ ${t.title || t.name}`,
+          url: t.url,
+          fallbackUrl: t.fallbackUrl || '',
+          source: 'drive',
+        });
+        added++;
+      }
+    });
+    updateAstroAudioUI();
+    if (showNotice) {
+      if (!tracks.length) {
+        showToast('구글 드라이브 [MoonPD_BGM] 폴더에 MP3/WAV 파일을 올리면 자동 로드됩니다.');
+      } else {
+        showToast(`구글 드라이브 MoonPD_BGM에서 ${tracks.length}곡 확인됨 (신규 ${added}곡)`);
+      }
+    }
+  } catch (err) {
+    if (showNotice) {
+      showToast('Apps Script를 최신 Google_WebApp_Code.gs로 1회 재배포하면 드라이브 음악이 자동 연동됩니다.');
+    }
+  }
+}
+
+// 4대 트랙 할 일 (TRK-01~04) Google Sheets 실시간 양방향 동기화 (항목별 updatedAt 병합)
+async function pullMarsMissionsFromSheets() {
+  const webAppUrl = typeof getSheetsWebAppUrl === 'function' ? getSheetsWebAppUrl() : '';
+  if (!webAppUrl) return;
+  try {
+    const res = await fetch(`${webAppUrl}?action=getMissions&t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data?.ok || !Array.isArray(data.tasks) || !data.tasks.length) return;
+
+    const map = {};
+    marsTasks.forEach((t) => {
+      map[t.id] = { ...t, updatedAt: Number(t.updatedAt) || 0, deleted: Boolean(t.deleted) };
+    });
+    data.tasks.forEach((r) => {
+      if (!r || !r.id) return;
+      const prev = map[r.id];
+      const remoteTs = Number(r.updatedAt) || 0;
+      if (!prev || remoteTs >= (Number(prev.updatedAt) || 0)) {
+        map[r.id] = {
+          id: String(r.id),
+          track: String(r.track || 'TRK-01'),
+          title: String(r.title || ''),
+          done: Boolean(r.done),
+          deleted: Boolean(r.deleted),
+          updatedAt: remoteTs,
+        };
+      }
+    });
+
+    marsTasks = Object.values(map).filter((t) => !t.deleted);
+    saveMarsTasks();
+    syncMarsDioramaState();
+    if (currentTab === 'missions') renderActiveTab();
+  } catch (e) {}
+}
+
+function schedulePushMarsMissionsToSheets(extraDeletedTask = null) {
+  const webAppUrl = typeof getSheetsWebAppUrl === 'function' ? getSheetsWebAppUrl() : '';
+  if (!webAppUrl) return;
+  if (marsMissionsSyncTimer) clearTimeout(marsMissionsSyncTimer);
+  marsMissionsSyncTimer = setTimeout(async () => {
+    try {
+      const payloadTasks = marsTasks.map((t) => ({
+        ...t,
+        deleted: false,
+        updatedAt: Number(t.updatedAt) || Date.now(),
+      }));
+      if (extraDeletedTask) {
+        payloadTasks.push({ ...extraDeletedTask, deleted: true, updatedAt: Date.now() });
+      }
+      await fetch(webAppUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'saveMissions', tasks: payloadTasks }),
+      });
+    } catch (e) {}
+  }, 450);
+}
+
+// 원격 PC 명령 예약 (모바일/GitHub Pages에서 크롤링 등 요청 시 회사/집 PC가 충돌 없이 자동 실행)
+async function enqueueRemotePcCommand(cmdType = 'crawl', data = {}) {
+  const webAppUrl = typeof getSheetsWebAppUrl === 'function' ? getSheetsWebAppUrl() : '';
+  if (!webAppUrl) {
+    showToast('Google Sheets 웹앱 URL이 필요합니다.');
+    return false;
+  }
+  try {
+    const res = await fetch(webAppUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        action: 'enqueueCommand',
+        type: cmdType,
+        requester: IS_LOCAL_SERVER ? 'local-pc' : 'web-mobile',
+        data,
+      }),
+    });
+    const out = await res.json();
+    if (out?.ok) {
+      showToast(
+        out.deduplicated
+          ? '이미 PC에서 처리 대기/실행 중인 원격 요청입니다.'
+          : '☁️ 원격 명령 등록 완료! 켜져 있는 PC가 자동 처리 후 웹에 반영합니다.'
+      );
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
+// 할 일 변경 함수에 updatedAt & Google Sheets 자동 동기화 훅 연결
+(function bindMissionsCloudSyncHooks() {
+  const origToggle = window.toggleMarsTaskDone;
+  if (typeof origToggle === 'function') {
+    window.toggleMarsTaskDone = function (taskId) {
+      const t = marsTasks.find((x) => x.id === taskId);
+      if (t) t.updatedAt = Date.now();
+      const res = origToggle(taskId);
+      schedulePushMarsMissionsToSheets();
+      return res;
+    };
+  }
+  const origAdd = window.addMarsTaskFromInput;
+  if (typeof origAdd === 'function') {
+    window.addMarsTaskFromInput = function (ev) {
+      const res = origAdd(ev);
+      if (marsTasks[0]) marsTasks[0].updatedAt = Date.now();
+      saveMarsTasks();
+      schedulePushMarsMissionsToSheets();
+      return res;
+    };
+  }
+  const origDel = window.deleteMarsTask;
+  if (typeof origDel === 'function') {
+    window.deleteMarsTask = function (taskId) {
+      const removed = marsTasks.find((x) => x.id === taskId);
+      const res = origDel(taskId);
+      if (removed) schedulePushMarsMissionsToSheets(removed);
+      return res;
+    };
+  }
+})();
+
+// 초기 로드 시 구글 드라이브 음악 & 4대 트랙 Sheets 자동 동기화
+window.addEventListener('DOMContentLoaded', () => {
+  pullMarsMissionsFromSheets();
+  loadDriveMusicTracks(false);
+});
