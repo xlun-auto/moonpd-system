@@ -5076,3 +5076,502 @@ window.addEventListener('keydown', (e) => {
     }
   }
 });
+
+
+// ============================================================================
+// 15. 아스트로니어 사운드 엔진 (Web Audio API 효과음·클릭음) & 커스텀 BGM 주크박스
+// ============================================================================
+const ASTRO_AUDIO_PREF_KEY = 'moonpd_astro_audio_pref_v1';
+
+let astroAudioCtx = null;
+let astroSfxEnabled = true;
+let astroLoopMode = 'all'; // 'all' (전곡 무한루프) | 'one' (한곡 무한루프)
+let astroBgmVolume = 0.55;
+let astroPlaylist = []; // [{ id, title, url, source: 'folder'|'upload' }]
+let astroTrackIdx = -1;
+let astroAudioEl = null;
+let astroAmbientNodes = null;
+let astroAmbientOn = false;
+let lastKnownBaseLevel = null;
+
+function loadAstroAudioPrefs() {
+  try {
+    const raw = localStorage.getItem(ASTRO_AUDIO_PREF_KEY);
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    if (typeof p.sfxEnabled === 'boolean') astroSfxEnabled = p.sfxEnabled;
+    if (p.loopMode === 'one' || p.loopMode === 'all') astroLoopMode = p.loopMode;
+    if (typeof p.volume === 'number' && p.volume >= 0 && p.volume <= 1) astroBgmVolume = p.volume;
+  } catch (e) {}
+}
+
+function saveAstroAudioPrefs() {
+  try {
+    localStorage.setItem(
+      ASTRO_AUDIO_PREF_KEY,
+      JSON.stringify({
+        sfxEnabled: astroSfxEnabled,
+        loopMode: astroLoopMode,
+        volume: astroBgmVolume,
+      })
+    );
+  } catch (e) {}
+}
+
+function getAstroAudioContext() {
+  if (!astroAudioCtx) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (Ctx) astroAudioCtx = new Ctx();
+  }
+  if (astroAudioCtx && astroAudioCtx.state === 'suspended') {
+    astroAudioCtx.resume().catch(() => {});
+  }
+  return astroAudioCtx;
+}
+
+function playAstroSfx(type = 'click') {
+  if (!astroSfxEnabled) return;
+  const ctx = getAstroAudioContext();
+  if (!ctx) return;
+
+  const now = ctx.currentTime;
+  const master = ctx.createGain();
+  master.connect(ctx.destination);
+
+  if (type === 'click') {
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(680, now);
+    osc.frequency.exponentialRampToValueAtTime(980, now + 0.042);
+    master.gain.setValueAtTime(0.06, now);
+    master.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
+    osc.connect(master);
+    osc.start(now);
+    osc.stop(now + 0.06);
+  } else if (type === 'station') {
+    // Astroneer warm hologram open chord
+    [330, 495, 660].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = i === 0 ? 'triangle' : 'sine';
+      osc.frequency.setValueAtTime(freq * 0.92, now + i * 0.03);
+      osc.frequency.exponentialRampToValueAtTime(freq, now + i * 0.03 + 0.14);
+      g.gain.setValueAtTime(0.001, now + i * 0.03);
+      g.gain.linearRampToValueAtTime(0.055, now + i * 0.03 + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.03 + 0.28);
+      osc.connect(g);
+      g.connect(master);
+      osc.start(now + i * 0.03);
+      osc.stop(now + i * 0.03 + 0.3);
+    });
+  } else if (type === 'close') {
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(520, now);
+    osc.frequency.exponentialRampToValueAtTime(240, now + 0.12);
+    master.gain.setValueAtTime(0.055, now);
+    master.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+    osc.connect(master);
+    osc.start(now);
+    osc.stop(now + 0.15);
+  } else if (type === 'complete') {
+    // Byte harvest ascending arpeggio (C5 -> E5 -> G5 -> C6)
+    [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+      const t0 = now + i * 0.055;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, t0);
+      g.gain.setValueAtTime(0.001, t0);
+      g.gain.linearRampToValueAtTime(0.075, t0 + 0.018);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.26);
+      osc.connect(g);
+      g.connect(master);
+      osc.start(t0);
+      osc.stop(t0 + 0.28);
+    });
+  } else if (type === 'levelup') {
+    [523.25, 659.25, 783.99, 987.77, 1174.66].forEach((freq, i) => {
+      const t0 = now + i * 0.07;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, t0);
+      g.gain.setValueAtTime(0.001, t0);
+      g.gain.linearRampToValueAtTime(0.085, t0 + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.45);
+      osc.connect(g);
+      g.connect(master);
+      osc.start(t0);
+      osc.stop(t0 + 0.48);
+    });
+  } else if (type === 'screensaver') {
+    [440, 329.63].forEach((freq, i) => {
+      const t0 = now + i * 0.09;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t0);
+      g.gain.setValueAtTime(0.05, t0);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.32);
+      osc.connect(g);
+      g.connect(master);
+      osc.start(t0);
+      osc.stop(t0 + 0.35);
+    });
+  }
+}
+
+function toggleAstroSfx() {
+  astroSfxEnabled = !astroSfxEnabled;
+  saveAstroAudioPrefs();
+  updateAstroAudioUI();
+  if (astroSfxEnabled) playAstroSfx('complete');
+}
+
+function toggleAstroAmbientSynth() {
+  const ctx = getAstroAudioContext();
+  if (!ctx) return;
+
+  if (astroAmbientOn && astroAmbientNodes) {
+    try {
+      astroAmbientNodes.gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
+      const nodes = astroAmbientNodes;
+      setTimeout(() => {
+        nodes.oscs.forEach((o) => {
+          try { o.stop(); } catch (e) {}
+        });
+      }, 450);
+    } catch (e) {}
+    astroAmbientNodes = null;
+    astroAmbientOn = false;
+    updateAstroAudioUI();
+    return;
+  }
+
+  // Warm low-passed Astroneer-like cosmic synth pad (C2 + G2 + D3)
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(340, ctx.currentTime);
+
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.001, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(Math.max(0.02, astroBgmVolume * 0.08), ctx.currentTime + 1.2);
+
+  filter.connect(gain);
+  gain.connect(ctx.destination);
+
+  const oscs = [65.41, 98.0, 146.83].map((f, idx) => {
+    const o = ctx.createOscillator();
+    o.type = idx === 0 ? 'sine' : 'triangle';
+    o.frequency.setValueAtTime(f, ctx.currentTime);
+    o.connect(filter);
+    o.start();
+    return o;
+  });
+
+  astroAmbientNodes = { oscs, gain, filter };
+  astroAmbientOn = true;
+  updateAstroAudioUI();
+}
+
+function ensureAstroAudioElement() {
+  if (astroAudioEl) return astroAudioEl;
+  astroAudioEl = new Audio();
+  astroAudioEl.preload = 'metadata';
+  astroAudioEl.volume = astroBgmVolume;
+  astroAudioEl.loop = astroLoopMode === 'one';
+
+  astroAudioEl.addEventListener('timeupdate', () => {
+    const curEl = document.getElementById('astroTimeCur');
+    const durEl = document.getElementById('astroTimeDur');
+    const seek = document.getElementById('astroSeekBar');
+    const cur = astroAudioEl.currentTime || 0;
+    const dur = astroAudioEl.duration || 0;
+    if (curEl) curEl.textContent = formatAudioTime(cur);
+    if (durEl) durEl.textContent = formatAudioTime(dur);
+    if (seek && dur > 0) seek.value = String(Math.round((cur / dur) * 100));
+  });
+
+  astroAudioEl.addEventListener('ended', () => {
+    if (astroLoopMode === 'one') {
+      astroAudioEl.currentTime = 0;
+      astroAudioEl.play().catch(() => {});
+    } else if (astroPlaylist.length > 0) {
+      const nextIdx = (astroTrackIdx + 1) % astroPlaylist.length;
+      playAstroTrackAt(nextIdx);
+    }
+  });
+
+  astroAudioEl.addEventListener('play', updateAstroAudioUI);
+  astroAudioEl.addEventListener('pause', updateAstroAudioUI);
+  return astroAudioEl;
+}
+
+function formatAudioTime(sec) {
+  if (!isFinite(sec) || sec < 0) return '00:00';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function playAstroTrackAt(idx) {
+  if (!astroPlaylist.length) {
+    showToast('먼저 [+ 내 음악 추가]로 음악을 넣거나 moonpd_system/music 폴더에 넣어주세요.');
+    return;
+  }
+  const safeIdx = ((idx % astroPlaylist.length) + astroPlaylist.length) % astroPlaylist.length;
+  astroTrackIdx = safeIdx;
+  const track = astroPlaylist[safeIdx];
+  const audio = ensureAstroAudioElement();
+  audio.src = track.url;
+  audio.loop = astroLoopMode === 'one';
+  audio.volume = astroBgmVolume;
+  audio.play().catch(() => {
+    showToast('브라우저 자동재생 정책으로 [▶ 재생]을 한 번 눌러주세요.');
+  });
+  updateAstroAudioUI();
+}
+
+function toggleAstroBgmPlay() {
+  const audio = ensureAstroAudioElement();
+  if (!astroPlaylist.length) {
+    showToast('재생할 음악이 없습니다. [+ 내 음악 추가]로 MP3/WAV 파일을 추가해 보세요.');
+    return;
+  }
+  if (astroTrackIdx < 0 || !audio.src) {
+    playAstroTrackAt(0);
+    return;
+  }
+  if (audio.paused) {
+    audio.play().catch(() => {});
+  } else {
+    audio.pause();
+  }
+  updateAstroAudioUI();
+}
+
+function nextAstroTrack() {
+  if (!astroPlaylist.length) return;
+  playAstroTrackAt(astroTrackIdx + 1);
+}
+
+function prevAstroTrack() {
+  if (!astroPlaylist.length) return;
+  playAstroTrackAt(astroTrackIdx - 1);
+}
+
+function toggleAstroLoopMode() {
+  astroLoopMode = astroLoopMode === 'all' ? 'one' : 'all';
+  if (astroAudioEl) astroAudioEl.loop = astroLoopMode === 'one';
+  saveAstroAudioPrefs();
+  updateAstroAudioUI();
+  showToast(astroLoopMode === 'one' ? '🔂 한곡 무한루프 활성화' : '🔁 전곡 무한루프 활성화');
+}
+
+function setAstroBgmVolume(val) {
+  const v = Math.max(0, Math.min(1, Number(val) / 100));
+  astroBgmVolume = v;
+  if (astroAudioEl) astroAudioEl.volume = v;
+  if (astroAmbientNodes && astroAudioCtx) {
+    astroAmbientNodes.gain.gain.setTargetAtTime(Math.max(0.01, v * 0.08), astroAudioCtx.currentTime, 0.08);
+  }
+  saveAstroAudioPrefs();
+}
+
+function seekAstroBgm(pct) {
+  if (!astroAudioEl || !astroAudioEl.duration) return;
+  astroAudioEl.currentTime = (Number(pct) / 100) * astroAudioEl.duration;
+}
+
+function handleAstroMusicFilesSelected(event) {
+  const files = Array.from(event?.target?.files || []);
+  if (!files.length) return;
+  const startIdx = astroPlaylist.length;
+  files.forEach((f) => {
+    const url = URL.createObjectURL(f);
+    const title = f.name.replace(/\.[^.]+$/, '');
+    astroPlaylist.push({
+      id: 'upl-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+      title,
+      url,
+      source: 'upload',
+    });
+  });
+  event.target.value = '';
+  updateAstroAudioUI();
+  playAstroTrackAt(startIdx);
+  showToast(`내 음악 ${files.length}곡이 플레이리스트에 추가되었습니다.`);
+}
+
+async function scanLocalMusicFolder(showNotice = false) {
+  if (!IS_LOCAL_SERVER) {
+    if (showNotice) showToast('폴더 자동 스캔은 로컬 PC 서버(localhost:8090)에서 지원됩니다. 웹에서는 [+ 내 음악 추가]를 사용해 주세요.');
+    return;
+  }
+  try {
+    const res = await fetch('/api/music', { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data?.ok || !Array.isArray(data.tracks)) return;
+
+    const existingUrls = new Set(astroPlaylist.map((t) => t.url));
+    let added = 0;
+    data.tracks.forEach((t) => {
+      if (!existingUrls.has(t.url)) {
+        astroPlaylist.push({
+          id: 'fld-' + t.name,
+          title: t.title || t.name,
+          url: t.url,
+          source: 'folder',
+        });
+        added++;
+      }
+    });
+    updateAstroAudioUI();
+    if (showNotice) {
+      if (data.tracks.length === 0) {
+        showToast('moonpd_system/music 폴더에 MP3/WAV 파일을 넣으면 자동 인식됩니다.');
+      } else {
+        showToast(`music 폴더에서 ${data.tracks.length}곡 확인됨 (신규 ${added}곡)`);
+      }
+    }
+  } catch (e) {}
+}
+
+function removeAstroTrack(idx, event) {
+  if (event) event.stopPropagation();
+  const removed = astroPlaylist[idx];
+  if (!removed) return;
+  if (removed.source === 'upload' && removed.url.startsWith('blob:')) {
+    try { URL.revokeObjectURL(removed.url); } catch (e) {}
+  }
+  astroPlaylist.splice(idx, 1);
+  if (idx === astroTrackIdx) {
+    if (astroAudioEl) {
+      astroAudioEl.pause();
+      astroAudioEl.src = '';
+    }
+    astroTrackIdx = -1;
+  } else if (idx < astroTrackIdx) {
+    astroTrackIdx--;
+  }
+  updateAstroAudioUI();
+}
+
+function toggleAstroAudioPopover(event) {
+  if (event) event.stopPropagation();
+  const pop = document.getElementById('astroAudioPopover');
+  if (!pop) return;
+  pop.classList.toggle('open');
+  updateAstroAudioUI();
+}
+
+function updateAstroAudioUI() {
+  const isPlaying = Boolean(astroAudioEl && !astroAudioEl.paused && astroAudioEl.src);
+  const trigger = document.getElementById('astroBgmTriggerBtn');
+  const triggerLabel = document.getElementById('astroBgmBtnLabel');
+  const nowEl = document.getElementById('astroNowPlayingLabel');
+  const playBtn = document.getElementById('astroPlayPauseBtn');
+  const loopBtn = document.getElementById('astroLoopModeBtn');
+  const sfxBtn = document.getElementById('astroSfxToggleBtn');
+  const ambBtn = document.getElementById('astroAmbientBtn');
+  const volBar = document.getElementById('astroVolBar');
+  const listBox = document.getElementById('astroPlaylistBox');
+
+  const curTrack = astroTrackIdx >= 0 ? astroPlaylist[astroTrackIdx] : null;
+  if (trigger) trigger.classList.toggle('is-playing', isPlaying || astroAmbientOn);
+  if (triggerLabel) {
+    triggerLabel.textContent = isPlaying && curTrack ? `♪ ${curTrack.title.slice(0, 12)}` : astroAmbientOn ? '♪ 우주음' : 'BGM';
+  }
+  if (nowEl) {
+    nowEl.textContent = curTrack ? `${isPlaying ? '▶ ' : '⏸ '}${curTrack.title}` : astroAmbientOn ? '🌌 내장 우주 앰비언트 재생 중' : '재생 중인 트랙 없음';
+  }
+  if (playBtn) playBtn.textContent = isPlaying ? '⏸ 일시정지' : '▶ 재생';
+  if (loopBtn) {
+    loopBtn.textContent = astroLoopMode === 'one' ? '🔂 한곡 무한루프' : '🔁 전곡 무한루프';
+    loopBtn.classList.toggle('mode-one', astroLoopMode === 'one');
+    loopBtn.classList.toggle('mode-all', astroLoopMode === 'all');
+  }
+  if (sfxBtn) sfxBtn.textContent = astroSfxEnabled ? '🔊 효과음 ON' : '🔇 효과음 OFF';
+  if (ambBtn) ambBtn.textContent = astroAmbientOn ? '🌌 우주음 ON' : '🌌 우주음 OFF';
+  if (volBar) volBar.value = String(Math.round(astroBgmVolume * 100));
+
+  if (listBox) {
+    if (!astroPlaylist.length) {
+      listBox.innerHTML = `<div class="astro-track-empty"><strong>[+ 내 음악 추가]</strong>로 직접 만든 MP3/WAV 파일을 추가하거나, PC의 <code>moonpd_system/music/</code> 폴더에 넣으면 자동 로드됩니다.</div>`;
+    } else {
+      listBox.innerHTML = astroPlaylist
+        .map((t, i) => {
+          const isCur = i === astroTrackIdx;
+          return `
+            <div class="astro-track-row ${isCur ? 'active' : ''}" onclick="playAstroTrackAt(${i})">
+              <span>${isCur && isPlaying ? '▶' : '♪'}</span>
+              <span class="astro-track-name" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>
+              <button type="button" class="mission-del-btn" onclick="removeAstroTrack(${i}, event)" title="목록에서 제거">✕</button>
+            </div>
+          `;
+        })
+        .join('');
+    }
+  }
+}
+
+// 바깥 클릭 시 BGM 팝오버 닫기 + 버튼 클릭 시 아스트로니어 클릭음 재생
+document.addEventListener('click', (e) => {
+  const wrap = document.querySelector('.astro-audio-wrap');
+  const pop = document.getElementById('astroAudioPopover');
+  if (pop && pop.classList.contains('open') && wrap && !wrap.contains(e.target)) {
+    pop.classList.remove('open');
+  }
+  if (e.target && e.target.closest('button, .astro-pin, .astro-dock-btn, .tab-btn')) {
+    playAstroSfx('click');
+  }
+});
+
+// 스테이션 열기/닫기/미션 완료 사운드 훅 연결
+(function bindAstroSfxHooks() {
+  const origOpen = window.openMarsStation;
+  if (typeof origOpen === 'function') {
+    window.openMarsStation = function (stationId, from3D = false) {
+      playAstroSfx('station');
+      return origOpen(stationId, from3D);
+    };
+  }
+  const origClose = window.closeMarsStationDrawer;
+  if (typeof origClose === 'function') {
+    window.closeMarsStationDrawer = function (from3D = false) {
+      const split = document.getElementById('workspaceSplit');
+      if (split && split.classList.contains('is-drawer-open')) {
+        playAstroSfx('close');
+      }
+      return origClose(from3D);
+    };
+  }
+  const origToggleTask = window.toggleMarsTaskDone;
+  if (typeof origToggleTask === 'function') {
+    window.toggleMarsTaskDone = function (taskId) {
+      const prev = marsTasks.find((t) => t.id === taskId)?.done;
+      const res = origToggleTask(taskId);
+      const nowDone = marsTasks.find((t) => t.id === taskId)?.done;
+      if (!prev && nowDone) {
+        const curLevel = window.__MARS_GAME_STATE__?.stats?.level || 1;
+        if (lastKnownBaseLevel !== null && curLevel > lastKnownBaseLevel) {
+          playAstroSfx('levelup');
+          showToast(`🚀 기지 레벨 업! LV.${curLevel} ${window.__MARS_GAME_STATE__?.stats?.levelTitle || ''}`);
+        } else {
+          playAstroSfx('complete');
+        }
+        lastKnownBaseLevel = curLevel;
+      }
+      return res;
+    };
+  }
+})();
+
+window.addEventListener('DOMContentLoaded', () => {
+  loadAstroAudioPrefs();
+  lastKnownBaseLevel = window.__MARS_GAME_STATE__?.stats?.level || 2;
+  updateAstroAudioUI();
+  scanLocalMusicFolder(false);
+});
