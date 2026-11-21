@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MarketLens — 미디어·콘텐츠 시장조사 리서치</title>
-  <link rel="stylesheet" href="styles.css?v=mars2" />
+  <link rel="stylesheet" href="styles.css?v=mars3" />
   <script type="importmap">
     {
       "imports": {
@@ -102,32 +102,36 @@
             <svg class="ui-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
             시점 초기화
           </button>
+          <button type="button" class="mars-hud-btn mars-hud-btn-standby" onclick="lockSessionNow('timeout')" title="즉시 3D 대기 모드 전환 (단축키: Alt+L)">
+            <svg class="ui-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            대기 모드
+          </button>
         </div>
       </div>
 
-      <!-- 3D 오브젝트 클릭 시 상세 상태 팝업 -->
+      <!-- 3D 오브젝트 클릭 시 컴팩트 텔레메트리 배지 (위장 코드명 전용) -->
       <div id="marsStructurePopup" class="mars-structure-popup" style="display:none;" role="status"></div>
 
-      <!-- 하단 실시간 섹터 텔레메트리 바 -->
+      <!-- 하단 실시간 섹터 텔레메트리 바 (순수 위장 코드명) -->
       <div class="mars-hud-bottom" id="marsTelemetryBar">
-        <button type="button" class="mars-tele-pill" data-track="TRK-01" onclick="onMarsStructureSelected('TRK-01')">
+        <button type="button" class="mars-tele-pill" data-track="TRK-01" onclick="onMarsStructureSelected('TRK-01')" title="SECTOR-01 풍력 발전기">
           <span class="mars-tele-dot dot-wind"></span>
-          <span class="mars-tele-name">풍력 · TRK-01</span>
+          <span class="mars-tele-name">SEC-01 WIND</span>
           <span class="mars-tele-val num" id="marsTeleTrk1">0%</span>
         </button>
-        <button type="button" class="mars-tele-pill" data-track="TRK-02" onclick="onMarsStructureSelected('TRK-02')">
+        <button type="button" class="mars-tele-pill" data-track="TRK-02" onclick="onMarsStructureSelected('TRK-02')" title="SECTOR-02 탐사 로버">
           <span class="mars-tele-dot dot-rover"></span>
-          <span class="mars-tele-name">로버 · TRK-02</span>
+          <span class="mars-tele-name">SEC-02 ROVER</span>
           <span class="mars-tele-val num" id="marsTeleTrk2">0%</span>
         </button>
-        <button type="button" class="mars-tele-pill" data-track="TRK-03" onclick="onMarsStructureSelected('TRK-03')">
+        <button type="button" class="mars-tele-pill" data-track="TRK-03" onclick="onMarsStructureSelected('TRK-03')" title="SECTOR-03 중앙 돔">
           <span class="mars-tele-dot dot-dome"></span>
-          <span class="mars-tele-name">돔 · TRK-03</span>
+          <span class="mars-tele-name">SEC-03 DOME</span>
           <span class="mars-tele-val num" id="marsTeleTrk3">0%</span>
         </button>
-        <button type="button" class="mars-tele-pill" data-track="TRK-04" onclick="onMarsStructureSelected('TRK-04')">
+        <button type="button" class="mars-tele-pill" data-track="TRK-04" onclick="onMarsStructureSelected('TRK-04')" title="SECTOR-04 거주 모듈">
           <span class="mars-tele-dot dot-hab"></span>
-          <span class="mars-tele-name">거주 · TRK-04</span>
+          <span class="mars-tele-name">SEC-04 HAB</span>
           <span class="mars-tele-val num" id="marsTeleTrk4">0%</span>
         </button>
       </div>
@@ -147,7 +151,7 @@
     </aside>
 
   <div class="app-shell" id="mainAppShell" style="display:none;">
-    <!-- 상단 헤더 -->
+    <!-- 상단 헤더 (1줄 컴팩트) -->
     <header class="top-header">
       <div class="header-inner">
         <div class="brand-area">
@@ -161,30 +165,70 @@
         </div>
 
         <div class="header-actions">
-          <a id="modeSwitchBtn" class="btn btn-outline btn-sm" href="#" target="_blank" rel="noopener" style="display:none;"></a>
-          <button type="button" class="btn btn-outline btn-sm" onclick="lockSessionNow('manual')" title="즉시 잠금 (표지로 이동)">
-            <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            잠금
-          </button>
-          <a class="btn btn-outline btn-sm" href="https://docs.google.com/spreadsheets/d/1wReNF82GUdAZb4c0_bFFI2kbU6grpapVz7fZqD2EFQE/edit" target="_blank" rel="noopener" title="구글 시트 DB 열기">
-            <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-            시트
-          </a>
-          <a class="btn btn-outline btn-sm" href="https://drive.google.com/drive/folders/1iLuXv3tbem-SzHNn-erlbLdtH2Yxyf5K" target="_blank" rel="noopener" title="구글 드라이브 폴더 열기">
-            <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-            드라이브
-          </a>
           <button type="button" class="btn btn-outline btn-sm" onclick="switchTab('saved')" title="관심공고함">
-            <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <svg class="ui-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             <span id="headerSavedCount" class="num">0</span>
           </button>
           <button type="button" class="btn btn-outline btn-sm" id="headerBatchBtn" onclick="runBatchConvertAndApply()" title="선택 공고 일괄 지원서 변환">
-            <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            <span id="selectedCount" class="num">0</span>
+            일괄 <span id="selectedCount" class="num">0</span>
+          </button>
+          <div class="header-more-wrap">
+            <button type="button" class="btn btn-outline btn-sm" id="headerMoreBtn" onclick="toggleHeaderMoreMenu(event)" title="외부 링크 및 보기 전환" aria-haspopup="true" aria-expanded="false">
+              ⋯
+            </button>
+            <div class="header-more-menu" id="headerMoreMenu" role="menu">
+              <a id="modeSwitchBtn" class="header-more-item" href="#" target="_blank" rel="noopener" role="menuitem" style="display:none;"></a>
+              <a class="header-more-item" href="https://docs.google.com/spreadsheets/d/1wReNF82GUdAZb4c0_bFFI2kbU6grpapVz7fZqD2EFQE/edit" target="_blank" rel="noopener" role="menuitem">
+                구글 시트 DB 열기
+              </a>
+              <a class="header-more-item" href="https://drive.google.com/drive/folders/1iLuXv3tbem-SzHNn-erlbLdtH2Yxyf5K" target="_blank" rel="noopener" role="menuitem">
+                구글 드라이브 폴더
+              </a>
+            </div>
+          </div>
+          <button type="button" class="btn btn-lock-accent btn-sm" onclick="lockSessionNow('timeout')" title="즉시 3D 대기 잠금 (Alt+L)">
+            <svg class="ui-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            잠금
           </button>
         </div>
       </div>
     </header>
+
+    <!-- 상단 고정(Sticky) 탭 내비게이션 -->
+    <div class="tabs-sticky-bar">
+      <nav class="tabs-nav" role="tablist" aria-label="메인 메뉴">
+        <button type="button" class="tab-btn active" role="tab" aria-selected="true" data-tab="missions" onclick="switchTab('missions')">
+          트랙·할일 <span class="tab-count num" id="tabCountMissions">0</span>
+        </button>
+        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="career" onclick="switchTab('career')">
+          정규직 <span class="tab-count num" id="tabCountCareer">0</span>
+        </button>
+        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="alba" onclick="switchTab('alba')">
+          알바 <span class="tab-count num" id="tabCountAlba">0</span>
+        </button>
+        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="freelance" onclick="switchTab('freelance')">
+          외주 <span class="tab-count num" id="tabCountFreelance">0</span>
+        </button>
+        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="contests" onclick="switchTab('contests')">
+          공모 <span class="tab-count num" id="tabCountContests">0</span>
+        </button>
+        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="saved" onclick="switchTab('saved')">
+          관심 <span class="tab-count num" id="tabCountSaved">0</span>
+        </button>
+        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="career_analysis" onclick="switchTab('career_analysis')">
+          직군분석
+        </button>
+        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="analytics" onclick="switchTab('analytics')">
+          이력서
+        </button>
+        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="radar" onclick="switchTab('radar')">
+          사이트 <span class="tab-count num" id="tabCountRadar">0</span>
+        </button>
+        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="life_hub" onclick="switchTab('life_hub')">
+          일정·프로젝트
+        </button>
+      </nav>
+    </div>
 
     <main class="container">
       <!-- KPI 요약 바 -->
@@ -283,60 +327,26 @@
         </div>
       </section>
 
-      <!-- 9개 트랙 탭 -->
-      <nav class="tabs-nav" aria-label="메인 메뉴">
-        <button type="button" class="tab-btn active" data-tab="missions" onclick="switchTab('missions')">
-          트랙·할일 <span class="tab-count num" id="tabCountMissions">0</span>
-        </button>
-        <button type="button" class="tab-btn" data-tab="career" onclick="switchTab('career')">
-          정규직 <span class="tab-count num" id="tabCountCareer">0</span>
-        </button>
-        <button type="button" class="tab-btn" data-tab="alba" onclick="switchTab('alba')">
-          알바 <span class="tab-count num" id="tabCountAlba">0</span>
-        </button>
-        <button type="button" class="tab-btn" data-tab="freelance" onclick="switchTab('freelance')">
-          외주 <span class="tab-count num" id="tabCountFreelance">0</span>
-        </button>
-        <button type="button" class="tab-btn" data-tab="contests" onclick="switchTab('contests')">
-          공모 <span class="tab-count num" id="tabCountContests">0</span>
-        </button>
-        <button type="button" class="tab-btn" data-tab="saved" onclick="switchTab('saved')">
-          관심 <span class="tab-count num" id="tabCountSaved">0</span>
-        </button>
-        <button type="button" class="tab-btn" data-tab="career_analysis" onclick="switchTab('career_analysis')">
-          직군분석
-        </button>
-        <button type="button" class="tab-btn" data-tab="analytics" onclick="switchTab('analytics')">
-          이력서
-        </button>
-        <button type="button" class="tab-btn" data-tab="radar" onclick="switchTab('radar')">
-          사이트 <span class="tab-count num" id="tabCountRadar">0</span>
-        </button>
-        <button type="button" class="tab-btn" data-tab="life_hub" onclick="switchTab('life_hub')">
-          일정·프로젝트
-        </button>
-      </nav>
-
       <!-- 컨텐츠 영역 -->
       <section id="tabContentArea"></section>
     </main>
+  </div>
+  </div> <!-- /#workspaceSplit -->
 
-    <!-- 3) Dooray 일정·업무 생성/수정 모달 (본 앱 내부 전용) -->
-    <div class="modal-backdrop" id="doorayModal" onclick="if(event.target===this) closeDoorayModal()">
-      <div class="modal-content confirm-box" role="dialog" aria-modal="true" aria-labelledby="doorayModalTitle">
-        <div class="modal-header">
-          <h3 id="doorayModalTitle" style="font-size:15px;font-weight:600;">Dooray 등록</h3>
-          <button type="button" class="btn btn-outline btn-sm" onclick="closeDoorayModal()">닫기</button>
-        </div>
-        <div class="modal-body" id="doorayModalBody"></div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline btn-sm" onclick="closeDoorayModal()">취소</button>
-          <button type="button" class="btn btn-primary btn-sm" id="doorayModalSubmitBtn">저장</button>
-        </div>
+  <!-- 3) Dooray 일정·업무 생성/수정 모달 (전역 오버레이: 45% 패널 갇힘 방지) -->
+  <div class="modal-backdrop" id="doorayModal" onclick="if(event.target===this) closeDoorayModal()">
+    <div class="modal-content confirm-box" role="dialog" aria-modal="true" aria-labelledby="doorayModalTitle">
+      <div class="modal-header">
+        <h3 id="doorayModalTitle" style="font-size:15px;font-weight:600;">Dooray 등록</h3>
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeDoorayModal()">닫기</button>
+      </div>
+      <div class="modal-body" id="doorayModalBody"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeDoorayModal()">취소</button>
+        <button type="button" class="btn btn-primary btn-sm" id="doorayModalSubmitBtn">저장</button>
       </div>
     </div>
   </div>
-  </div> <!-- /#workspaceSplit -->
 
   <!-- 선택된 공고 일괄 처리 플로팅 바 -->
   <div class="batch-floating-bar" id="batchFloatingBar" aria-live="polite">
@@ -400,7 +410,7 @@
 
   <script src="data/db_seed.js"></script>
   <script src="data/ai_career_seed.js"></script>
-  <script src="app.js?v=mars2"></script>
-  <script type="module" src="mars_diorama.js?v=mars2"></script>
+  <script src="app.js?v=mars3"></script>
+  <script type="module" src="mars_diorama.js?v=mars3"></script>
 </body>
 </html>
