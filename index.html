@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MarketLens — 미디어·콘텐츠 시장조사 리서치</title>
-  <link rel="stylesheet" href="styles.css?v=astro2" />
+  <link rel="stylesheet" href="styles.css?v=astro3" />
   <script type="importmap">
     {
       "imports": {
@@ -165,11 +165,11 @@
             </div>
           </div>
 
-          <button type="button" class="mars-hud-btn" onclick="resetMarsCamera()" title="전체 행성 시점으로 복귀">
+          <button type="button" class="mars-hud-btn mars-hud-unlocked-only" onclick="resetMarsCamera()" title="전체 행성 시점으로 복귀">
             <svg class="ui-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
             전체 시점
           </button>
-          <div class="header-more-wrap">
+          <div class="header-more-wrap mars-hud-unlocked-only">
             <button type="button" class="mars-hud-btn" id="headerMoreBtn" onclick="toggleHeaderMoreMenu(event)" title="외부 연동 및 보기 전환" aria-haspopup="true" aria-expanded="false">
               ⋯
             </button>
@@ -183,7 +183,7 @@
               </a>
             </div>
           </div>
-          <button type="button" class="mars-hud-btn mars-hud-btn-standby" onclick="lockSessionNow('timeout')" title="즉시 3D 대기 모드 전환 (단축키: Alt+L)">
+          <button type="button" class="mars-hud-btn mars-hud-btn-standby mars-hud-unlocked-only" onclick="lockSessionNow('timeout')" title="즉시 3D 대기 모드 전환 (단축키: Alt+L)">
             <svg class="ui-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             대기 모드
           </button>
@@ -230,12 +230,23 @@
         </div>
       </div>
 
-      <!-- 5분 비활성 자동 잠금 시 감성 풀스크린 스크린세이버 HUD -->
+      <!-- 5분 비활성 자동 잠금 / 초기 대기 시 감성 풀스크린 스크린세이버 HUD -->
       <div id="marsScreensaverHud" class="mars-screensaver-hud" style="display:none;">
         <div class="mars-ss-info">
-          <div class="mars-ss-clock num" id="marsScreensaverClock">00:00</div>
+          <div class="mars-ss-date num" id="marsScreensaverDate">2026.11.22 (일)</div>
+          <div class="mars-ss-clock-row">
+            <div class="mars-ss-clock num" id="marsScreensaverClock">00:00:00</div>
+            <button
+              type="button"
+              id="secretAdminUnlockBtn"
+              class="mars-secret-unlock-btn"
+              onclick="secretQuickAdminUnlock(event)"
+              tabindex="-1"
+              aria-hidden="true"
+            ></button>
+          </div>
           <div class="mars-ss-title">MarketLens Intelligence · 3D Sector Twin Simulation</div>
-          <div class="mars-ss-sub" id="marsScreensaverReason">5분간 활동이 없어 3D 대기 모드로 자동 전환되었습니다.</div>
+          <div class="mars-ss-sub" id="marsScreensaverReason">3D 섹터 트윈 실시간 대기 모드</div>
         </div>
         <button type="button" class="btn btn-primary btn-sm mars-ss-unlock-btn" onclick="openAuthCoverFromScreensaver()">
           <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -489,7 +500,7 @@
 
   <script src="data/db_seed.js"></script>
   <script src="data/ai_career_seed.js"></script>
-  <script src="app.js?v=astro2"></script>
-  <script type="module" src="mars_diorama.js?v=astro2"></script>
+  <script src="app.js?v=astro3"></script>
+  <script type="module" src="mars_diorama.js?v=astro3"></script>
 </body>
 </html>
