@@ -4,9 +4,25 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MarketLens — 미디어·콘텐츠 시장조사 리서치</title>
-  <link rel="stylesheet" href="styles.css?v=cosmos8" />
+  <link rel="stylesheet" href="styles.css?v=mars2" />
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.3.1",
+        "react/": "https://esm.sh/react@18.3.1/",
+        "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+        "react-dom": "https://esm.sh/react-dom@18.3.1",
+        "react-dom/": "https://esm.sh/react-dom@18.3.1/",
+        "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+        "three": "https://esm.sh/three@0.169.0",
+        "three/": "https://esm.sh/three@0.169.0/",
+        "@react-three/fiber": "https://esm.sh/@react-three/fiber@8.17.10?external=react,react-dom,three",
+        "@react-three/drei": "https://esm.sh/@react-three/drei@9.114.3?external=react,react-dom,three,@react-three/fiber"
+      }
+    }
+  </script>
 </head>
-<body>
+<body class="mars-layout-mode">
   <canvas id="cosmosCanvas" aria-hidden="true"></canvas>
 
   <!-- 시장조사 앱 위장 표지 및 ID/PW 인증 게이트 (5분 미사용 시 자동 복귀) -->
@@ -14,13 +30,13 @@
     <div class="cover-card">
       <div class="cover-top-badge">
         <span class="cover-dot"></span>
-        <span>MARKET RESEARCH WORKSPACE · v2.4</span>
+        <span>MARKET RESEARCH WORKSPACE · v2.4 · 3D TWIN</span>
       </div>
       <div class="cover-brand">
         <div class="cover-logo" aria-hidden="true">ML</div>
         <div>
           <h1 class="cover-title">MarketLens Intelligence</h1>
-          <p class="cover-subtitle">미디어 · 커머스 · 콘텐츠 산업 시장 동향 및 채널 트렌드 분석 플랫폼</p>
+          <p class="cover-subtitle">미디어 · 커머스 · 콘텐츠 산업 시장 동향 및 3D 섹터 트윈 시뮬레이션 플랫폼</p>
         </div>
       </div>
 
@@ -30,8 +46,8 @@
           <div class="cover-metric-label">모니터링 채널</div>
         </div>
         <div class="cover-metric-tile">
-          <div class="cover-metric-num num">AI</div>
-          <div class="cover-metric-label">섹터 트렌드 진단</div>
+          <div class="cover-metric-num num">3D</div>
+          <div class="cover-metric-label">섹터 트윈 엔진</div>
         </div>
         <div class="cover-metric-tile">
           <div class="cover-metric-num num">5m</div>
@@ -55,14 +71,80 @@
             <svg class="ui-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             리서치 워크스페이스 입장
           </button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="enterMarsScreensaverFromCover()" title="로그인 카드 숨기고 3D 스크린세이버 감상">
+            3D 대기 화면 보기
+          </button>
         </div>
       </form>
 
       <p class="cover-footnote">
-        승인된 리서처 계정 전용 · 5분 미사용 시 표지 화면으로 자동 전환됩니다.
+        승인된 리서처 계정 전용 · 5분 미사용 시 3D 섹터 트윈 스크린세이버로 자동 전환됩니다.
       </p>
     </div>
   </section>
+
+  <!-- 55% 좌측 3D 화성 기지 뷰포트 + 45% 우측 다크 글래스모피즘 패널 -->
+  <div id="workspaceSplit" class="workspace-split is-locked">
+    <aside id="marsViewportPane" class="mars-viewport-pane" aria-label="3D Sector Twin Simulation">
+      <div id="marsCanvasRoot" class="mars-canvas-root"></div>
+      <div id="marsLoadingBadge" class="mars-loading-badge">3D Sector Twin 초기화 중...</div>
+
+      <!-- 위장 HUD (좌상단) -->
+      <div class="mars-hud-top">
+        <div class="mars-hud-badge">
+          <span class="mars-live-dot"></span>
+          <span class="mars-hud-title">3D Sector Twin Simulation</span>
+          <span class="mars-hud-sep">·</span>
+          <span class="mars-hud-sub num">MARS-04</span>
+        </div>
+        <div class="mars-hud-controls">
+          <button type="button" class="mars-hud-btn" onclick="resetMarsCamera()" title="카메라 시점 초기화">
+            <svg class="ui-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+            시점 초기화
+          </button>
+        </div>
+      </div>
+
+      <!-- 3D 오브젝트 클릭 시 상세 상태 팝업 -->
+      <div id="marsStructurePopup" class="mars-structure-popup" style="display:none;" role="status"></div>
+
+      <!-- 하단 실시간 섹터 텔레메트리 바 -->
+      <div class="mars-hud-bottom" id="marsTelemetryBar">
+        <button type="button" class="mars-tele-pill" data-track="TRK-01" onclick="onMarsStructureSelected('TRK-01')">
+          <span class="mars-tele-dot dot-wind"></span>
+          <span class="mars-tele-name">풍력 · TRK-01</span>
+          <span class="mars-tele-val num" id="marsTeleTrk1">0%</span>
+        </button>
+        <button type="button" class="mars-tele-pill" data-track="TRK-02" onclick="onMarsStructureSelected('TRK-02')">
+          <span class="mars-tele-dot dot-rover"></span>
+          <span class="mars-tele-name">로버 · TRK-02</span>
+          <span class="mars-tele-val num" id="marsTeleTrk2">0%</span>
+        </button>
+        <button type="button" class="mars-tele-pill" data-track="TRK-03" onclick="onMarsStructureSelected('TRK-03')">
+          <span class="mars-tele-dot dot-dome"></span>
+          <span class="mars-tele-name">돔 · TRK-03</span>
+          <span class="mars-tele-val num" id="marsTeleTrk3">0%</span>
+        </button>
+        <button type="button" class="mars-tele-pill" data-track="TRK-04" onclick="onMarsStructureSelected('TRK-04')">
+          <span class="mars-tele-dot dot-hab"></span>
+          <span class="mars-tele-name">거주 · TRK-04</span>
+          <span class="mars-tele-val num" id="marsTeleTrk4">0%</span>
+        </button>
+      </div>
+
+      <!-- 5분 비활성 자동 잠금 시 감성 풀스크린 스크린세이버 HUD -->
+      <div id="marsScreensaverHud" class="mars-screensaver-hud" style="display:none;">
+        <div class="mars-ss-info">
+          <div class="mars-ss-clock num" id="marsScreensaverClock">00:00</div>
+          <div class="mars-ss-title">MarketLens Intelligence · 3D Sector Twin Simulation</div>
+          <div class="mars-ss-sub" id="marsScreensaverReason">5분간 활동이 없어 3D 대기 모드로 자동 전환되었습니다.</div>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm mars-ss-unlock-btn" onclick="openAuthCoverFromScreensaver()">
+          <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          리서처 인증 열기
+        </button>
+      </div>
+    </aside>
 
   <div class="app-shell" id="mainAppShell" style="display:none;">
     <!-- 상단 헤더 -->
@@ -201,9 +283,12 @@
         </div>
       </section>
 
-      <!-- 8개 트랙 탭 -->
+      <!-- 9개 트랙 탭 -->
       <nav class="tabs-nav" aria-label="메인 메뉴">
-        <button type="button" class="tab-btn active" data-tab="career" onclick="switchTab('career')">
+        <button type="button" class="tab-btn active" data-tab="missions" onclick="switchTab('missions')">
+          트랙·할일 <span class="tab-count num" id="tabCountMissions">0</span>
+        </button>
+        <button type="button" class="tab-btn" data-tab="career" onclick="switchTab('career')">
           정규직 <span class="tab-count num" id="tabCountCareer">0</span>
         </button>
         <button type="button" class="tab-btn" data-tab="alba" onclick="switchTab('alba')">
@@ -251,6 +336,7 @@
       </div>
     </div>
   </div>
+  </div> <!-- /#workspaceSplit -->
 
   <!-- 선택된 공고 일괄 처리 플로팅 바 -->
   <div class="batch-floating-bar" id="batchFloatingBar" aria-live="polite">
@@ -314,6 +400,7 @@
 
   <script src="data/db_seed.js"></script>
   <script src="data/ai_career_seed.js"></script>
-  <script src="app.js?v=cosmos8"></script>
+  <script src="app.js?v=mars2"></script>
+  <script type="module" src="mars_diorama.js?v=mars2"></script>
 </body>
 </html>
