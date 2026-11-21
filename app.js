@@ -822,24 +822,25 @@ function initCosmosBackground() {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  const prefersReducedMotion = false;
+  const prefersReducedMotion = Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  canvas.style.opacity = '0.32';
   let width = 0;
   let height = 0;
   let dpr = 1;
   let rafId = null;
   let lastTs = 0;
-  let nextMeteorAt = 300;
+  let nextMeteorAt = 999999;
 
   let targetMouseX = 0;
   let targetMouseY = 0;
   let mouseX = 0;
   let mouseY = 0;
 
-  const starColors = ['#ffffff', '#bae6fd', '#e0e7ff', '#fef3c7'];
+  const starColors = ['#ffffff', '#bae6fd', '#e0e7ff'];
   const layerConfigs = [
-    { count: 140, rMin: 1.0, rMax: 1.7, speed: 0.024, parallax: 14, alphaMin: 0.55, alphaMax: 0.92 },
-    { count: 85, rMin: 1.6, rMax: 2.6, speed: 0.048, parallax: 28, alphaMin: 0.72, alphaMax: 1.00 },
-    { count: 45, rMin: 2.3, rMax: 3.8, speed: 0.082, parallax: 46, alphaMin: 0.85, alphaMax: 1.00 }
+    { count: 42, rMin: 0.8, rMax: 1.4, speed: 0.006, parallax: 8, alphaMin: 0.16, alphaMax: 0.34 },
+    { count: 24, rMin: 1.2, rMax: 1.9, speed: 0.012, parallax: 14, alphaMin: 0.22, alphaMax: 0.42 },
+    { count: 12, rMin: 1.6, rMax: 2.4, speed: 0.020, parallax: 20, alphaMin: 0.28, alphaMax: 0.50 }
   ];
 
   const stars = [];
@@ -862,10 +863,10 @@ function initCosmosBackground() {
   });
 
   const nebulae = [
-    { bx: 0.18, by: 0.22, rScale: 0.58, color: 'rgba(56, 189, 248, 0.34)', dx: 0.10, dy: 0.06, freq: 0.00035, phase: 0.2 },
-    { bx: 0.52, by: 0.48, rScale: 0.62, color: 'rgba(99, 102, 241, 0.30)', dx: 0.08, dy: 0.07, freq: 0.00028, phase: 1.4 },
-    { bx: 0.84, by: 0.26, rScale: 0.52, color: 'rgba(14, 165, 233, 0.36)', dx: 0.11, dy: 0.07, freq: 0.00030, phase: 2.5 },
-    { bx: 0.72, by: 0.82, rScale: 0.56, color: 'rgba(139, 92, 246, 0.26)', dx: 0.09, dy: 0.06, freq: 0.00032, phase: 4.0 }
+    { bx: 0.18, by: 0.22, rScale: 0.58, color: 'rgba(56, 189, 248, 0.14)', dx: 0.04, dy: 0.03, freq: 0.00012, phase: 0.2 },
+    { bx: 0.52, by: 0.48, rScale: 0.62, color: 'rgba(94, 92, 230, 0.14)', dx: 0.03, dy: 0.03, freq: 0.00010, phase: 1.4 },
+    { bx: 0.84, by: 0.26, rScale: 0.52, color: 'rgba(10, 132, 255, 0.14)', dx: 0.04, dy: 0.03, freq: 0.00011, phase: 2.5 },
+    { bx: 0.72, by: 0.82, rScale: 0.56, color: 'rgba(48, 209, 88, 0.08)', dx: 0.03, dy: 0.02, freq: 0.00012, phase: 4.0 }
   ];
 
   const meteors = [];
@@ -1696,11 +1697,20 @@ function updateSelectionUI() {
   if (fBar) fBar.classList.toggle('visible', count > 0);
 }
 
+function updateContextChromeVisibility(tabName = currentTab) {
+  const isJobListTab = ['career', 'alba', 'freelance', 'contests', 'saved'].includes(tabName);
+  const toolbar = document.querySelector('.toolbar');
+  const kpiGrid = document.querySelector('.kpi-grid');
+  if (toolbar) toolbar.style.display = isJobListTab ? '' : 'none';
+  if (kpiGrid) kpiGrid.style.display = tabName === 'life_hub' ? 'none' : '';
+}
+
 function switchTab(tabName) {
   currentTab = tabName;
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tabName);
   });
+  updateContextChromeVisibility(tabName);
   if (tabName === 'life_hub') {
     if (HAS_BACKEND_API && !doorayOverview && !doorayLoading) {
       fetchDoorayOverview(false);
@@ -1890,6 +1900,7 @@ function renderUrgencyBadge(sched) {
 }
 
 function renderActiveTab() {
+  updateContextChromeVisibility(currentTab);
   const area = document.getElementById('tabContentArea');
   if (!area) return;
 
