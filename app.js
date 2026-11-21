@@ -1363,12 +1363,21 @@ function lockSessionNow(reason = 'manual') {
   }
 
   document.title = COVER_DISGUISE_TITLE;
-  if (reason === 'timeout') {
-    // 5분 비활성 자동 잠금: 우측 패널 페이드아웃 후 3D 화성 기지 풀스크린 스크린세이버로 전환
+  if (reason === 'timeout' || reason === 'initial') {
+    // 초기 접속 및 5분 비활성 자동 잠금: 3D 화성 기지 풀스크린 대기 모드 (BGM 제어 + 시계 옆 비밀 관리자 버튼)
     if (cover) cover.style.display = 'none';
     if (ssHud) ssHud.style.display = 'flex';
-    if (ssReason) ssReason.textContent = '5분간 활동이 없어 3D 섹터 트윈 대기 모드로 자동 전환되었습니다.';
-    setCoverLockReason('보안을 위해 5분간 활동이 없어 자동 잠금되었습니다. 다시 로그인해 주세요.');
+    if (ssReason) {
+      ssReason.textContent =
+        reason === 'timeout'
+          ? '5분간 활동이 없어 3D 섹터 트윈 대기 모드로 자동 전환되었습니다.'
+          : 'MarketLens 3D 섹터 트윈 실시간 대기 화면';
+    }
+    if (reason === 'timeout') {
+      setCoverLockReason('보안을 위해 5분간 활동이 없어 자동 잠금되었습니다. 다시 로그인해 주세요.');
+    } else {
+      setCoverLockReason('');
+    }
   } else if (reason === 'manual') {
     if (ssHud) ssHud.style.display = 'none';
     if (cover) cover.style.display = 'flex';
@@ -4778,7 +4787,7 @@ function setMarsScreensaverMode(active) {
   if (active) {
     updateMarsScreensaverClock();
     if (!marsScreensaverClockTimer) {
-      marsScreensaverClockTimer = setInterval(updateMarsScreensaverClock, 15000);
+      marsScreensaverClockTimer = setInterval(updateMarsScreensaverClock, 1000);
     }
   } else if (marsScreensaverClockTimer) {
     clearInterval(marsScreensaverClockTimer);
@@ -4787,12 +4796,29 @@ function setMarsScreensaverMode(active) {
 }
 
 function updateMarsScreensaverClock() {
-  const el = document.getElementById('marsScreensaverClock');
-  if (!el) return;
+  const clockEl = document.getElementById('marsScreensaverClock');
+  const dateEl = document.getElementById('marsScreensaverDate');
   const now = new Date();
-  const hh = String(now.getHours()).padStart(2, '0');
-  const mm = String(now.getMinutes()).padStart(2, '0');
-  el.textContent = `${hh}:${mm}`;
+  const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+  if (dateEl) {
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const day = weekdays[now.getDay()];
+    dateEl.textContent = `${yyyy}.${mm}.${dd} (${day})`;
+  }
+  if (clockEl) {
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mi = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    clockEl.textContent = `${hh}:${mi}:${ss}`;
+  }
+}
+
+function secretQuickAdminUnlock(event) {
+  if (event) event.stopPropagation();
+  if (typeof playAstroSfx === 'function') playAstroSfx('station');
+  unlockAppSession('andymun');
 }
 
 function resetMarsCamera() {
