@@ -2126,77 +2126,75 @@ body.mars-layout-mode .cover-screen {
   color: #ffb340;
 }
 
-/* 3D Structure Click Detail Popup */
+/* 3D Structure Click Compact Telemetry Badge (Pure Disguised HUD) */
 .mars-structure-popup {
   position: absolute;
   left: 20px;
-  bottom: 66px;
-  width: min(330px, calc(100% - 40px));
-  padding: 15px 16px;
-  border-radius: 16px;
-  background: rgba(16, 20, 30, 0.84);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  bottom: 64px;
+  max-width: calc(100% - 40px);
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: rgba(14, 18, 28, 0.86);
+  backdrop-filter: blur(20px) saturate(170%);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
   border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.52);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.48);
   z-index: 26;
-  animation: marsPopupIn 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: marsPopupIn 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@keyframes marsPopupIn {
-  from { opacity: 0; transform: translateY(10px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.mars-popup-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+.mars-popup-compact {
+  display: inline-flex;
+  align-items: center;
   gap: 10px;
-  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--text-sub);
+  white-space: nowrap;
 }
 
-.mars-popup-title {
-  font-size: 14px;
+.mars-popup-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mars-popup-code {
   font-weight: 600;
   color: #ffffff;
-}
-
-.mars-popup-sub {
-  font-size: 11.5px;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-
-.mars-popup-close {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: var(--text-sub);
-  border-radius: 8px;
-  padding: 3px 8px;
-  font-size: 11px;
-  cursor: pointer;
-}
-
-.mars-popup-bar-bg {
-  width: 100%;
-  height: 7px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.09);
-  overflow: hidden;
-  margin: 8px 0 10px;
-}
-
-.mars-popup-bar-fill {
-  height: 100%;
-  border-radius: 999px;
-  transition: width 0.35s ease;
+  letter-spacing: 0.02em;
 }
 
 .mars-popup-metric {
-  font-size: 12px;
+  font-size: 11.5px;
+  color: rgba(245, 245, 247, 0.78);
+}
+
+.mars-popup-close {
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   color: var(--text-sub);
-  line-height: 1.45;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  margin-left: 2px;
+}
+
+.mars-popup-close:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+.mars-hud-btn-standby {
+  border-color: rgba(255, 159, 10, 0.34);
+  color: #ffd180;
+}
+
+.mars-hud-btn-standby:hover {
+  border-color: rgba(255, 159, 10, 0.65);
+  background: rgba(255, 159, 10, 0.18);
+  color: #ffffff;
 }
 
 /* Fullscreen Screensaver Standby HUD */
@@ -2276,9 +2274,115 @@ body.mars-layout-mode .app-shell {
   pointer-events: none;
 }
 
+@keyframes marsPopupIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 body.mars-layout-mode .top-header {
-  padding: 12px 18px;
+  padding: 10px 18px;
   flex-shrink: 0;
+  position: relative;
+  z-index: 32;
+}
+
+body.mars-layout-mode .header-inner {
+  flex-wrap: nowrap;
+  gap: 10px;
+}
+
+body.mars-layout-mode .header-actions {
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+.header-more-wrap {
+  position: relative;
+}
+
+.header-more-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 168px;
+  padding: 6px;
+  border-radius: 12px;
+  background: rgba(18, 22, 34, 0.94);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.56);
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 60;
+}
+
+.header-more-menu.open {
+  display: flex;
+}
+
+.header-more-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--text-sub);
+  text-decoration: none;
+  font-size: 12.5px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.header-more-item:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: #ffffff;
+}
+
+.btn-lock-accent {
+  background: rgba(255, 159, 10, 0.14);
+  border-color: rgba(255, 159, 10, 0.34);
+  color: #ffd180;
+}
+
+.btn-lock-accent:hover {
+  background: rgba(255, 159, 10, 0.24);
+  border-color: rgba(255, 159, 10, 0.58);
+  color: #ffffff;
+}
+
+/* Sticky Tab Bar Directly Under Header */
+.tabs-sticky-bar {
+  position: relative;
+  flex-shrink: 0;
+  padding: 8px 18px;
+  background: rgba(16, 20, 30, 0.78);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+  z-index: 28;
+}
+
+.tabs-sticky-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 34px;
+  background: linear-gradient(90deg, transparent, rgba(16, 20, 30, 0.94));
+  pointer-events: none;
+}
+
+body.mars-layout-mode .tabs-nav {
+  margin: 0;
+  padding: 0 20px 2px 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 6px;
+  scrollbar-width: none;
+}
+
+body.mars-layout-mode .tabs-nav::-webkit-scrollbar {
+  display: none;
 }
 
 body.mars-layout-mode .container {
@@ -2288,6 +2392,18 @@ body.mars-layout-mode .container {
   padding: 14px 18px 80px;
   max-width: none;
   width: 100%;
+}
+
+/* Prevent toast from overlapping right-panel delete (x) buttons */
+body.mars-layout-mode .toast {
+  left: 27.5vw;
+  right: auto;
+  bottom: 68px;
+  transform: translateX(-50%) translateY(14px);
+}
+
+body.mars-layout-mode .toast.show {
+  transform: translateX(-50%) translateY(0);
 }
 
 /* Compact Right-Panel Adaptations */
@@ -2412,19 +2528,28 @@ body.mars-layout-mode .tab-btn {
 
 .mission-add-bar {
   display: flex;
+  align-items: center;
   gap: 8px;
   margin-bottom: 14px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .mission-add-bar select {
-  width: 136px;
+  width: 122px;
+  height: 38px;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .mission-add-bar input {
   flex: 1;
-  min-width: 150px;
+  height: 38px;
+  min-width: 120px;
+}
+
+.mission-add-bar button {
+  height: 38px;
+  flex-shrink: 0;
 }
 
 .mission-list {
@@ -2449,13 +2574,16 @@ body.mars-layout-mode .tab-btn {
   border-color: rgba(255, 255, 255, 0.2);
 }
 
+/* WCAG AA contrast preserved on completed tasks (no double opacity dimming) */
 .mission-item.done {
-  opacity: 0.66;
+  background: rgba(28, 34, 48, 0.38);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .mission-item.done .mission-item-title {
   text-decoration: line-through;
-  color: var(--text-muted);
+  text-decoration-color: rgba(245, 245, 247, 0.36);
+  color: rgba(245, 245, 247, 0.62);
 }
 
 .mission-check {
@@ -2546,5 +2674,33 @@ body.mars-layout-mode .tab-btn {
     min-height: 56vh;
     border-left: none;
     border-top: 1px solid rgba(255, 255, 255, 0.14);
+  }
+  .mars-structure-popup {
+    display: none !important;
+  }
+  .mars-hud-bottom {
+    left: 12px;
+    right: 12px;
+    bottom: 10px;
+    gap: 6px;
+  }
+  .mars-tele-pill {
+    padding: 5px 9px;
+    font-size: 11px;
+  }
+  body.mars-layout-mode .toast {
+    left: 50%;
+    bottom: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mars-viewport-pane,
+  body.mars-layout-mode .app-shell,
+  .mars-live-dot,
+  .mars-structure-popup,
+  .mars-screensaver-hud {
+    animation: none !important;
+    transition: none !important;
   }
 }
